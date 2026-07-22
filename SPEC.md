@@ -79,6 +79,12 @@ Chat, multi-tenant accounts beyond stream keys, DASH (HLS only), transcoding GPU
 
 Docker Compose stack, deployed on a remote Ubuntu box (Tailscale hostname `aayush-internserver.hs.aayushpathak.com`, reachable at `100.64.0.9`), not on any contributor's laptop. Deploy flow (no CI yet): sync files over with `tar czf - <paths> | ssh kubernetes-server "cd ~/streaming-project && tar xzf -"`, then `docker compose up -d --build <service>` on the box. Schema changes to the already-running Postgres are applied by hand via `docker compose exec postgres psql` (`postgres/init.sql` only auto-runs on a fresh volume). Confirmed: Kubernetes is **not** installed on that box yet, despite the name — Phase 2 hasn't started.
 
+**Pending manual step**: the `web` service now reads `RTMP_PUBLIC_URL` (added alongside `MINIO_PUBLIC_URL`'s existing pattern, to fix the streamer-facing RTMP URL that was previously hardcoded to `localhost`, which only ever resolves to whatever machine OBS itself is running on). The code is deployed, but `.env` on the box is untracked/gitignored, so it needs this line added by hand before the next `docker compose up -d --build web`:
+```
+RTMP_PUBLIC_URL=rtmp://aayush-internserver.hs.aayushpathak.com:1935
+```
+Without it, `web` will fail to start (`os.environ["RTMP_PUBLIC_URL"]` KeyError).
+
 ## Next steps
 
 Roughly in order:
