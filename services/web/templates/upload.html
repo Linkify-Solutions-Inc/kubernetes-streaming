@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Upload a video</title>
+</head>
+<body>
+  <p><a href="/">&larr; back</a></p>
+  <h1>Upload a video</h1>
+
+  {% if result %}
+    <p>Uploaded: <strong>{{ result.title }}</strong> (status: {{ result.status }})</p>
+  {% else %}
+    <form method="post" action="/upload" enctype="multipart/form-data">
+      <label>Stream key: <input type="text" name="stream_key" required></label><br>
+      <label>Title: <input type="text" name="title" required></label><br>
+      <label>File: <input type="file" name="file" required></label><br>
+      <button type="submit">Upload</button>
+    </form>
+  {% endif %}
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Watch</title>
+</head>
+<body>
+  <p><a href="/">&larr; back</a></p>
+
+  <video id="player" controls autoplay muted style="width: 100%; max-width: 960px; background: #000"></video>
+  <p id="status"></p>
+
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
+  <script>
+    const video = document.getElementById("player");
+    const statusEl = document.getElementById("status");
+    const src = "{{ manifest_url }}";
+
+    if (video.canPlayType("application/vnd.apple.mpegurl")) {
+      // Safari has native HLS support — no hls.js needed.
+      video.src = src;
+    } else if (window.Hls && Hls.isSupported()) {
+      const hls = new Hls();
+      hls.loadSource(src);
+      hls.attachMedia(video);
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data.fatal) {
+          statusEl.textContent = "Playback error (" + data.details + ") — if this is a fresh upload/stream, the first segment may not be ready yet; try reloading in a few seconds.";
+        }
+      });
+    } else {
+      statusEl.textContent = "This browser can't play HLS.";
+    }
+  </script>
+
+  <p><small>Manifest: <code>{{ manifest_url }}</code></small></p>
+  <p><small>This view was recorded through the real pipeline: web &rarr; upload-api &rarr; Kafka (<code>viewer.analytics</code>) &rarr; analytics-worker &rarr; Postgres.</small></p>
+</body>
+</html>

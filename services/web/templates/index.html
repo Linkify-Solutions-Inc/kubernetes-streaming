@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Streaming Platform</title>
+</head>
+<body>
+  <h1>Streaming platform — Phase 1 scaffold</h1>
+  <p><a href="/streamers/new">Get a stream key</a> · <a href="/upload">Upload a video</a></p>
+
+  <h2>Live now</h2>
+  <ul>
+    {% for s in streams %}
+      <li>{{ s.display_name }} — live since {{ s.started_at }} — {{ s.view_count }} view{{ "s" if s.view_count != 1 }}
+        — <a href="/watch/stream/{{ s.id }}">Watch</a></li>
+    {% else %}
+      <li>(nobody is live)</li>
+    {% endfor %}
+  </ul>
+
+  <h2>Videos</h2>
+  <ul>
+    {% for v in videos %}
+      <li>{{ v.title }} by {{ v.display_name }} — {{ v.status }} — {{ v.view_count }} view{{ "s" if v.view_count != 1 }}
+        {% if v.status == "ready" %} — <a href="/watch/video/{{ v.id }}">Watch</a>{% endif %}</li>
+    {% else %}
+      <li>(no videos uploaded yet)</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>

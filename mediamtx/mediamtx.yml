@@ -1,0 +1,31 @@
+# Minimal MediaMTX config for Phase 1.
+# RTMP ingest only for now (HLS/WebRTC/SRT can be added later, JIT).
+
+rtmpAddress: :1935
+
+# Real stream-key auth: MediaMTX calls this URL with a JSON POST before
+# accepting a publish (fields confirmed against MediaMTX's own source:
+# ip/user/password/token/action/path/protocol/id/query/userAgent). 2xx
+# accepts, anything else rejects. This is the actual gate — runOnReady
+# below only fires *after* a stream is already accepted.
+authMethod: http
+authHTTPAddress: http://ingest-webhook:8000/hooks/auth
+
+# No shell in the plain mediamtx image — this config only works with the
+# bluenviron/mediamtx:*-ffmpeg tag, which is Alpine-based and has wget/sh.
+#
+# Note: MediaMTX's hook is called runOnReady/runOnNotReady (fires when a
+# stream becomes readable, i.e. right after publish, and when it stops being
+# readable) — there is no runOnPublish/runOnUnpublish field, despite that
+# being a common assumption from other RTMP servers' naming. Confirmed
+# against this image's own default config.
+paths:
+  all_others:
+    runOnReady: >
+      wget -q -O /dev/null
+      --post-data="path=$MTX_PATH"
+      http://ingest-webhook:8000/hooks/publish
+    runOnNotReady: >
+      wget -q -O /dev/null
+      --post-data="path=$MTX_PATH"
+      http://ingest-webhook:8000/hooks/unpublish
