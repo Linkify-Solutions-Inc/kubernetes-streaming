@@ -164,6 +164,12 @@ services:
       # isn't reachable from outside the compose network) — see
       # dev_server_access memory for why this is the Tailscale MagicDNS name.
       MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL}
+      # Same reasoning as MINIO_PUBLIC_URL, but for the RTMP address shown to
+      # streamers: OBS runs on the streamer's own machine, so "localhost"
+      # would point at their machine, not this server. Needs to be the
+      # Tailscale MagicDNS hostname (or public host in prod), e.g.
+      # rtmp://aayush-internserver.hs.aayushpathak.com:1935
+      RTMP_PUBLIC_URL: ${RTMP_PUBLIC_URL}
     depends_on:
       - upload-api
     ports:

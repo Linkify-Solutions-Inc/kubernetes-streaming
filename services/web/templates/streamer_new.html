@@ -11,7 +11,7 @@
   {% if result %}
     <p><strong>{{ result.display_name }}</strong> — save this, it's shown once:</p>
     <pre>stream key: {{ result.stream_key }}
-RTMP URL:  rtmp://localhost:1935/{{ result.stream_key }}</pre>
+RTMP URL:  {{ rtmp_url }}</pre>
   {% else %}
     <form method="post" action="/streamers/new">
       <label>Display name: <input type="text" name="display_name" required></label>

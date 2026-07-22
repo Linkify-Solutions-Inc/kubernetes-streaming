@@ -547,6 +547,10 @@ footer p{ color:var(--ink-faint); font-size:0.85rem; font-family:var(--mono); }
       <span class="lbl">Why partitions matter later</span>
       <p>Every topic is keyed by stream/video ID, which guarantees all events for the <em>same</em> stream stay in order even across multiple partitions. Right now each topic has a placeholder of 3 partitions (not sized for real load yet), but this is exactly the knob that lets Kafka spread work across many consumer instances later, which is the same mechanism Kubernetes autoscaling will hook into (more on that below).</p>
     </div>
+    <div class="callout warn" style="margin-top:20px;">
+      <span class="lbl">Doesn't Kafka carry the video itself, like at Hotstar or JioTV?</span>
+      <p>No, and it doesn't there either. Kafka only ever carries small notes about what happened, never the actual video bytes. Large platforms that lean on Kafka heavily (Hotstar's own engineering writeups about scaling past 25 million concurrent viewers are well known) use it for exactly the same role as here: backend event coordination and analytics/telemetry, not video delivery. The video itself still goes out as HLS/DASH over plain HTTP from object storage and a CDN, the same shape this project uses (MinIO/S3 today, CDN explicitly deferred). Kafka's a distributed log built for one or a few consumers reading messages in order; video needs thousands of readers fetching the identical segment at once plus byte-range seeking, which is a caching problem, not a queueing one.</p>
+    </div>
   </div>
 </section>
 

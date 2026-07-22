@@ -9,6 +9,7 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 UPLOAD_API_URL = os.environ["UPLOAD_API_URL"]
 MINIO_PUBLIC_URL = os.environ["MINIO_PUBLIC_URL"]
+RTMP_PUBLIC_URL = os.environ["RTMP_PUBLIC_URL"]
 
 
 @app.get("/health")
@@ -35,8 +36,9 @@ def new_streamer_form(request: Request):
 def new_streamer_submit(request: Request, display_name: str = Form(...)):
     with httpx.Client(base_url=UPLOAD_API_URL) as client:
         result = client.post("/streamers", json={"display_name": display_name}).json()
+    rtmp_url = f"{RTMP_PUBLIC_URL}/{result['stream_key']}"
     return templates.TemplateResponse(
-        "streamer_new.html", {"request": request, "result": result}
+        "streamer_new.html", {"request": request, "result": result, "rtmp_url": rtmp_url}
     )
 
 
