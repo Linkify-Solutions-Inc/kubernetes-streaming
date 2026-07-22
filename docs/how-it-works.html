@@ -1,0 +1,766 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How This Streaming Platform Works: A Field Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Serif:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0f1216;
+  --bg-raised:#171b21;
+  --bg-raised-2:#1d222a;
+  --grid-line:rgba(120,200,215,0.07);
+  --ink:#e9e6dd;
+  --ink-dim:#9aa2ad;
+  --ink-faint:#666e79;
+  --rule:#2a303a;
+  --live:#ff8a3d;
+  --live-dim:#5a3f28;
+  --data:#5ec9d6;
+  --data-dim:#284246;
+  --storage:#8fd17d;
+  --storage-dim:#31402c;
+  --k8s:#5c8dff;
+  --k8s-dim:#26304a;
+  --k8s-bg:#0d1830;
+  --warn:#f2c14e;
+  --mono:'IBM Plex Mono', ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  --serif:'IBM Plex Serif', Georgia, 'Times New Roman', serif;
+  --radius:10px;
+}
+:root[data-theme="light"]{
+  --bg:#f6f4ee;
+  --bg-raised:#ffffff;
+  --bg-raised-2:#f0ede4;
+  --grid-line:rgba(40,110,130,0.08);
+  --ink:#1c1f24;
+  --ink-dim:#4d545e;
+  --ink-faint:#868d97;
+  --rule:#dcd7c9;
+  --live-dim:#ffe2c4;
+  --data-dim:#d7f0f3;
+  --storage-dim:#dcf0d3;
+  --k8s-dim:#dbe6ff;
+  --k8s-bg:#eaf0ff;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#f6f4ee;
+    --bg-raised:#ffffff;
+    --bg-raised-2:#f0ede4;
+    --grid-line:rgba(40,110,130,0.08);
+    --ink:#1c1f24;
+    --ink-dim:#4d545e;
+    --ink-faint:#868d97;
+    --rule:#dcd7c9;
+    --live-dim:#ffe2c4;
+    --data-dim:#d7f0f3;
+    --storage-dim:#dcf0d3;
+    --k8s-dim:#dbe6ff;
+    --k8s-bg:#eaf0ff;
+  }
+}
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/48px 48px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/48px 48px,
+    var(--bg);
+  color:var(--ink);
+  font-family:var(--serif);
+  font-size:17px;
+  line-height:1.6;
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+::selection{ background:var(--live); color:#1a0d02; }
+a{ color:inherit; }
+h1,h2,h3,h4{ font-family:var(--mono); font-weight:600; margin:0; letter-spacing:-0.01em; }
+.mono{ font-family:var(--mono); }
+p{ margin:0 0 1em 0; color:var(--ink); }
+.container{ max-width:1080px; margin:0 auto; padding:0 28px; }
+.dim{ color:var(--ink-dim); }
+
+/* ---------- Nav ---------- */
+nav.topnav{
+  position:sticky; top:0; z-index:50;
+  backdrop-filter:blur(10px);
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  border-bottom:1px solid var(--rule);
+}
+.topnav-inner{
+  max-width:1080px; margin:0 auto; padding:14px 28px;
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+}
+.wordmark{ font-family:var(--mono); font-weight:700; font-size:14px; letter-spacing:0.02em; white-space:nowrap;}
+.wordmark span{ color:var(--live); }
+.navlinks{ display:flex; gap:18px; overflow-x:auto; scrollbar-width:none; }
+.navlinks::-webkit-scrollbar{ display:none; }
+.navlinks a{
+  font-family:var(--mono); font-size:12px; text-transform:uppercase; letter-spacing:0.06em;
+  color:var(--ink-dim); text-decoration:none; white-space:nowrap; padding:4px 0; border-bottom:2px solid transparent;
+}
+.navlinks a:hover{ color:var(--ink); border-color:var(--live); }
+
+/* ---------- Hero ---------- */
+.hero{ padding:88px 0 56px; }
+.eyebrow{
+  display:inline-flex; align-items:center; gap:8px;
+  font-family:var(--mono); font-size:12px; letter-spacing:0.12em; text-transform:uppercase;
+  color:var(--live); border:1px solid var(--live-dim); background:var(--live-dim);
+  padding:6px 12px; border-radius:100px; margin-bottom:28px;
+}
+.eyebrow::before{ content:''; width:6px; height:6px; border-radius:50%; background:var(--live); box-shadow:0 0 8px var(--live); }
+.hero h1{
+  font-size:clamp(2.4rem, 5.5vw, 4.2rem); line-height:1.02; max-width:920px;
+  font-family:var(--serif); font-weight:600; letter-spacing:-0.02em;
+}
+.hero h1 em{ font-style:italic; color:var(--live); }
+.hero .lede{ margin-top:24px; max-width:640px; font-size:1.15rem; color:var(--ink-dim); }
+.hero .lede strong{ color:var(--ink); font-weight:600; }
+
+/* ---------- pipeline strip (hero diagram) ---------- */
+.pipeline-strip{
+  margin-top:56px; display:flex; align-items:center; gap:0; overflow-x:auto; padding-bottom:8px;
+}
+.pipe-node{
+  flex:0 0 auto; display:flex; flex-direction:column; align-items:center; gap:8px; min-width:96px; text-align:center;
+}
+.pipe-badge{
+  width:56px; height:56px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:10px; font-weight:700; letter-spacing:0.02em;
+  border:1.5px solid var(--rule); background:var(--bg-raised); color:var(--ink);
+}
+.pipe-node.live .pipe-badge{ border-color:var(--live); color:var(--live); }
+.pipe-node.data .pipe-badge{ border-color:var(--data); color:var(--data); }
+.pipe-node.storage .pipe-badge{ border-color:var(--storage); color:var(--storage); }
+.pipe-label{ font-family:var(--mono); font-size:11px; color:var(--ink-dim); max-width:100px; }
+.pipe-arrow{ flex:0 0 auto; width:40px; height:1px; background:var(--rule); position:relative; align-self:flex-start; margin-top:28px; }
+.pipe-arrow::after{
+  content:''; position:absolute; right:0; top:-3px; width:0; height:0;
+  border-top:3px solid transparent; border-bottom:3px solid transparent; border-left:6px solid var(--rule);
+}
+
+/* ---------- sections ---------- */
+section{ padding:72px 0; border-top:1px solid var(--rule); }
+section.hero-section{ border-top:none; }
+h2.title{ font-size:clamp(1.6rem, 3.2vw, 2.3rem); font-family:var(--serif); font-weight:600; max-width:760px; text-wrap:balance; }
+.section-intro{ max-width:680px; margin-top:16px; color:var(--ink-dim); font-size:1.05rem; text-wrap:pretty; }
+
+/* ---------- cast cards ---------- */
+.cast-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:16px; margin-top:40px; }
+.card{
+  background:var(--bg-raised); border:1px solid var(--rule); border-radius:var(--radius); padding:22px;
+}
+.card-tag{
+  display:inline-block; font-family:var(--mono); font-size:11px; padding:2px 8px; border-radius:4px;
+  background:var(--bg-raised-2); color:var(--ink-faint); margin-bottom:12px; letter-spacing:0.04em;
+}
+.card h3{ font-family:var(--serif); font-size:1.2rem; font-weight:600; margin-bottom:8px; }
+.card .analogy{ color:var(--ink-dim); font-size:0.98rem; }
+.card details{ margin-top:14px; border-top:1px dashed var(--rule); padding-top:14px; }
+.card summary{
+  font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--data);
+  cursor:pointer; list-style:none; display:inline-flex; align-items:center; gap:6px;
+  background:var(--bg-raised-2); border:1px solid var(--rule); border-radius:100px; padding:5px 12px 5px 10px;
+  transition:border-color 0.15s ease, color 0.15s ease;
+}
+.card summary:hover{ border-color:var(--data); color:var(--data); }
+.card summary::-webkit-details-marker{ display:none; }
+.card summary::before{ content:'▸'; font-size:9px; transition:transform 0.15s ease; }
+.card details[open] summary::before{ content:'▸'; transform:rotate(90deg); }
+.card details p{ margin-top:10px; font-size:0.92rem; color:var(--ink-dim); }
+.card details p.risk{ margin-top:12px; padding-top:12px; border-top:1px dashed var(--rule); }
+.card details p.risk strong{ color:var(--warn); }
+.card details code, p code, li code{
+  font-family:var(--mono); font-size:0.85em; background:var(--bg-raised-2); padding:1px 6px; border-radius:4px; color:var(--data);
+}
+
+/* ---------- timeline / journey steps ---------- */
+.tabs{ display:flex; gap:8px; margin-top:36px; }
+.tab-btn{
+  font-family:var(--mono); font-size:12.5px; text-transform:uppercase; letter-spacing:0.05em;
+  padding:10px 18px; border-radius:100px; border:1px solid var(--rule); background:transparent; color:var(--ink-dim);
+  cursor:pointer;
+}
+.tab-btn[aria-selected="true"]{ background:var(--live-dim); border-color:var(--live); color:var(--live); }
+.journey{ display:none; margin-top:32px; }
+.journey.active{ display:block; }
+.steps{ position:relative; padding-left:36px; }
+.steps::before{ content:''; position:absolute; left:11px; top:8px; bottom:8px; width:2px; background:var(--rule); }
+.step{ position:relative; padding-bottom:34px; }
+.step:last-child{ padding-bottom:0; }
+.step-dot{
+  position:absolute; left:-36px; top:2px; width:24px; height:24px; border-radius:50%;
+  background:var(--bg-raised); border:2px solid var(--live); display:flex; align-items:center; justify-content:center;
+  font-family:var(--mono); font-size:11px; font-weight:700; color:var(--live);
+}
+.step h4{ font-family:var(--serif); font-weight:600; font-size:1.08rem; margin-bottom:6px; }
+.step p{ color:var(--ink-dim); font-size:0.98rem; margin-bottom:6px; }
+.step .who{ font-family:var(--mono); font-size:11px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:0.05em; margin-bottom:8px; }
+
+/* ---------- callouts ---------- */
+.callout{
+  margin:28px 0; padding:20px 22px; border-radius:var(--radius); border:1px solid var(--data-dim);
+  background:color-mix(in srgb, var(--data-dim) 45%, transparent);
+}
+.callout.warn{ border-color:var(--live-dim); background:color-mix(in srgb, var(--live-dim) 35%, transparent); }
+.callout .lbl{ font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--data); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+.callout .lbl::before{ content:''; width:7px; height:7px; border-radius:2px; background:var(--data); flex:none; }
+.callout.warn .lbl{ color:var(--warn); }
+.callout.warn .lbl::before{ background:var(--warn); }
+.callout p:last-child{ margin-bottom:0; }
+
+/* ---------- ABR ladder ---------- */
+.ladder{ margin-top:36px; display:flex; flex-direction:column; gap:10px; max-width:560px; }
+.rung{ display:flex; align-items:center; gap:16px; }
+.rung .bar{ height:34px; border-radius:6px; display:flex; align-items:center; padding-left:14px; font-family:var(--mono); font-size:12px; color:#0f1216; font-weight:700; }
+.rung:nth-child(1) .bar{ width:100%; background:var(--live); }
+.rung:nth-child(2) .bar{ width:74%; background:color-mix(in srgb, var(--live) 70%, var(--warn)); }
+.rung:nth-child(3) .bar{ width:48%; background:var(--warn); }
+.rung .meta{ font-family:var(--mono); font-size:11px; color:var(--ink-faint); white-space:nowrap; }
+
+/* ---------- kafka belts ---------- */
+.belts{ margin-top:36px; display:flex; flex-direction:column; gap:14px; }
+.belt{
+  display:grid; grid-template-columns:180px 1fr; gap:18px; align-items:center;
+  padding:14px 18px; background:var(--bg-raised); border:1px solid var(--rule); border-radius:8px;
+}
+.belt .name{ font-family:var(--mono); font-size:13px; color:var(--data); }
+.belt .desc{ font-size:0.92rem; color:var(--ink-dim); }
+.belt.unused{ opacity:0.55; }
+.belt.unused .name::after{ content:' (reserved, unused)'; color:var(--ink-faint); font-size:10px; }
+
+/* ---------- deployment box (today) ---------- */
+.onebox{
+  margin-top:36px; border:2px dashed var(--rule); border-radius:16px; padding:28px;
+  display:grid; grid-template-columns:repeat(auto-fit, minmax(130px,1fr)); gap:12px;
+}
+.onebox .chip{
+  font-family:var(--mono); font-size:12px; text-align:center; padding:14px 8px; border-radius:8px;
+  background:var(--bg-raised); border:1px solid var(--rule); color:var(--ink-dim);
+}
+.onebox-label{ font-family:var(--mono); font-size:11px; color:var(--ink-faint); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:-6px; }
+
+/* ---------- kubernetes section ---------- */
+section.k8s{
+  background:
+    linear-gradient(var(--grid-line) 1px, transparent 1px) 0 0/48px 48px,
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px) 0 0/48px 48px,
+    var(--k8s-bg);
+  border-top:1px solid var(--k8s-dim); border-bottom:1px solid var(--k8s-dim);
+}
+section.k8s .eyebrow{ border-color:var(--k8s-dim); background:var(--k8s-dim); color:var(--k8s); }
+section.k8s .eyebrow::before{ background:var(--k8s); box-shadow:0 0 8px var(--k8s); }
+
+.map-table{ margin-top:36px; width:100%; border-collapse:collapse; font-size:0.95rem; }
+.map-table th{
+  font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:0.06em; color:var(--ink-faint);
+  text-align:left; padding:10px 14px; border-bottom:1px solid var(--rule);
+}
+.map-table td{ padding:14px; border-bottom:1px solid var(--rule); vertical-align:top; }
+.map-table td.today{ font-family:var(--mono); font-size:13px; color:var(--ink-dim); white-space:nowrap; }
+.map-table td.tomorrow{ font-family:var(--mono); font-size:13px; color:var(--k8s); white-space:nowrap; }
+.map-table td.why{ color:var(--ink-dim); }
+.map-table tr:last-child td{ border-bottom:none; }
+
+.vs-grid{ display:grid; grid-template-columns:1fr auto 1fr; gap:20px; align-items:stretch; margin-top:32px; }
+.vs-card{ background:var(--bg-raised); border:1px solid var(--rule); border-radius:var(--radius); padding:24px; }
+.vs-card .vs-lbl{ font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:14px; display:block; }
+.vs-card.now .vs-lbl{ color:var(--ink-faint); }
+.vs-card.future .vs-lbl{ color:var(--k8s); }
+.vs-card.future{ border-color:var(--k8s-dim); }
+.vs-divider{ display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:12px; color:var(--ink-faint); }
+.vs-card ul{ margin:0; padding-left:18px; color:var(--ink-dim); font-size:0.93rem; }
+.vs-card li{ margin-bottom:8px; }
+@media (max-width:760px){ .vs-grid{ grid-template-columns:1fr; } .vs-divider{ padding:4px 0; } }
+
+.pain-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:14px; margin-top:36px; }
+.pain-card{ background:var(--bg-raised); border:1px solid var(--rule); border-radius:8px; padding:18px; }
+.pain-card .pain{ font-size:0.9rem; color:var(--ink-faint); margin-bottom:8px; }
+.pain-card .fix{ font-family:var(--mono); font-size:13px; color:var(--k8s); font-weight:600; display:flex; align-items:center; gap:8px; }
+.pain-card .fix::before{ content:''; width:7px; height:7px; border-radius:2px; background:var(--k8s); flex:none; }
+.pain-card .fixdesc{ font-size:0.88rem; color:var(--ink-dim); margin-top:6px; }
+
+/* ---------- roadmap timeline ---------- */
+.roadmap{ margin-top:44px; display:grid; grid-template-columns:repeat(3,1fr); gap:0; position:relative; }
+.roadmap::before{ content:''; position:absolute; top:20px; left:8%; right:8%; height:2px; background:var(--rule); }
+.phase{ position:relative; padding:0 16px; }
+.phase-dot{
+  width:14px; height:14px; border-radius:50%; background:var(--bg); border:3px solid var(--ink-faint); margin-bottom:20px; position:relative; z-index:1;
+}
+.phase.active .phase-dot{ border-color:var(--live); background:var(--live); }
+.phase.next .phase-dot{ border-color:var(--k8s); background:var(--k8s); }
+.phase-tag{ font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:0.08em; color:var(--ink-faint); margin-bottom:8px; }
+.phase.active .phase-tag{ color:var(--live); }
+.phase.next .phase-tag{ color:var(--k8s); }
+.phase h4{ font-family:var(--serif); font-size:1.15rem; margin-bottom:10px; }
+.phase ul{ padding-left:16px; margin:0; color:var(--ink-dim); font-size:0.9rem; }
+.phase li{ margin-bottom:6px; }
+@media (max-width:760px){ .roadmap{ grid-template-columns:1fr; gap:36px; } .roadmap::before{ display:none; } }
+
+/* ---------- glossary ---------- */
+.gloss-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(240px,1fr)); gap:2px; margin-top:36px; background:var(--rule); border:1px solid var(--rule); border-radius:8px; overflow:hidden; }
+.gloss-item{ background:var(--bg-raised); padding:18px; }
+.gloss-item dt{ font-family:var(--mono); font-size:12.5px; color:var(--live); margin-bottom:6px; font-weight:600; }
+.gloss-item dd{ margin:0; font-size:0.88rem; color:var(--ink-dim); }
+
+footer{ padding:48px 0 80px; border-top:1px solid var(--rule); }
+footer p{ color:var(--ink-faint); font-size:0.85rem; font-family:var(--mono); }
+
+@media (max-width:640px){
+  .hero{ padding:56px 0 40px; }
+  section{ padding:52px 0; }
+  .navlinks{ display:none; }
+}
+</style>
+</head>
+<body>
+
+<nav class="topnav">
+  <div class="topnav-inner">
+    <div class="wordmark">stream<span>://</span>fieldguide</div>
+    <div class="navlinks">
+      <a href="#cast">Cast</a>
+      <a href="#live-flow">Going Live</a>
+      <a href="#kafka">Kafka</a>
+      <a href="#today">Today</a>
+      <a href="#kubernetes">Kubernetes</a>
+      <a href="#roadmap">Roadmap</a>
+      <a href="#glossary">Glossary</a>
+    </div>
+  </div>
+</nav>
+
+<section class="hero-section">
+  <div class="container hero">
+    <div class="eyebrow">Phase 1 running today &middot; Kubernetes is Phase 2</div>
+    <h1>A home‑grown Twitch, <em>explained in plain English</em>, and where Kubernetes takes it next.</h1>
+    <p class="lede">This repo lets anyone <strong>go live from OBS</strong> or <strong>upload a video file</strong>, and lets anyone else <strong>watch it</strong>, no accounts, just a per‑streamer stream key. Under the hood it's five small Python services stitched together with Kafka, ffmpeg, Postgres and S3‑compatible storage. This guide walks through how a byte of video actually gets from a webcam to a browser, and then goes deep on the part you asked about most: <strong>what Kubernetes changes, and which of its features are the ones that actually help this system scale.</strong></p>
+
+    <div class="pipeline-strip">
+      <div class="pipe-node live"><div class="pipe-badge">OBS</div><div class="pipe-label">Streamer's camera</div></div>
+      <div class="pipe-arrow"></div>
+      <div class="pipe-node live"><div class="pipe-badge">RTMP</div><div class="pipe-label">MediaMTX ingest</div></div>
+      <div class="pipe-arrow"></div>
+      <div class="pipe-node data"><div class="pipe-badge">KAFKA</div><div class="pipe-label">Event backbone</div></div>
+      <div class="pipe-arrow"></div>
+      <div class="pipe-node live"><div class="pipe-badge">FFMPEG</div><div class="pipe-label">ABR transcode</div></div>
+      <div class="pipe-arrow"></div>
+      <div class="pipe-node storage"><div class="pipe-badge">S3</div><div class="pipe-label">HLS storage</div></div>
+      <div class="pipe-arrow"></div>
+      <div class="pipe-node storage"><div class="pipe-badge">WEB</div><div class="pipe-label">Viewer's browser</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="cast">
+  <div class="container">
+    <h2 class="title">Nine moving parts, each with one job</h2>
+    <p class="section-intro">Nothing here is one giant app. It's small single‑purpose services that only know about each other through Kafka messages or a database row. Click any "technical detail" to see what's actually happening in the code.</p>
+
+    <div class="cast-grid">
+      <div class="card">
+        <span class="card-tag">infra</span>
+        <h3>MediaMTX</h3>
+        <p class="analogy">The loading dock. It's the only thing that speaks "RTMP" (the protocol OBS uses to push a live video feed to a server).</p>
+        <details open><summary>Technical detail</summary><p>Runs as its own container, listening on port <code>1935</code>. Before it accepts a publish, it calls out to <code>ingest-webhook</code>'s <code>/hooks/auth</code> over HTTP to check the stream key is real. Once a stream is live/dead, it fires <code>runOnReady</code> / <code>runOnNotReady</code> hooks (not "onPublish", a common but wrong assumption carried over from other RTMP servers).</p><p class="risk"><strong>Without it:</strong> every service that wanted a live video feed would need to implement RTMP's handshake and chunking itself. One dedicated ingest point means nothing else in the system ever has to know RTMP exists.</p></details>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">service</span>
+        <h3>ingest-webhook</h3>
+        <p class="analogy">The bouncer. Checks the stream key is on the list before anyone's allowed to go live, then records that a stream started or ended.</p>
+        <details open><summary>Technical detail</summary><p>FastAPI service. <code>/hooks/auth</code> rejects unknown stream keys with a 401 <em>before</em> MediaMTX accepts the publish. <code>/hooks/publish</code> and <code>/hooks/unpublish</code> fire afterwards: they insert/update a row in the <code>streams</code> table and emit a <code>stream.lifecycle</code> event onto Kafka (<code>started</code> / <code>ended</code>).</p><p class="risk"><strong>Without it:</strong> MediaMTX would accept a publish from anyone who knew the RTMP address, no stream-key check at all, so any anonymous connection could go live under someone else's slot or flood the system with junk streams.</p></details>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">service</span>
+        <h3>upload-api</h3>
+        <p class="analogy">The front desk. Hands out stream keys, lists what's live or uploaded, and takes video files off people's hands.</p>
+        <details open><summary>Technical detail</summary><p>FastAPI service backed by Postgres + MinIO. <code>POST /streamers</code> mints a stream key. <code>POST /videos</code> streams the upload straight into MinIO under <code>raw/&lt;uuid&gt;</code>, writes a <code>videos</code> row, and emits an <code>upload.events</code> message. <code>GET /streams</code> / <code>GET /videos</code> back the homepage.</p><p class="risk"><strong>Without it:</strong> there'd be no single place issuing stream keys or fronting uploads, so every other service would need its own copy of "is this a real streamer" logic, duplicated and easy to get subtly wrong in one of them.</p></details>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">backbone</span>
+        <h3>Kafka</h3>
+        <p class="analogy">The nervous system. Instead of services calling each other directly, they drop a note on a shared board and whoever cares about that kind of note picks it up.</p>
+        <details open><summary>Technical detail</summary><p>Single-broker KRaft-mode cluster (no Zookeeper). Five topics, each partitioned by stream/video ID so events for the same stream stay strictly ordered even as partition count grows. See the dedicated section below.</p><p class="risk"><strong>Without it:</strong> every service would have to call every other one directly, for example <code>ingest-webhook</code> hitting <code>transcode-worker</code>'s API by hand. A slow or crashed <code>transcode-worker</code> would then make <code>ingest-webhook</code> itself hang or fail, instead of the event just waiting safely on a topic until its consumer comes back.</p></details>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">worker</span>
+        <h3>transcode-worker</h3>
+        <p class="analogy">The video processing factory floor. Takes one raw feed in, and produces three quality levels out, using ffmpeg.</p>
+        <details open><summary>Technical detail</summary><p>Consumes <code>stream.lifecycle</code> and <code>upload.events</code> directly (no separate dispatcher stage). For a live stream it launches one long-running <code>ffmpeg</code> subprocess per stream and a background thread that uploads new HLS segments to MinIO every 2 seconds. For an upload it downloads the raw file, runs ffmpeg once, and pushes the finished HLS folder to storage. Currently one process juggles every concurrent stream via Python threads. See the Kubernetes section for why that's the most interesting scaling question in this whole system.</p><p class="risk"><strong>Without it:</strong> a viewer's player switching from 720p to 480p mid-stream would land on a misaligned keyframe boundary (if the renditions weren't produced from one aligned decode), causing a visible stutter or a frozen frame at every quality switch instead of a clean handoff.</p></details>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">storage</span>
+        <h3>MinIO / S3</h3>
+        <p class="analogy">The warehouse. Holds the raw uploaded files and the finished video segments, addressed the exact same way whether it's a laptop or AWS.</p>
+        <details open><summary>Technical detail</summary><p>MinIO in dev speaks the S3 API, so the exact same boto3 client code runs unchanged against real S3 in prod. The <code>media/hls</code> prefix is set public-read so a browser (or VLC) can fetch <code>master.m3u8</code> directly: a deliberate dev-only convenience.</p><p class="risk"><strong>Without it:</strong> video would have to be served by an app server instead of a plain object store, so viewer count would directly load whatever produced the video. A viral stream with ten thousand viewers would mean ten thousand connections into the transcoding process itself, instead of ten thousand cheap, stateless HTTP GETs against storage.</p></details>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">ledger</span>
+        <h3>Postgres</h3>
+        <p class="analogy">The filing cabinet. Who's a streamer, which streams/videos exist, and a raw log of every "watch" click.</p>
+        <details open><summary>Technical detail</summary><p>Four tables: <code>streamers</code>, <code>streams</code>, <code>videos</code>, <code>view_events</code>. View counts aren't a running counter column. They're computed with <code>GROUP BY</code> over the raw event log on every read, so the log stays the single source of truth.</p><p class="risk"><strong>Without it:</strong> there'd be no durable, queryable record of who's a streamer, what's live, or what's been uploaded. And without the raw log specifically (versus a running counter), a crash mid-update could silently under- or over-count views, with no way to recompute the true number afterward.</p></details>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">worker</span>
+        <h3>analytics-worker</h3>
+        <p class="analogy">The counting clerk. Watches for "someone hit play" notes and tallies them into the filing cabinet.</p>
+        <details open><summary>Technical detail</summary><p>Consumes <code>viewer.analytics</code> and inserts a <code>view_events</code> row per view. Also consumes <code>transcode.status</code> but only logs it today: no aggregation needed there yet since <code>transcode-worker</code> already updates <code>videos.status</code> directly.</p><p class="risk"><strong>Without it:</strong> view-recording would have to happen synchronously inside <code>upload-api</code>'s own request handler, so a burst of viewers all clicking play at once would hammer Postgres directly and could slow the page down for everyone. Buffering through Kafka absorbs that burst instead of passing it straight through.</p></details>
+      </div>
+
+      <div class="card">
+        <span class="card-tag">frontend</span>
+        <h3>web</h3>
+        <p class="analogy">The storefront and the TV. Browse what's live or uploaded, get a stream key, upload a file, and actually watch things play.</p>
+        <details open><summary>Technical detail</summary><p>Server-rendered FastAPI + Jinja templates, no SPA framework. <code>/watch/&lt;type&gt;/&lt;id&gt;</code> records a view then plays the MinIO-hosted HLS manifest with <code>hls.js</code> (falling back to native HLS on Safari).</p><p class="risk"><strong>Without it:</strong> viewers would need to hand-construct HLS manifest URLs with no browse or discovery page at all, and non-Safari browsers wouldn't play HLS in the first place without the <code>hls.js</code> shim.</p></details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="live-flow">
+  <div class="container">
+    <h2 class="title">Two journeys: going live, and uploading a file</h2>
+    <p class="section-intro">Same destination (a watchable video), two very different starting points. Toggle between them.</p>
+
+    <div class="tabs" role="tablist">
+      <button class="tab-btn" id="tab-live" role="tab" aria-selected="true" onclick="showJourney('live')">Going Live</button>
+      <button class="tab-btn" id="tab-upload" role="tab" aria-selected="false" onclick="showJourney('upload')">Uploading a Video</button>
+    </div>
+
+    <div class="journey active" id="journey-live">
+      <div class="steps">
+        <div class="step">
+          <div class="step-dot">1</div>
+          <div class="who">Streamer → MediaMTX</div>
+          <h4>OBS pushes an RTMP feed</h4>
+          <p>The streamer points OBS at the server's RTMP address with their private stream key as the "path." MediaMTX receives the connection but doesn't accept it yet.</p>
+        </div>
+        <div class="step">
+          <div class="step-dot">2</div>
+          <div class="who">MediaMTX → ingest-webhook</div>
+          <h4>The bouncer checks the list</h4>
+          <p>Before accepting the publish, MediaMTX calls <code>/hooks/auth</code> with the stream key. If it's not a real streamer's key, the connection is rejected with a 401: this is the actual security gate.</p>
+        </div>
+        <div class="step">
+          <div class="step-dot">3</div>
+          <div class="who">ingest-webhook → Postgres + Kafka</div>
+          <h4>The stream is recorded and announced</h4>
+          <p>A new row lands in <code>streams</code> (status <code>live</code>), and a <code>stream.lifecycle: started</code> event is dropped on Kafka, including the new, public-safe <code>stream_id</code>, never the secret stream key.</p>
+        </div>
+        <div class="step">
+          <div class="step-dot">4</div>
+          <div class="who">transcode-worker</div>
+          <h4>ffmpeg spins up, live</h4>
+          <p>Hearing the "started" event, <code>transcode-worker</code> launches a single ffmpeg process that pulls the RTMP feed and simultaneously encodes it into 1080p / 720p / 480p HLS renditions, uploading new 4‑second segments to storage roughly every 2 seconds.</p>
+        </div>
+        <div class="step">
+          <div class="step-dot">5</div>
+          <div class="who">Viewer → web → MinIO</div>
+          <h4>A viewer hits play</h4>
+          <p>The homepage lists the stream (with a live view count). Clicking it records a view and loads <code>hls.js</code>, pointed straight at the manifest in storage: the browser talks to MinIO/S3 directly, not through any app server.</p>
+        </div>
+        <div class="step">
+          <div class="step-dot">6</div>
+          <div class="who">Streamer stops → ingest-webhook → transcode-worker</div>
+          <h4>Stream ends, cleanly</h4>
+          <p>OBS disconnects, MediaMTX fires <code>runOnNotReady</code>, the stream row flips to <code>ended</code>, an "ended" event goes out, and <code>transcode-worker</code> sends ffmpeg a SIGTERM so it finalizes the HLS playlist properly instead of leaving it dangling.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="journey" id="journey-upload">
+      <div class="steps">
+        <div class="step">
+          <div class="step-dot">1</div>
+          <div class="who">Streamer → web → upload-api</div>
+          <h4>A file is picked and submitted</h4>
+          <p>The streamer fills in their stream key and a title, and picks a video file. The <code>web</code> app forwards this straight through to <code>upload-api</code>.</p>
+        </div>
+        <div class="step">
+          <div class="step-dot">2</div>
+          <div class="who">upload-api → Postgres + MinIO</div>
+          <h4>The raw file is stashed</h4>
+          <p>The stream key is checked against <code>streamers</code>, the raw file is streamed into MinIO at <code>raw/&lt;video_id&gt;.&lt;ext&gt;</code>, and a <code>videos</code> row is created with status <code>uploaded</code>.</p>
+        </div>
+        <div class="step">
+          <div class="step-dot">3</div>
+          <div class="who">upload-api → Kafka</div>
+          <h4>An "uploaded" event goes out</h4>
+          <p>An <code>upload.events</code> message carries the new <code>video_id</code> and its raw storage key: this is the only thing that tells <code>transcode-worker</code> there's work to do.</p>
+        </div>
+        <div class="step">
+          <div class="step-dot">4</div>
+          <div class="who">transcode-worker</div>
+          <h4>ffmpeg transcodes the whole file, once</h4>
+          <p>Unlike live, there's no real-time pressure, so this runs with a slower, higher-quality preset. The video's status moves <code>uploaded → transcoding → ready</code> (or <code>failed</code>), and a <code>transcode.status</code> event is emitted at each step.</p>
+        </div>
+        <div class="step">
+          <div class="step-dot">5</div>
+          <div class="who">Viewer → web → MinIO</div>
+          <h4>Anyone can now watch it on demand</h4>
+          <p>Once <code>ready</code>, the video shows up on the homepage with a view count, and plays through the exact same <code>hls.js</code> player as a live stream. VOD and live share one playback path.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout">
+      <span class="lbl">Why one ffmpeg process, not three?</span>
+      <p>You'd think making three quality levels means running ffmpeg three times. Instead, <strong>one</strong> process decodes the source once and splits it internally into three scaled outputs. That's not just an efficiency trick: HLS's adaptive switching requires every quality level to place its keyframes at <em>exactly</em> the same instants, and the only reliable way to guarantee that is to derive them all from one shared decode/timeline.</p>
+    </div>
+
+    <h3 style="font-family:var(--serif); font-size:1.3rem; margin-top:52px;">One file in, three qualities out</h3>
+    <p class="section-intro" style="margin-top:8px;">This is the "ABR ladder": the same idea as Netflix quietly dropping your picture quality on bad wifi instead of buffering. A viewer's player picks whichever rung fits their connection, and can switch mid-stream.</p>
+    <div class="ladder">
+      <div class="rung"><div class="bar">1080p</div><div class="meta">5.0 Mbps · full detail</div></div>
+      <div class="rung"><div class="bar">720p</div><div class="meta">2.8 Mbps · the safe default</div></div>
+      <div class="rung"><div class="bar">480p</div><div class="meta">1.4 Mbps · shaky connections</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="kafka">
+  <div class="container">
+    <h2 class="title">Kafka: five conveyor belts, not five phone calls</h2>
+    <p class="section-intro">No service calls another service directly to say "hey, a stream just started." Instead, it drops a labeled note on the right belt, and only whoever's watching that belt reacts. That means the person who wrote <code>ingest-webhook</code> never had to know that a transcoder or analytics worker exists. New listeners can be added later without touching it.</p>
+    <div class="belts">
+      <div class="belt"><span class="name">stream.lifecycle</span><span class="desc">"A stream started/ended," written by ingest-webhook, read by transcode-worker.</span></div>
+      <div class="belt"><span class="name">upload.events</span><span class="desc">"A video was uploaded," written by upload-api, read by transcode-worker.</span></div>
+      <div class="belt"><span class="name">transcode.status</span><span class="desc">"A transcode started/finished/failed," written by transcode-worker, read by analytics-worker (logged today, no aggregation yet).</span></div>
+      <div class="belt"><span class="name">viewer.analytics</span><span class="desc">"Someone hit play," written by upload-api's view endpoint, read by analytics-worker, which turns it into a Postgres row.</span></div>
+      <div class="belt unused"><span class="name">transcode.jobs</span><span class="desc">Created for a future dispatcher stage that decouples "event happened" from "here's a transcode job," not needed yet, kept as a placeholder.</span></div>
+    </div>
+    <div class="callout" style="margin-top:32px;">
+      <span class="lbl">Why partitions matter later</span>
+      <p>Every topic is keyed by stream/video ID, which guarantees all events for the <em>same</em> stream stay in order even across multiple partitions. Right now each topic has a placeholder of 3 partitions (not sized for real load yet), but this is exactly the knob that lets Kafka spread work across many consumer instances later, which is the same mechanism Kubernetes autoscaling will hook into (more on that below).</p>
+    </div>
+  </div>
+</section>
+
+<section id="today">
+  <div class="container">
+    <h2 class="title">Where this actually runs today</h2>
+    <p class="section-intro">Every piece above is a separate container, but today they all live on <strong>one Ubuntu box</strong>, wired together with Docker Compose. There's no cluster yet: deploying a change means copying files over with <code>tar | ssh</code> and running <code>docker compose up -d --build</code> by hand.</p>
+    <div class="onebox">
+      <div class="onebox-label" style="grid-column:1/-1;">One physical/virtual machine</div>
+      <div class="chip">postgres</div>
+      <div class="chip">minio</div>
+      <div class="chip">kafka</div>
+      <div class="chip">mediamtx</div>
+      <div class="chip">ingest-webhook</div>
+      <div class="chip">upload-api</div>
+      <div class="chip">transcode-worker</div>
+      <div class="chip">analytics-worker</div>
+      <div class="chip">web</div>
+    </div>
+    <div class="callout warn" style="margin-top:32px;">
+      <span class="lbl">Honestly, the rough edges</span>
+      <p>This box is a single point of failure, schema changes are applied by hand over SSH, and there's no autoscaling: if ten streams go live at once, they all fight for the CPU of one machine and one <code>transcode-worker</code> process. That's precisely the set of problems Kubernetes is being brought in to solve, not novelty for its own sake.</p>
+    </div>
+  </div>
+</section>
+
+<section class="k8s" id="kubernetes">
+  <div class="container">
+    <div class="eyebrow">Phase 2 · not yet built</div>
+    <h2 class="title">What Kubernetes actually buys this system</h2>
+    <p class="section-intro">Kubernetes isn't "Docker Compose but fancier." It's a control loop that constantly watches a fleet of machines and asks: <em>is reality matching what I was told to run?</em> If a container dies, it restarts it. If a machine disappears, it reschedules its work elsewhere. If you say "I want 5 copies of this," it makes sure there are always 5, no human on call at 2am doing that by hand. That single idea (a supervisor, not a script) is what every feature below actually is.</p>
+
+    <h3 style="font-family:var(--serif); font-size:1.35rem; margin-top:56px;">Mapping today's containers onto Kubernetes</h3>
+    <p class="section-intro" style="margin-top:8px;">Every service in <code>docker-compose.yml</code> has a natural Kubernetes shape. None of this needs a rewrite: it's the same containers, described differently.</p>
+    <table class="map-table">
+      <tr><th>Today (Compose)</th><th>Tomorrow (K8s)</th><th>Why that shape</th></tr>
+      <tr><td class="today">postgres</td><td class="tomorrow">StatefulSet + PVC</td><td class="why">Needs a stable identity and disk that survives a pod being rescheduled. A plain Deployment assumes pods are interchangeable and disposable, which a database isn't.</td></tr>
+      <tr><td class="today">minio</td><td class="tomorrow">StatefulSet or Bitnami Helm chart</td><td class="why">Same reasoning as Postgres: persistent identity plus storage. In prod this role is simply replaced by real S3, so it may not even need to run in-cluster there.</td></tr>
+      <tr><td class="today">kafka</td><td class="tomorrow">Strimzi Operator</td><td class="why">Kafka is notoriously fiddly to run by hand (broker IDs, storage, rolling upgrades). An operator teaches Kubernetes the actual "how do I safely run and heal a Kafka cluster" logic, instead of you scripting it.</td></tr>
+      <tr><td class="today">mediamtx</td><td class="tomorrow">Deployment + NodePort/LB on :1935</td><td class="why">RTMP is a long-lived raw TCP connection, not HTTP. It needs a networking path that keeps a connection open for the whole stream, which not every load balancer handles well (see the AWS callout below).</td></tr>
+      <tr><td class="today">ingest-webhook, upload-api, web</td><td class="tomorrow">Deployment + Service, 2+ replicas</td><td class="why">Fully stateless: any replica can answer any request. Trivial to scale horizontally and to roll out updates with zero downtime.</td></tr>
+      <tr><td class="today">analytics-worker</td><td class="tomorrow">Deployment, 1–2 replicas</td><td class="why">Kafka consumer groups already handle "don't double-process a message" across replicas, so this scales the same way as the stateless services.</td></tr>
+      <tr><td class="today">transcode-worker</td><td class="tomorrow">The interesting one (see below)</td><td class="why">This is the CPU-hungry bottleneck and the one place a straight Compose→K8s port undersells what's possible.</td></tr>
+    </table>
+
+    <h3 style="font-family:var(--serif); font-size:1.35rem; margin-top:56px;">Settled: one pod per live stream, not one worker juggling many</h3>
+    <p class="section-intro" style="margin-top:8px;"><strong>Confirmed direction for Phase 2, now written into <code>SPEC.md</code>.</strong> Right now <code>transcode-worker</code> is a single process that tracks every concurrent stream's ffmpeg subprocess in an in-memory dictionary (<code>active_streams</code>) using Python threads. Live streams are moving to a Kubernetes-native model instead: one dedicated Job/pod per stream, matching how most real streaming platforms isolate concurrent transcodes. Here's both models side by side, and why the second one won:</p>
+
+    <div class="vs-grid">
+      <div class="vs-card now">
+        <span class="vs-lbl">Today's model</span>
+        <h4 style="font-family:var(--serif); font-size:1.1rem; margin-bottom:12px;">One worker, many threads</h4>
+        <ul>
+          <li>A single <code>transcode-worker</code> replica runs one ffmpeg subprocess per active stream, tracked by a thread + a lock.</li>
+          <li>Scaling means running <em>more copies</em> of the whole worker; Kafka's consumer-group rebalancing spreads which streams land on which copy.</li>
+          <li>A crash in one stream's ffmpeg is isolated at the process level, but the whole worker (and every stream it's holding) shares one pod's CPU/memory budget.</li>
+          <li>Already warm: no cold-start latency when a new stream begins.</li>
+        </ul>
+      </div>
+      <div class="vs-divider">vs.</div>
+      <div class="vs-card future">
+        <span class="vs-lbl">The Phase 2 plan</span>
+        <h4 style="font-family:var(--serif); font-size:1.1rem; margin-bottom:12px;">One Job/pod per live stream</h4>
+        <ul>
+          <li>A small Python dispatcher consumes <code>stream.lifecycle</code> and, on each <code>started</code> event, calls the Kubernetes API directly to create one dedicated Job/pod running exactly one ffmpeg process for that one stream.</li>
+          <li>The pod gets its own CPU/memory <em>requests and limits</em>, sized for exactly one stream: no noisy-neighbor risk between streams.</li>
+          <li>Pod count equals the number of currently-live streams, visible directly in <code>kubectl get pods</code>. Capacity planning becomes "how many streams, times cost-per-stream," not a guess.</li>
+          <li>Trade-off: a few seconds of pod-startup latency per stream, and one new small service (the dispatcher) to run, versus the always-warm existing worker.</li>
+        </ul>
+      </div>
+    </div>
+    <div class="callout" style="margin-top:24px;">
+      <span class="lbl">One pod per stream, not one pod per viewer</span>
+      <p>Easy thing to assume wrong: this pod has nothing to do with how many people are <em>watching</em> the stream. Its only job is pulling the RTMP feed and writing HLS segments to storage, a single writer, full stop. A viewer's browser never talks to this pod at all; it fetches finished segments straight from MinIO/S3 (or a CDN later) over plain HTTP, which is a completely separate, independently scaling path. One viewer or ten thousand is identical load on the transcode pod, because object storage (not the pod) is what handles the fan-out.</p>
+    </div>
+
+    <div class="callout" style="margin-top:20px;">
+      <span class="lbl">Settled: this is the plan</span>
+      <p>Confirmed direction for Phase 2, now written into <code>SPEC.md</code>: pod-per-stream for live, driven by a small Python dispatcher calling the Kubernetes API directly (highest learning value, no new tooling), with each pod watching its own <code>stream_id</code> on <code>stream.lifecycle</code> to know when to shut itself down. VOD uploads stay on the existing shared <code>transcode-worker</code> pool, since each upload is already a short, self-contained job.</p>
+    </div>
+
+    <h3 style="font-family:var(--serif); font-size:1.35rem; margin-top:56px;">KEDA's job: the VOD pool, not the live path</h3>
+    <p class="section-intro" style="margin-top:8px;">Live streams now have a deterministic answer (one dispatcher-created pod per stream), so autoscaling isn't needed there. It's still the right tool for the shared VOD <code>transcode-worker</code> pool, though. KEDA (Kubernetes Event-Driven Autoscaling) watches <strong>Kafka consumer lag</strong>, how far behind a consumer group has fallen on <code>upload.events</code>, and adjusts replica count directly from that: more lag, more workers, and back down to <em>zero</em> replicas once uploads catch up. A plain CPU-based autoscaler can't do that last part, since there's nothing running yet to measure CPU on.</p>
+    <div class="pipeline-strip" style="margin-top:28px;">
+      <div class="pipe-node data"><div class="pipe-badge">LAG</div><div class="pipe-label">Uploads back up</div></div>
+      <div class="pipe-arrow"></div>
+      <div class="pipe-node data"><div class="pipe-badge">KEDA</div><div class="pipe-label">Watches lag metric</div></div>
+      <div class="pipe-arrow"></div>
+      <div class="pipe-node live"><div class="pipe-badge">+PODS</div><div class="pipe-label">More VOD workers appear</div></div>
+      <div class="pipe-arrow"></div>
+      <div class="pipe-node storage"><div class="pipe-badge">0</div><div class="pipe-label">Scales to zero when idle</div></div>
+    </div>
+
+    <h3 style="font-family:var(--serif); font-size:1.35rem; margin-top:56px;">Two kinds of load balancing, not one</h3>
+    <p class="section-intro" style="margin-top:8px;">"Load balancer" means something different depending on which traffic it's carrying. The HTTP services (<code>web</code>, <code>upload-api</code>, <code>ingest-webhook</code>) sit behind an Ingress controller, doing ordinary L7 routing across replicas with host/path rules and TLS termination, replacing today's separate host ports. RTMP isn't HTTP, so MediaMTX needs L4 TCP load balancing instead: a <code>NodePort</code> or <code>LoadBalancer</code> Service, not an Ingress. The per-stream transcode pods need no inbound load balancing at all, since they only pull from MediaMTX and push to storage and never receive traffic themselves. And the dispatcher, if it's ever run with more than one replica for its own availability, doesn't need leader-election machinery either: it's just a normal Kafka consumer group, and Kafka's partition assignment already guarantees only one replica ever acts on a given stream.</p>
+
+    <h3 style="font-family:var(--serif); font-size:1.35rem; margin-top:56px;">Every other rough edge, mapped to the feature that fixes it</h3>
+    <div class="pain-grid">
+      <div class="pain-card">
+        <div class="pain">One box going down takes everything with it.</div>
+        <div class="fix">Multi-node cluster + self-healing</div>
+        <div class="fixdesc">Kubernetes reschedules a pod onto a healthy node automatically when one dies, no manual intervention.</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain">Deploys today briefly interrupt the whole app.</div>
+        <div class="fix">Rolling updates</div>
+        <div class="fixdesc">New pods come up and pass health checks before old ones are terminated: zero-downtime deploys of web/upload-api.</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain">No real numbers behind how much CPU transcoding needs.</div>
+        <div class="fix">Resource requests/limits</div>
+        <div class="fixdesc">Once ffmpeg is benchmarked, requests/limits stop one greedy transcode from starving its neighbors on the same node.</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain"><code>.env</code> files copied over SSH by hand.</div>
+        <div class="fix">ConfigMaps &amp; Secrets</div>
+        <div class="fixdesc">Configuration and credentials become cluster-managed objects instead of files living on someone's laptop.</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain">Dev and prod are just "different Compose files."</div>
+        <div class="fix">Namespaces</div>
+        <div class="fixdesc">The kubeadm dev cluster and the future EKS prod cluster can share manifests, separated cleanly by namespace instead of by folder convention.</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain">RTMP is a raw, long-lived TCP connection.</div>
+        <div class="fix">NodePort now, NLB (TCP passthrough) later</div>
+        <div class="fixdesc">Flagged explicitly in the spec: managed load balancers can be unkind to long-lived TCP streams. Validate this rather than assume it "just works" on AWS.</div>
+      </div>
+    </div>
+
+    <h3 id="roadmap" style="font-family:var(--serif); font-size:1.35rem; margin-top:56px;">The three-phase roadmap</h3>
+    <div class="roadmap">
+      <div class="phase active">
+        <div class="phase-dot"></div>
+        <div class="phase-tag">Phase 1 · Done</div>
+        <h4>Docker Compose</h4>
+        <ul>
+          <li>Every service above, running for real</li>
+          <li>Single Ubuntu box</li>
+          <li>Manual <code>tar | ssh</code> deploys</li>
+        </ul>
+      </div>
+      <div class="phase next">
+        <div class="phase-dot"></div>
+        <div class="phase-tag">Phase 2 · Next</div>
+        <h4>Kubernetes (dev cluster)</h4>
+        <ul>
+          <li><code>kubeadm</code> on the same Ubuntu box, chosen over k3s/microk8s for the deeper operator-pattern learning value</li>
+          <li>Kafka via the Strimzi operator</li>
+          <li>Postgres/MinIO as StatefulSets or Helm charts</li>
+          <li><code>transcode-worker</code> sized from real ffmpeg benchmarks, and the pod-per-stream question resolved with real data</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="phase-dot"></div>
+        <div class="phase-tag">Phase 3 · Future</div>
+        <h4>AWS (production)</h4>
+        <ul>
+          <li>EKS instead of self-managed <code>kubeadm</code></li>
+          <li>Real S3, RDS for Postgres, MSK or self-hosted Kafka</li>
+          <li>NLB with TCP passthrough for RTMP, validated against the long-lived-connection failure class first</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="hardening">
+  <div class="container">
+    <h2 class="title">Known gaps worth closing first</h2>
+    <p class="section-intro">Straight from the project's own hardening list: small, concrete, and cheap relative to the Kubernetes migration itself.</p>
+    <div class="cast-grid">
+      <div class="card"><h3 style="font-size:1.05rem;">Duplicate transcodes</h3><p class="analogy">A redelivered Kafka message today would kick off a second transcode of the same stream/video: needs an idempotency check.</p></div>
+      <div class="card"><h3 style="font-size:1.05rem;">Placeholder partition counts</h3><p class="analogy">Every topic has 3 partitions as a stand-in, needs sizing from real throughput numbers, especially before KEDA enters the picture.</p></div>
+      <div class="card"><h3 style="font-size:1.05rem;">Wrong file types in storage</h3><p class="analogy"><code>.m3u8</code>/<code>.ts</code> files upload as generic binary today. Works with hls.js, but worth fixing before anything stricter relies on correct MIME types.</p></div>
+      <div class="card"><h3 style="font-size:1.05rem;">No upload limits</h3><p class="analogy">Anyone with a stream key can currently upload arbitrarily large or numerous files: no auth/rate-limiting yet.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="glossary">
+  <div class="container">
+    <h2 class="title">Glossary</h2>
+    <dl class="gloss-grid">
+      <div class="gloss-item"><dt>RTMP</dt><dd>The protocol OBS uses to push a live video feed to a server: think of it as the "upload pipe" for going live.</dd></div>
+      <div class="gloss-item"><dt>HLS</dt><dd>HTTP Live Streaming: video chopped into a few seconds of playable segments plus a manifest listing them, so a browser can fetch and switch quality like any other web file.</dd></div>
+      <div class="gloss-item"><dt>ABR ladder</dt><dd>The set of quality levels (1080p/720p/480p here) offered so a player can adapt to the viewer's connection.</dd></div>
+      <div class="gloss-item"><dt>GOP / keyframe</dt><dd>A "Group of Pictures": the chunk of video between full reference frames. It has to line up identically across every quality level for ABR switching to work.</dd></div>
+      <div class="gloss-item"><dt>Consumer group</dt><dd>A named set of Kafka readers that split up a topic's messages between them: the mechanism that lets you add more workers without double-processing anything.</dd></div>
+      <div class="gloss-item"><dt>Partition</dt><dd>A topic is split into ordered lanes; messages with the same key always land in the same lane, keeping per-stream ordering intact.</dd></div>
+      <div class="gloss-item"><dt>Pod</dt><dd>Kubernetes's smallest deployable unit, usually one container, running somewhere on the cluster.</dd></div>
+      <div class="gloss-item"><dt>Deployment</dt><dd>A Kubernetes object that keeps N identical, stateless pod copies running, replacing dead ones automatically.</dd></div>
+      <div class="gloss-item"><dt>StatefulSet</dt><dd>Like a Deployment, but for things that need stable identity and storage across restarts, for example databases or Kafka brokers.</dd></div>
+      <div class="gloss-item"><dt>Operator</dt><dd>Software that teaches Kubernetes the specific "how to run and heal this" logic for something complex. Strimzi is the Kafka operator.</dd></div>
+      <div class="gloss-item"><dt>HPA / KEDA</dt><dd>Autoscalers: HPA reacts to CPU/memory, KEDA reacts to external signals like Kafka lag, including scaling to zero.</dd></div>
+      <div class="gloss-item"><dt>NodePort / LB</dt><dd>Ways to expose a service outside the cluster: NodePort opens a fixed port on every node, and a LoadBalancer provisions a real external one.</dd></div>
+    </dl>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <p>Generated as a plain-English field guide to this repository's Phase 1 pipeline and Phase 2 Kubernetes plan. Source of truth is <code>SPEC.md</code> and the service code itself. This page will drift out of date as the project evolves, so treat it as a snapshot, not a spec.</p>
+  </div>
+</footer>
+
+<script>
+function showJourney(which){
+  document.getElementById('journey-live').classList.toggle('active', which==='live');
+  document.getElementById('journey-upload').classList.toggle('active', which==='upload');
+  document.getElementById('tab-live').setAttribute('aria-selected', which==='live');
+  document.getElementById('tab-upload').setAttribute('aria-selected', which==='upload');
+}
+</script>
+
+</body>
+</html>
