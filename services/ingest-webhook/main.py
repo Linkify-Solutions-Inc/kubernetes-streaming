@@ -12,7 +12,12 @@ logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("ingest-webhook")
 
 app = FastAPI()
-producer = Producer({"bootstrap.servers": os.environ["KAFKA_BOOTSTRAP_SERVERS"]})
+# enable.idempotence: a produce-request retry (broker restart, network blip)
+# would otherwise risk landing the same "started"/"ended" event twice.
+producer = Producer({
+    "bootstrap.servers": os.environ["KAFKA_BOOTSTRAP_SERVERS"],
+    "enable.idempotence": True,
+})
 
 
 def pg_connect():
@@ -83,6 +88,22 @@ def on_publish(path: str = Form(...)):
             # Shouldn't happen (auth already gated this), but don't crash the hook.
             log.error("publish hook for unknown stream key %r", path)
             return {"ok": False}
+
+        # MediaMTX can call runOnReady more than once for the same publish
+        # session (e.g. it retries on a slow/lost webhook response). Without
+        # this guard a duplicate call would insert a second "live" streams
+        # row and emit a second "started" event, kicking off a duplicate
+        # transcode downstream (see SPEC.md Phase 1 hardening).
+        existing = conn.execute(
+            "SELECT id FROM streams WHERE streamer_id = %s AND status = 'live'",
+            (streamer[0],),
+        ).fetchone()
+        if existing is not None:
+            log.warning(
+                "duplicate publish hook for path=%s, stream_id=%s already live",
+                path, existing[0],
+            )
+            return {"ok": True}
 
         stream_id = conn.execute(
             "INSERT INTO streams (streamer_id, path) VALUES (%s, %s) RETURNING id",

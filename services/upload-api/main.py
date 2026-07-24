@@ -13,7 +13,20 @@ from psycopg.rows import dict_row
 from pydantic import BaseModel
 
 app = FastAPI()
-producer = Producer({"bootstrap.servers": os.environ["KAFKA_BOOTSTRAP_SERVERS"]})
+# enable.idempotence: a produce-request retry (broker restart, network blip)
+# would otherwise risk landing the same "uploaded"/"view" event twice.
+producer = Producer({
+    "bootstrap.servers": os.environ["KAFKA_BOOTSTRAP_SERVERS"],
+    "enable.idempotence": True,
+})
+
+# Anyone holding a stream key could otherwise upload arbitrarily large or
+# arbitrarily many files (see SPEC.md Phase 1 hardening) -- both configurable
+# since "arbitrarily large" and "arbitrarily many" are judgment calls that'll
+# want tuning once real usage exists.
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", 5 * 1024 * 1024 * 1024))  # 5 GiB
+UPLOAD_RATE_LIMIT_COUNT = int(os.environ.get("UPLOAD_RATE_LIMIT_COUNT", 10))
+UPLOAD_RATE_LIMIT_WINDOW_MINUTES = int(os.environ.get("UPLOAD_RATE_LIMIT_WINDOW_MINUTES", 60))
 
 
 def pg_connect():
@@ -151,6 +164,28 @@ def record_view(body: RecordView):
 
 
 # ── Upload ───────────────────────────────────────────────────────────────
+class _UploadTooLarge(Exception):
+    pass
+
+
+class _SizeLimitedReader:
+    # Wraps UploadFile's underlying file object so boto3's upload_fileobj
+    # (which reads directly from it, bypassing FastAPI's own body handling)
+    # aborts once actual bytes read exceed the limit -- a backstop that
+    # holds even if Content-Length is missing or understates the real size.
+    def __init__(self, fileobj, limit: int):
+        self._fileobj = fileobj
+        self._limit = limit
+        self._read = 0
+
+    def read(self, size=-1):
+        chunk = self._fileobj.read(size)
+        self._read += len(chunk)
+        if self._read > self._limit:
+            raise _UploadTooLarge()
+        return chunk
+
+
 @app.post("/videos")
 def upload_video(
     stream_key: str = Form(...),
@@ -164,11 +199,39 @@ def upload_video(
         if streamer is None:
             raise HTTPException(status_code=401, detail="unknown stream key")
 
+        recent_uploads = conn.execute(
+            """
+            SELECT COUNT(*) AS n FROM videos
+            WHERE streamer_id = %s
+              AND created_at > now() - (%s * interval '1 minute')
+            """,
+            (streamer["id"], UPLOAD_RATE_LIMIT_WINDOW_MINUTES),
+        ).fetchone()["n"]
+        if recent_uploads >= UPLOAD_RATE_LIMIT_COUNT:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"upload rate limit exceeded: max {UPLOAD_RATE_LIMIT_COUNT} "
+                    f"uploads per {UPLOAD_RATE_LIMIT_WINDOW_MINUTES} minutes"
+                ),
+            )
+
         video_id = uuid.uuid4()
         ext = os.path.splitext(file.filename or "")[1] or ".bin"
         object_key = f"raw/{video_id}{ext}"
 
-        s3_client().upload_fileobj(file.file, "media", object_key)
+        try:
+            s3_client().upload_fileobj(
+                _SizeLimitedReader(file.file, MAX_UPLOAD_BYTES), "media", object_key
+            )
+        except _UploadTooLarge:
+            # Confirmed empirically (both the single-put and multipart code
+            # paths): boto3's upload_fileobj propagates an exception raised
+            # from the Fileobj's own read() unwrapped, unlike upload_file's
+            # convenience wrapper which re-raises as S3UploadFailedError.
+            raise HTTPException(
+                status_code=413, detail=f"file exceeds {MAX_UPLOAD_BYTES} byte limit"
+            )
 
         video = conn.execute(
             """

@@ -1,39 +1,71 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Watch</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}{{ heading }} — Streaming Platform{% endblock %}
+{% block content %}
   <p><a href="/">&larr; back</a></p>
 
-  <video id="player" controls autoplay muted style="width: 100%; max-width: 960px; background: #000"></video>
-  <p id="status"></p>
+  <div class="watch-head">
+    <span class="badge {{ 'badge-live' if content_type == 'stream' else 'badge-vod' }}">
+      {% if content_type == "stream" %}<span class="dot"></span>LIVE{% else %}VOD{% endif %}
+    </span>
+    <h1>{{ heading }}</h1>
+  </div>
+  {% if subtitle %}<p class="watch-by">{{ subtitle }}</p>{% endif %}
+
+  <div class="player-wrap">
+    <video id="player" controls autoplay muted playsinline></video>
+    <p id="status" class="player-status"></p>
+  </div>
 
   <script src="https://cdn.jsdelivr.net/npm/hls.js@1"></script>
   <script>
     const video = document.getElementById("player");
     const statusEl = document.getElementById("status");
     const src = "{{ manifest_url }}";
+    const MAX_RETRIES = 5;
+
+    function setStatus(msg) { statusEl.textContent = msg || ""; }
+    video.addEventListener("waiting", () => setStatus("Buffering…"));
+    video.addEventListener("playing", () => setStatus(""));
 
     if (video.canPlayType("application/vnd.apple.mpegurl")) {
-      // Safari has native HLS support — no hls.js needed.
+      // Safari has native HLS support — no hls.js needed. It handles its
+      // own reconnect/retry internally, no extra recovery logic here.
       video.src = src;
     } else if (window.Hls && Hls.isSupported()) {
       const hls = new Hls();
+      let retries = 0;
       hls.loadSource(src);
       hls.attachMedia(video);
+      hls.on(Hls.Events.FRAG_LOADED, () => { retries = 0; });
       hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
-          statusEl.textContent = "Playback error (" + data.details + ") — if this is a fresh upload/stream, the first segment may not be ready yet; try reloading in a few seconds.";
+        if (!data.fatal) return;
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            // Covers things like a segment briefly 404ing mid-rotation, or
+            // a network blip — worth a few retries with backoff before
+            // giving up, rather than dying on the first hiccup.
+            if (retries < MAX_RETRIES) {
+              retries++;
+              setStatus("Connection hiccup — reconnecting… (" + retries + "/" + MAX_RETRIES + ")");
+              setTimeout(() => hls.startLoad(), 1500 * retries);
+            } else {
+              setStatus("Lost connection to the stream — reload to try again.");
+            }
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            setStatus("Recovering playback…");
+            hls.recoverMediaError();
+            break;
+          default:
+            setStatus("Playback error (" + data.details + ") — reload to try again.");
+            hls.destroy();
         }
       });
     } else {
-      statusEl.textContent = "This browser can't play HLS.";
+      setStatus("This browser can't play HLS.");
     }
   </script>
 
-  <p><small>Manifest: <code>{{ manifest_url }}</code></small></p>
-  <p><small>This view was recorded through the real pipeline: web &rarr; upload-api &rarr; Kafka (<code>viewer.analytics</code>) &rarr; analytics-worker &rarr; Postgres.</small></p>
-</body>
-</html>
+  <p class="manifest-link"><small>Manifest: <code>{{ manifest_url }}</code></small></p>
+  <p class="manifest-link"><small>This view was recorded through the real pipeline: web &rarr; upload-api &rarr; Kafka (<code>viewer.analytics</code>) &rarr; analytics-worker &rarr; Postgres.</small></p>
+{% endblock %}

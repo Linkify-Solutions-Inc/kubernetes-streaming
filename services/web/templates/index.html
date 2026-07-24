@@ -1,31 +1,43 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Streaming Platform</title>
-</head>
-<body>
-  <h1>Streaming platform — Phase 1 scaffold</h1>
-  <p><a href="/streamers/new">Get a stream key</a> · <a href="/upload">Upload a video</a></p>
+{% extends "base.html" %}
+{% block title %}Streaming Platform{% endblock %}
+{% block content %}
+  <section>
+    <h2>Live now</h2>
+    <div class="grid">
+      {% for s in streams %}
+        <a class="card" href="/watch/stream/{{ s.id }}">
+          <div class="thumb">
+            <span class="badge badge-live"><span class="dot"></span>LIVE</span>
+          </div>
+          <div class="card-body">
+            <div class="card-title">{{ s.display_name }}</div>
+            <div class="card-meta">{{ s.view_count }} view{{ "s" if s.view_count != 1 }} &middot; live since {{ s.started_at }}</div>
+          </div>
+        </a>
+      {% else %}
+        <p class="empty">Nobody is live right now.</p>
+      {% endfor %}
+    </div>
+  </section>
 
-  <h2>Live now</h2>
-  <ul>
-    {% for s in streams %}
-      <li>{{ s.display_name }} — live since {{ s.started_at }} — {{ s.view_count }} view{{ "s" if s.view_count != 1 }}
-        — <a href="/watch/stream/{{ s.id }}">Watch</a></li>
-    {% else %}
-      <li>(nobody is live)</li>
-    {% endfor %}
-  </ul>
-
-  <h2>Videos</h2>
-  <ul>
-    {% for v in videos %}
-      <li>{{ v.title }} by {{ v.display_name }} — {{ v.status }} — {{ v.view_count }} view{{ "s" if v.view_count != 1 }}
-        {% if v.status == "ready" %} — <a href="/watch/video/{{ v.id }}">Watch</a>{% endif %}</li>
-    {% else %}
-      <li>(no videos uploaded yet)</li>
-    {% endfor %}
-  </ul>
-</body>
-</html>
+  <section>
+    <h2>Videos</h2>
+    <div class="grid">
+      {% for v in videos %}
+        <div class="card {{ 'card-disabled' if v.status != 'ready' }}">
+          {% if v.status == "ready" %}<a href="/watch/video/{{ v.id }}" class="card-link">{% endif %}
+            <div class="thumb">
+              {% if v.status != "ready" %}<span class="badge badge-status">{{ v.status }}</span>{% endif %}
+            </div>
+            <div class="card-body">
+              <div class="card-title">{{ v.title }}</div>
+              <div class="card-meta">{{ v.display_name }} &middot; {{ v.view_count }} view{{ "s" if v.view_count != 1 }}</div>
+            </div>
+          {% if v.status == "ready" %}</a>{% endif %}
+        </div>
+      {% else %}
+        <p class="empty">No videos uploaded yet.</p>
+      {% endfor %}
+    </div>
+  </section>
+{% endblock %}

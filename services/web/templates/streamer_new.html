@@ -1,10 +1,6 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <title>Get a stream key</title>
-</head>
-<body>
+{% extends "base.html" %}
+{% block title %}Get a stream key — Streaming Platform{% endblock %}
+{% block content %}
   <p><a href="/">&larr; back</a></p>
   <h1>Get a stream key</h1>
 
@@ -12,11 +8,13 @@
     <p><strong>{{ result.display_name }}</strong> — save this, it's shown once:</p>
     <pre>stream key: {{ result.stream_key }}
 RTMP URL:  {{ rtmp_url }}</pre>
+    <p class="watch-by">Paste the RTMP URL above into OBS's <strong>Server</strong> field as-is, and leave <strong>Stream Key</strong> blank — the key is already part of the URL.</p>
   {% else %}
     <form method="post" action="/streamers/new">
-      <label>Display name: <input type="text" name="display_name" required></label>
+      <label>Display name
+        <input type="text" name="display_name" required>
+      </label>
       <button type="submit">Create</button>
     </form>
   {% endif %}
-</body>
-</html>
+{% endblock %}

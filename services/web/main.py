@@ -3,9 +3,11 @@ import os
 import httpx
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 UPLOAD_API_URL = os.environ["UPLOAD_API_URL"]
 MINIO_PUBLIC_URL = os.environ["MINIO_PUBLIC_URL"]
@@ -22,8 +24,13 @@ def index(request: Request):
     with httpx.Client(base_url=UPLOAD_API_URL) as client:
         streams = client.get("/streams").json()
         videos = client.get("/videos").json()
+    # The live-stream list changes as soon as someone goes on/off air —
+    # a cached copy of this page can send a viewer to a "Watch" link for a
+    # stream that already ended (or hide one that just went live).
     return templates.TemplateResponse(
-        "index.html", {"request": request, "streams": streams, "videos": videos}
+        "index.html",
+        {"request": request, "streams": streams, "videos": videos},
+        headers={"Cache-Control": "no-store"},
     )
 
 
@@ -69,6 +76,19 @@ async def upload_submit(request: Request):
 def watch(request: Request, content_type: str, content_id: str):
     with httpx.Client(base_url=UPLOAD_API_URL) as client:
         client.post("/analytics/view", json={"content_type": content_type, "content_id": content_id})
+        # /streams only lists status='live' rows and /videos has no
+        # per-id lookup, so a stream that already ended (or, in principle,
+        # a video row that's since vanished) just falls back to a generic
+        # heading below rather than a failed request.
+        listing = client.get("/streams" if content_type == "stream" else "/videos").json()
+    match = next((item for item in listing if str(item["id"]) == content_id), None)
+    if content_type == "stream":
+        heading = match["display_name"] if match else "Live stream"
+        subtitle = None
+    else:
+        heading = match["title"] if match else "Video"
+        subtitle = f"by {match['display_name']}" if match else None
+
     prefix = "live" if content_type == "stream" else "vod"
     manifest_url = f"{MINIO_PUBLIC_URL}/media/hls/{prefix}/{content_id}/master.m3u8"
     return templates.TemplateResponse(
@@ -78,5 +98,11 @@ def watch(request: Request, content_type: str, content_id: str):
             "content_type": content_type,
             "content_id": content_id,
             "manifest_url": manifest_url,
+            "heading": heading,
+            "subtitle": subtitle,
         },
+        # A cached page response means the browser skips the request
+        # entirely on a revisit — silently dropping the /analytics/view
+        # call above, not just risking stale content.
+        headers={"Cache-Control": "no-store"},
     )

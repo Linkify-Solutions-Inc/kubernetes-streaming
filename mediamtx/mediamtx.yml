@@ -3,6 +3,17 @@
 
 rtmpAddress: :1935
 
+# Default writeQueueSize (512 outgoing packets) is what was causing
+# "reader is too slow, discarding N frames" -> "closed: i/o timeout" against
+# transcode-worker's ffmpeg client, even though the box has CPU/network
+# headroom to spare (confirmed via docker stats during a live stall: ffmpeg
+# was using ~230% CPU out of 12 cores available, nowhere near saturated).
+# A brief scheduling/IO hiccup on ffmpeg's read side is enough to overflow a
+# 512-packet queue; per MediaMTX's own config reference and reports of the
+# same symptom (bluenviron/mediamtx#5162, #5093), a much larger queue is the
+# standard fix. RAM cost is a non-issue at this scale.
+writeQueueSize: 65536
+
 # Real stream-key auth: MediaMTX calls this URL with a JSON POST before
 # accepting a publish (fields confirmed against MediaMTX's own source:
 # ip/user/password/token/action/path/protocol/id/query/userAgent). 2xx
