@@ -127,3 +127,31 @@ jobs:
           tags: |
             ghcr.io/${{ env.REPO_LC }}-${{ matrix.service }}:sha-${{ env.SHA_SHORT }}
             ghcr.io/${{ env.REPO_LC }}-${{ matrix.service }}:latest
+
+  # Phase 1 CD (see SPEC.md): runs on the self-hosted runner installed on
+  # the dev box itself, so no SSH key or network hop is needed to reach it.
+  # Only redeploys the services paths-filter actually rebuilt above --
+  # everything else keeps running its existing container untouched.
+  deploy:
+    needs: [changes, build]
+    if: needs.changes.outputs.services != '[]' && github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: [self-hosted]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy changed services via docker compose
+        run: |
+          # docker-compose.yml's env_file: .env and ${VAR} substitutions
+          # both resolve relative to the compose project directory (this
+          # fresh checkout), which never has the real, gitignored secrets
+          # file -- symlink it in from where it persists on this box instead
+          # of copying it (copying would drift out of sync silently).
+          ln -sf /home/gha-runner/streaming-project.env .env
+
+          export IMAGE_TAG=sha-$(git rev-parse --short=7 HEAD)
+          SERVICES='${{ needs.changes.outputs.services }}'
+          SERVICE_LIST=$(echo "$SERVICES" | tr -d '[]"' | tr ',' ' ')
+          echo "Deploying: $SERVICE_LIST (tag=$IMAGE_TAG)"
+
+          docker compose pull $SERVICE_LIST
+          docker compose up -d $SERVICE_LIST

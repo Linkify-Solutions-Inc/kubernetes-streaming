@@ -94,7 +94,11 @@ services:
 
   # ── App services (Phase 1 stubs — see SPEC.md) ──────────────────────
   ingest-webhook:
-    build: ./services/ingest-webhook
+    # Built by CI, not locally -- see .github/workflows/ci.yml and SPEC.md's
+    # CI/CD design. IMAGE_TAG defaults to "latest" so a manual
+    # `docker compose up -d` still works without it set; the CD deploy job
+    # sets it explicitly to the exact commit's sha-<short> tag.
+    image: ghcr.io/linkify-solutions-inc/kubernetes-streaming-ingest-webhook:${IMAGE_TAG:-latest}
     env_file: .env
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -108,7 +112,7 @@ services:
       - "8000:8000"
 
   upload-api:
-    build: ./services/upload-api
+    image: ghcr.io/linkify-solutions-inc/kubernetes-streaming-upload-api:${IMAGE_TAG:-latest}
     env_file: .env
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -127,7 +131,7 @@ services:
       - "8001:8000"
 
   transcode-worker:
-    build: ./services/transcode-worker
+    image: ghcr.io/linkify-solutions-inc/kubernetes-streaming-transcode-worker:${IMAGE_TAG:-latest}
     env_file: .env
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -144,7 +148,7 @@ services:
         condition: service_healthy
 
   analytics-worker:
-    build: ./services/analytics-worker
+    image: ghcr.io/linkify-solutions-inc/kubernetes-streaming-analytics-worker:${IMAGE_TAG:-latest}
     env_file: .env
     environment:
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -156,7 +160,7 @@ services:
         condition: service_healthy
 
   web:
-    build: ./services/web
+    image: ghcr.io/linkify-solutions-inc/kubernetes-streaming-web:${IMAGE_TAG:-latest}
     env_file: .env
     environment:
       UPLOAD_API_URL: http://upload-api:8000
