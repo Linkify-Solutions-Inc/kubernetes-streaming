@@ -1,0 +1,545 @@
+<title>Self-Hosted Runner Setup — kubernetes-streaming</title>
+<style>
+  :root {
+    --paper: #eef1f4;
+    --surface: #ffffff;
+    --surface-dim: #e4e8ec;
+    --ink: #1b232c;
+    --ink-dim: #57626d;
+    --line: #ccd3d9;
+    --amber: #a35f22;
+    --amber-ink: #7c4718;
+    --teal: #2d5f74;
+    --teal-bg: #dfe9ec;
+    --ok: #2f6b3e;
+    --ok-bg: #dfeee2;
+    --code-bg: #1b232c;
+    --code-ink: #e7ebee;
+    --code-dim: #93a1ac;
+    --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161c;
+      --surface: #1a2029;
+      --surface-dim: #212833;
+      --ink: #e7ebee;
+      --ink-dim: #93a1ac;
+      --line: #2c3542;
+      --amber: #e0954f;
+      --amber-ink: #f0b378;
+      --teal: #7fb3c9;
+      --teal-bg: #1c2e35;
+      --ok: #7cc190;
+      --ok-bg: #1a2d20;
+      --code-bg: #0d1116;
+      --code-ink: #e7ebee;
+      --code-dim: #6b7885;
+      --code-key: #e0954f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+    --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+    --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+    --ok: #7cc190; --ok-bg: #1a2d20; --code-bg: #0d1116; --code-ink: #e7ebee;
+    --code-dim: #6b7885; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1f4; --surface: #ffffff; --surface-dim: #e4e8ec;
+    --ink: #1b232c; --ink-dim: #57626d; --line: #ccd3d9;
+    --amber: #a35f22; --amber-ink: #7c4718; --teal: #2d5f74; --teal-bg: #dfe9ec;
+    --ok: #2f6b3e; --ok-bg: #dfeee2; --code-bg: #1b232c; --code-ink: #e7ebee;
+    --code-dim: #93a1ac; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.55;
+    font-size: 16px;
+  }
+
+  ::selection { background: var(--amber); color: #fff; }
+
+  a { color: var(--amber-ink); }
+
+  code, pre, kbd {
+    font-family: "Cascadia Code", "Cascadia Mono", ui-monospace, "SF Mono", Consolas,
+      "Liberation Mono", monospace;
+  }
+
+  .topbar {
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .topbar-inner {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 1.75rem;
+  }
+  .eyebrow {
+    display: inline-block;
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--amber-ink);
+    background: color-mix(in srgb, var(--amber) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    padding: 0.2rem 0.55rem;
+    border-radius: 3px;
+  }
+  h1 {
+    margin: 0.65rem 0 0.35rem;
+    font-size: 1.9rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .subtitle {
+    margin: 0 0 1rem;
+    color: var(--ink-dim);
+    font-size: 1.02rem;
+    max-width: 62ch;
+  }
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1.25rem;
+    font-size: 0.85rem;
+    color: var(--ink-dim);
+  }
+  .meta-row strong { color: var(--ink); font-weight: 600; }
+  .meta-row code {
+    background: var(--surface-dim);
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.82rem;
+  }
+
+  .layout {
+    max-width: 920px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 5rem;
+    display: grid;
+    grid-template-columns: 190px minmax(0, 1fr);
+    gap: 2.5rem;
+    align-items: start;
+  }
+  @media (max-width: 760px) {
+    .layout { grid-template-columns: 1fr; }
+    .rail { display: none; }
+  }
+
+  .rail {
+    position: sticky;
+    top: 2rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+  .rail-label {
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-dim);
+    margin-bottom: 0.6rem;
+  }
+  .rail a {
+    display: flex;
+    gap: 0.55rem;
+    align-items: baseline;
+    padding: 0.35rem 0;
+    font-size: 0.87rem;
+    color: var(--ink-dim);
+    text-decoration: none;
+    border-left: 2px solid var(--line);
+    padding-left: 0.75rem;
+    margin-left: -1px;
+  }
+  .rail a:hover { color: var(--ink); border-left-color: var(--amber); }
+  .rail a .n {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber-ink);
+    font-size: 0.8rem;
+    flex-shrink: 0;
+  }
+
+  main { min-width: 0; }
+
+  .intro {
+    color: var(--ink-dim);
+    max-width: 68ch;
+    margin: 0 0 2.25rem;
+    font-size: 1rem;
+  }
+  .intro strong { color: var(--ink); }
+
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.5rem 1.6rem 1.7rem;
+    margin-bottom: 1.5rem;
+    box-shadow: var(--shadow);
+    scroll-margin-top: 1.5rem;
+  }
+  .step-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.85rem;
+    margin-bottom: 0.9rem;
+    flex-wrap: wrap;
+  }
+  .step-num {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber);
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+  .step h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 650;
+    letter-spacing: -0.005em;
+  }
+  .context-chip {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--teal);
+    background: var(--teal-bg);
+    border-radius: 999px;
+    padding: 0.18rem 0.65rem;
+    white-space: nowrap;
+  }
+
+  .why {
+    display: flex;
+    gap: 0.7rem;
+    background: var(--teal-bg);
+    border-left: 3px solid var(--teal);
+    border-radius: 0 6px 6px 0;
+    padding: 0.75rem 0.9rem;
+    margin: 0 0 1rem;
+    font-size: 0.92rem;
+    color: var(--ink);
+  }
+  .why b { color: var(--teal); font-weight: 700; }
+
+  p.step-p { margin: 0 0 1rem; color: var(--ink); }
+  p.step-p:last-child { margin-bottom: 0; }
+
+  .cmd-label {
+    font-size: 0.78rem;
+    color: var(--ink-dim);
+    margin: 0.9rem 0 0.35rem;
+    font-family: "Cascadia Code", ui-monospace, monospace;
+  }
+  .cmd-label:first-child { margin-top: 0; }
+
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    border-radius: 8px;
+    padding: 0.85rem 1rem;
+    margin: 0 0 0.2rem;
+    overflow-x: auto;
+    font-size: 0.86rem;
+    line-height: 1.6;
+  }
+  pre code { color: inherit; }
+  .ph { color: var(--code-key); }
+
+  code.inline {
+    background: var(--surface-dim);
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
+    font-size: 0.87em;
+  }
+
+  .confirm {
+    display: flex;
+    gap: 0.7rem;
+    background: var(--ok-bg);
+    border-left: 3px solid var(--ok);
+    border-radius: 0 6px 6px 0;
+    padding: 0.85rem 1rem;
+    margin-top: 1rem;
+    font-size: 0.92rem;
+  }
+  .confirm b { color: var(--ok); }
+
+  footer.finish {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--amber);
+    border-radius: 0 10px 10px 0;
+    padding: 1.3rem 1.5rem;
+    box-shadow: var(--shadow);
+    font-size: 0.97rem;
+  }
+  footer.finish .eyebrow { margin-bottom: 0.6rem; }
+
+  :focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 2px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .step { transition: border-color 0.15s ease; }
+  }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="eyebrow">Phase 2 · CI/CD, Stage 2</span>
+    <h1>Self-Hosted Runner Setup</h1>
+    <p class="subtitle">
+      Installing a GitHub Actions runner directly on the dev box, so the
+      deploy step in <code class="inline">ci.yml</code> can run
+      <code class="inline">docker compose</code> locally — no SSH key,
+      no inbound network path.
+    </p>
+    <div class="meta-row">
+      <span><strong>Repo:</strong> <code>Linkify-Solutions-Inc/kubernetes-streaming</code></span>
+      <span><strong>Box:</strong> <code>kubernetes-server</code></span>
+      <span><strong>Runner user:</strong> <code>gha-runner</code></span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="rail">
+    <div class="rail-label">Steps</div>
+    <a href="#step-1"><span class="n">1</span> Get a token</a>
+    <a href="#step-2"><span class="n">2</span> Restricted user</a>
+    <a href="#step-3"><span class="n">3</span> Copy secrets</a>
+    <a href="#step-4"><span class="n">4</span> Download + configure</a>
+    <a href="#step-5"><span class="n">5</span> Install as service</a>
+    <a href="#step-6"><span class="n">6</span> CPU constraint</a>
+    <a href="#step-7"><span class="n">7</span> Start + confirm</a>
+  </nav>
+
+  <main>
+    <p class="intro">
+      A small program runs on the box itself, polls GitHub for queued jobs
+      labeled <code class="inline">self-hosted</code>, and executes them
+      locally — that's what lets the <code class="inline">deploy</code> job
+      in <code class="inline">ci.yml</code> run
+      <code class="inline">docker compose</code> directly on the box.
+      Everything below runs <strong>on the box</strong>
+      (<code class="inline">ssh kubernetes-server</code> first), except
+      step 1's token, which you generate from your own machine.
+    </p>
+
+    <section class="step" id="step-1">
+      <div class="step-head">
+        <span class="step-num">01</span>
+        <h2>Get a registration token</h2>
+        <span class="context-chip">your laptop</span>
+      </div>
+      <p class="step-p">
+        A short-lived (~1hr) credential that lets a machine register itself
+        as a runner for this repo — nothing more.
+      </p>
+      <pre><code>gh api -X POST repos/Linkify-Solutions-Inc/kubernetes-streaming/actions/runners/registration-token --jq '.token'</code></pre>
+      <p class="step-p" style="margin-top: 0.6rem; color: var(--ink-dim); font-size: 0.9rem;">
+        Copy the token it prints. If it expires before you finish, just re-run this.
+      </p>
+    </section>
+
+    <section class="step" id="step-2">
+      <div class="step-head">
+        <span class="step-num">02</span>
+        <h2>Create a dedicated, restricted user</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <div class="why">
+        <b>Why —</b>
+        <span>
+          the runner executes whatever a workflow tells it to (today just
+          <code class="inline">docker compose</code>, but that's still real
+          capability). A dedicated account limits the blast radius if a
+          workflow ever does something unexpected — it should never run as
+          your own <code class="inline">fatima</code> account or as root.
+        </span>
+      </div>
+      <pre><code>ssh kubernetes-server
+sudo useradd -m -s /bin/bash gha-runner
+sudo usermod -aG docker gha-runner</code></pre>
+      <p class="step-p" style="margin-top: 0.7rem;">
+        <code class="inline">docker</code> group membership is the
+        <em>only</em> privilege it gets — no <code class="inline">sudo</code>.
+        That's enough to run <code class="inline">docker compose</code>,
+        nothing else.
+      </p>
+    </section>
+
+    <section class="step" id="step-3">
+      <div class="step-head">
+        <span class="step-num">03</span>
+        <h2>Copy today's secrets to where the runner can read them</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <p class="step-p">
+        The runner's job checks out a fresh copy of the repo each run — it
+        won't have your gitignored <code class="inline">.env</code>.
+        <code class="inline">ci.yml</code>'s <code class="inline">deploy</code>
+        step expects it at
+        <code class="inline">/home/gha-runner/streaming-project.env</code>:
+      </p>
+      <pre><code>sudo cp ~/streaming-project/.env /home/gha-runner/streaming-project.env
+sudo chown gha-runner:gha-runner /home/gha-runner/streaming-project.env
+sudo chmod 600 /home/gha-runner/streaming-project.env</code></pre>
+    </section>
+
+    <section class="step" id="step-4">
+      <div class="step-head">
+        <span class="step-num">04</span>
+        <h2>Download and configure the runner</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <div class="why">
+        <b>Why this version —</b>
+        <span>
+          v2.336.0 is GitHub's current release as of today; the sha256 below
+          is checked against GitHub's published value rather than assumed.
+        </span>
+      </div>
+      <p class="cmd-label">as gha-runner:</p>
+      <pre><code>sudo -iu gha-runner
+mkdir actions-runner &amp;&amp; cd actions-runner
+curl -o actions-runner-linux-x64-2.336.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.336.0/actions-runner-linux-x64-2.336.0.tar.gz
+echo "04cf0be1aff4c3ec3554466c39124ca250e3effd8873bb7e8d68535aa9505d5d  actions-runner-linux-x64-2.336.0.tar.gz" | sha256sum -c
+tar xzf actions-runner-linux-x64-2.336.0.tar.gz</code></pre>
+      <p class="step-p" style="font-size: 0.9rem; color: var(--ink-dim);">
+        <code class="inline">sha256sum -c</code> should print
+        <code class="inline">OK</code> — confirms the download wasn't
+        corrupted or tampered with.
+      </p>
+
+      <p class="cmd-label">register it (paste your token from step 1):</p>
+      <pre><code>./config.sh --url https://github.com/Linkify-Solutions-Inc/kubernetes-streaming --token <span class="ph">&lt;YOUR_TOKEN&gt;</span> --name kubernetes-server --labels self-hosted,linux,streaming-project --unattended</code></pre>
+      <p class="step-p" style="font-size: 0.9rem; color: var(--ink-dim);">
+        <code class="inline">--unattended</code> skips interactive prompts;
+        the <code class="inline">--labels</code> aren't load-bearing yet
+        (the workflow just targets the built-in
+        <code class="inline">self-hosted</code> label) but they're there if
+        you ever add a second runner and want to target this one
+        specifically.
+      </p>
+
+      <p class="cmd-label">leave the gha-runner shell:</p>
+      <pre><code>exit</code></pre>
+    </section>
+
+    <section class="step" id="step-5">
+      <div class="step-head">
+        <span class="step-num">05</span>
+        <h2>Install it as a systemd service</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <div class="why">
+        <b>Why a service —</b>
+        <span>
+          a foreground process dies when your SSH session ends. systemd
+          keeps it running, restarts it on crash, and starts it on boot.
+        </span>
+      </div>
+      <div class="why">
+        <b>Why one sudo command —</b>
+        <span>
+          <code class="inline">gha-runner</code>'s home directory is
+          private by default (mode 0750/0700), so a plain
+          <code class="inline">cd</code> as <code class="inline">fatima</code>
+          gets denied — and <code class="inline">sudo cd ...</code> can't
+          work either, since <code class="inline">cd</code> is a shell
+          builtin, not a program <code class="inline">sudo</code> can exec.
+          Running both as one privileged command sidesteps both problems:
+          root bypasses the permission check, and
+          <code class="inline">svc.sh install</code> needs root anyway to
+          write the systemd unit.
+        </span>
+      </div>
+      <pre><code>sudo bash -c 'cd /home/gha-runner/actions-runner && ./svc.sh install gha-runner'</code></pre>
+      <p class="step-p" style="margin-top: 0.7rem;">
+        The <code class="inline">gha-runner</code> argument tells the
+        installer to run the service as that user (not root) — this
+        generates
+        <code class="inline">/etc/systemd/system/actions.runner.Linkify-Solutions-Inc-kubernetes-streaming.kubernetes-server.service</code>.
+      </p>
+    </section>
+
+    <section class="step" id="step-6">
+      <div class="step-head">
+        <span class="step-num">06</span>
+        <h2>Add the CPU constraint</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <div class="why">
+        <b>Why —</b>
+        <span>
+          Kafka's bursty log-segment writes and a live ffmpeg encode are
+          both real CPU consumers on this box (empirically ~2.3 cores per
+          live stream, see SPEC.md). An unconstrained
+          <code class="inline">docker build</code> running concurrently
+          could win the CPU scheduler fight against a live stream
+          mid-encode. <code class="inline">Nice=</code> lowers its
+          traditional scheduling priority;
+          <code class="inline">CPUWeight=</code> does the equivalent under
+          cgroup v2 (what modern systemd uses) — both make the runner yield
+          CPU under contention rather than compete evenly.
+        </span>
+      </div>
+      <pre><code>sudo systemctl edit actions.runner.Linkify-Solutions-Inc-kubernetes-streaming.kubernetes-server.service</code></pre>
+      <p class="cmd-label">this opens an editor for an override file — paste:</p>
+      <pre><code>[Service]
+Nice=10
+CPUWeight=50</code></pre>
+      <p class="step-p" style="font-size: 0.9rem; color: var(--ink-dim);">
+        Save and exit (in <code class="inline">nano</code>: Ctrl+O, Enter, Ctrl+X).
+      </p>
+    </section>
+
+    <section class="step" id="step-7">
+      <div class="step-head">
+        <span class="step-num">07</span>
+        <h2>Start it and confirm it's alive</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <pre><code>sudo systemctl start actions.runner.Linkify-Solutions-Inc-kubernetes-streaming.kubernetes-server.service
+sudo systemctl status actions.runner.Linkify-Solutions-Inc-kubernetes-streaming.kubernetes-server.service</code></pre>
+      <p class="step-p" style="margin-top: 0.7rem;">
+        You want <code class="inline">active (running)</code>. Then check
+        GitHub sees it:
+      </p>
+      <pre><code>gh api repos/Linkify-Solutions-Inc/kubernetes-streaming/actions/runners --jq '.runners[].name'</code></pre>
+      <div class="confirm">
+        <b>Confirms —</b>
+        <span>should print <code class="inline">kubernetes-server</code>.</span>
+      </div>
+    </section>
+
+    <footer class="finish">
+      <span class="eyebrow">Once this is done</span>
+      <p style="margin: 0;">
+        Let your assistant know, and it'll trigger a real push to test the
+        full pipeline end-to-end: CI builds and pushes to
+        <code class="inline">ghcr.io</code>, your runner picks up the
+        deploy job, and the changed containers come back up on the box.
+      </p>
+    </footer>
+  </main>
+</div>
