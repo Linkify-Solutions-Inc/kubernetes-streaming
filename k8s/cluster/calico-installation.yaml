@@ -1,0 +1,29 @@
+# Calico v3.32.1 config for the Phase 2 single-node cluster.
+# Prereq: the Tigera operator must be installed first --
+#   kubectl create -f https://raw.githubusercontent.com/projectcalico/calico/v3.32.1/manifests/tigera-operator.yaml
+apiVersion: operator.tigera.io/v1
+kind: Installation
+metadata:
+  name: default
+spec:
+  calicoNetwork:
+    ipPools:
+      - name: default-ipv4-ippool
+        blockSize: 26
+        # Must match networking.podSubnet in kubeadm-config.yaml.
+        cidr: 192.168.0.0/16
+        # Only encapsulates traffic that crosses a subnet boundary. On this
+        # single node nothing does, so pod traffic stays unencapsulated --
+        # but the setting is already correct if a second node is ever joined.
+        encapsulation: VXLANCrossSubnet
+        natOutgoing: Enabled
+        nodeSelector: all()
+---
+# Serves Calico's CRDs (NetworkPolicy, IPPool, ...) through the k8s API
+# aggregation layer, so `kubectl get networkpolicies.crd.projectcalico.org`
+# and field validation work.
+apiVersion: operator.tigera.io/v1
+kind: APIServer
+metadata:
+  name: default
+spec: {}

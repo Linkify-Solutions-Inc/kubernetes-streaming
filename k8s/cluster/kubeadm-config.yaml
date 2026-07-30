@@ -1,0 +1,34 @@
+# Single-node control-plane for Phase 2 (see SPEC.md). Applied with:
+#   sudo kubeadm init --config k8s/cluster/kubeadm-config.yaml
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: InitConfiguration
+localAPIEndpoint:
+  # The box's LAN address on ens18. Tailscale's 100.64.0.9 is a /32 with no
+  # subnet routes, so it can't be the advertise address -- it's a cert SAN
+  # below instead, which is all that's needed to run kubectl over Tailscale.
+  advertiseAddress: 10.50.0.2
+  bindPort: 6443
+nodeRegistration:
+  # The box's hostname is "aayush-InternServer"; node names must be lowercase
+  # RFC-1123, so it's pinned explicitly rather than left to kubeadm.
+  name: aayush-internserver
+  criSocket: unix:///run/containerd/containerd.sock
+---
+apiVersion: kubeadm.k8s.io/v1beta4
+kind: ClusterConfiguration
+kubernetesVersion: v1.35.7
+clusterName: kubernetes-streaming
+networking:
+  # Calico's default pod CIDR. Deliberately not 10.x or 172.16-31.x: the box's
+  # LAN is 10.50.0.0/24 and Docker's bridges hold 172.17-172.20.0.0/16.
+  podSubnet: 192.168.0.0/16
+  serviceSubnet: 10.96.0.0/12
+  dnsDomain: cluster.local
+apiServer:
+  certSANs:
+    - 10.50.0.2
+    - 100.64.0.9
+    - aayush-internserver
+    - aayush-internserver.hs.aayushpathak.com
+    - localhost
+    - 127.0.0.1

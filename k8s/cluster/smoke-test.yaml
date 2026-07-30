@@ -1,0 +1,73 @@
+# Throwaway end-to-end check of the Phase 2 cluster: proves scheduling,
+# Calico pod networking, CoreDNS, MetalLB address assignment and ingress-nginx
+# L7 routing all work together. Delete once the real services land.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: smoke-test
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whoami
+  namespace: smoke-test
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: whoami }
+  template:
+    metadata:
+      labels: { app: whoami }
+    spec:
+      containers:
+        - name: whoami
+          image: traefik/whoami:v1.10.2
+          ports:
+            - containerPort: 80
+          resources:
+            requests: { cpu: 10m, memory: 16Mi }
+            limits: { cpu: 100m, memory: 64Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami
+  namespace: smoke-test
+spec:
+  selector: { app: whoami }
+  ports:
+    - port: 80
+      targetPort: 80
+---
+# L7 path: hits ingress-nginx on the MetalLB IP, routed by Host header.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: whoami
+  namespace: smoke-test
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: whoami.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: whoami
+                port: { number: 80 }
+---
+# L4 path: the same shape MediaMTX's RTMP:1935 will use -- a bare
+# type: LoadBalancer Service getting its own MetalLB IP, no Ingress involved.
+apiVersion: v1
+kind: Service
+metadata:
+  name: whoami-l4
+  namespace: smoke-test
+spec:
+  type: LoadBalancer
+  selector: { app: whoami }
+  ports:
+    - port: 8080
+      targetPort: 80

@@ -1,0 +1,2018 @@
+<title>How Kubernetes Actually Works</title>
+<style>
+  :root {
+    --paper: #eef1f4;
+    --surface: #ffffff;
+    --surface-dim: #e4e8ec;
+    --ink: #1b232c;
+    --ink-dim: #57626d;
+    --line: #ccd3d9;
+    --amber: #a35f22;
+    --amber-ink: #7c4718;
+    --teal: #2d5f74;
+    --teal-bg: #dfe9ec;
+    --ok: #2f6b3e;
+    --ok-bg: #dfeee2;
+    --warn: #9a3d3d;
+    --warn-bg: #f2e0e0;
+    --code-bg: #1b232c;
+    --code-ink: #e7ebee;
+    --code-dim: #93a1ac;
+    --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+      --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+      --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+      --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+      --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+    --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+    --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+    --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+    --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1f4; --surface: #ffffff; --surface-dim: #e4e8ec;
+    --ink: #1b232c; --ink-dim: #57626d; --line: #ccd3d9;
+    --amber: #a35f22; --amber-ink: #7c4718; --teal: #2d5f74; --teal-bg: #dfe9ec;
+    --ok: #2f6b3e; --ok-bg: #dfeee2; --warn: #9a3d3d; --warn-bg: #f2e0e0;
+    --code-bg: #1b232c; --code-ink: #e7ebee; --code-dim: #93a1ac; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6; font-size: 16px;
+  }
+  ::selection { background: var(--amber); color: #fff; }
+  a { color: var(--amber-ink); }
+  code, pre, kbd {
+    font-family: "Cascadia Code", "Cascadia Mono", ui-monospace, "SF Mono", Consolas,
+      "Liberation Mono", monospace;
+  }
+
+  .topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .topbar-inner { max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 1.75rem; }
+  .eyebrow {
+    display: inline-block; font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--amber-ink); background: color-mix(in srgb, var(--amber) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    padding: 0.2rem 0.55rem; border-radius: 3px;
+  }
+  h1 {
+    margin: 0.65rem 0 0.35rem; font-size: 1.95rem; font-weight: 700;
+    letter-spacing: -0.015em; text-wrap: balance;
+  }
+  .subtitle {
+    margin: 0 0 1rem; color: var(--ink-dim); font-size: 1.02rem;
+    max-width: 64ch; text-wrap: pretty;
+  }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem;
+    font-size: 0.85rem; color: var(--ink-dim);
+  }
+  .meta-row strong { color: var(--ink); font-weight: 600; }
+
+  .layout {
+    max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 5rem;
+    display: grid; grid-template-columns: 210px minmax(0, 1fr);
+    gap: 2.5rem; align-items: start;
+  }
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+    .rail { display: none; }
+  }
+
+  .rail {
+    position: sticky; top: 1.5rem; display: flex; flex-direction: column;
+    gap: 0.1rem; max-height: calc(100vh - 3rem); overflow-y: auto;
+    padding-right: 0.4rem;
+  }
+  .rail-label {
+    font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 0.45rem;
+  }
+  .rail-label + .rail-label, .rail a + .rail-label { margin-top: 1.1rem; }
+  .rail a {
+    display: flex; gap: 0.5rem; align-items: baseline;
+    padding: 0.3rem 0 0.3rem 0.7rem; font-size: 0.85rem;
+    color: var(--ink-dim); text-decoration: none;
+    border-left: 2px solid var(--line); margin-left: -1px;
+  }
+  .rail a:hover { color: var(--ink); border-left-color: var(--amber); }
+  .rail a .n {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber-ink); font-size: 0.78rem; flex-shrink: 0;
+  }
+
+  main { min-width: 0; }
+
+  .intro { color: var(--ink-dim); max-width: 68ch; margin: 0 0 2rem; }
+  .intro strong { color: var(--ink); }
+  .intro p { margin: 0 0 0.9rem; text-wrap: pretty; }
+
+  .step {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.5rem 1.6rem 1.7rem;
+    margin-bottom: 1.5rem; box-shadow: var(--shadow); scroll-margin-top: 1.5rem;
+  }
+  .step-head {
+    display: flex; align-items: baseline; gap: 0.85rem;
+    margin-bottom: 0.9rem; flex-wrap: wrap;
+  }
+  .step-num {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber); font-size: 1.05rem; font-weight: 600;
+  }
+  .step h2 { margin: 0; font-size: 1.2rem; font-weight: 650; letter-spacing: -0.008em; }
+  .step h3 {
+    margin: 1.6rem 0 0.6rem; font-size: 0.99rem; font-weight: 650;
+    letter-spacing: -0.005em;
+  }
+  .step h3:first-child { margin-top: 0; }
+  .step h4 {
+    margin: 1.1rem 0 0.4rem; font-size: 0.9rem; font-weight: 650;
+    color: var(--ink-dim); letter-spacing: 0.01em;
+  }
+  .context-chip {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--teal); background: var(--teal-bg);
+    border-radius: 999px; padding: 0.18rem 0.65rem; white-space: nowrap;
+  }
+
+  .why, .confirm, .gotcha {
+    display: flex; gap: 0.7rem; border-radius: 0 6px 6px 0;
+    padding: 0.8rem 0.95rem; margin: 0 0 1rem;
+    font-size: 0.92rem; text-wrap: pretty;
+  }
+  .why { background: var(--teal-bg); border-left: 3px solid var(--teal); }
+  .why b { color: var(--teal); font-weight: 700; }
+  .confirm { background: var(--ok-bg); border-left: 3px solid var(--ok); }
+  .confirm b { color: var(--ok); font-weight: 700; }
+  .gotcha { background: var(--warn-bg); border-left: 3px solid var(--warn); }
+  .gotcha b { color: var(--warn); font-weight: 700; }
+
+  p.step-p { margin: 0 0 1rem; text-wrap: pretty; }
+  p.step-p:last-child { margin-bottom: 0; }
+  .step ul, .step ol { margin: 0 0 1rem; padding-left: 1.35rem; }
+  .step li { margin-bottom: 0.45rem; text-wrap: pretty; }
+  .step li:last-child { margin-bottom: 0; }
+  .step ul ul, .step ol ol, .step ul ol { margin: 0.4rem 0 0; }
+
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+    padding: 0.85rem 1rem; margin: 0 0 1rem; overflow-x: auto;
+    font-size: 0.85rem; line-height: 1.6;
+  }
+  pre code { color: inherit; }
+  pre .c { color: var(--code-dim); }
+  pre .ph { color: var(--code-key); }
+  pre.out {
+    background: var(--surface-dim); color: var(--ink); border: 1px solid var(--line);
+  }
+  pre.out .c { color: var(--ink-dim); }
+  code.inline {
+    background: var(--surface-dim); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.87em; word-break: break-word;
+  }
+
+  .tbl-wrap { overflow-x: auto; margin: 0 0 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 460px; }
+  th, td {
+    text-align: left; padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  th {
+    font-size: 0.73rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-dim); font-weight: 600;
+  }
+  td code { font-size: 0.85em; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .diagram {
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.1rem; margin: 0 0 1.2rem;
+  }
+  .dlayer {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 0.75rem 0.85rem; margin-bottom: 0.55rem;
+  }
+  .dlayer:last-child { margin-bottom: 0; }
+  .dlayer-title {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--amber-ink); margin-bottom: 0.5rem;
+  }
+  .dboxes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .dbox {
+    border: 1px solid var(--line); border-radius: 5px;
+    padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--paper);
+  }
+  .dbox b { display: block; font-weight: 650; font-size: 0.82rem; }
+  .dbox span {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; color: var(--ink-dim);
+  }
+  .dbox.accent {
+    border-color: var(--amber);
+    background: color-mix(in srgb, var(--amber) 8%, var(--paper));
+  }
+  .dbox.teal { border-color: var(--teal); background: var(--teal-bg); }
+  .darrow {
+    text-align: center; color: var(--ink-dim); font-size: 0.88rem;
+    margin: 0.15rem 0; font-family: "Cascadia Code", ui-monospace, monospace;
+  }
+
+  /* numbered end-to-end trace */
+  .trace { margin: 0 0 1.2rem; counter-reset: tr; }
+  .trace-item {
+    display: grid; grid-template-columns: 1.7rem minmax(0, 1fr);
+    gap: 0.85rem; padding-bottom: 1rem; position: relative;
+  }
+  .trace-item::before {
+    counter-increment: tr; content: counter(tr);
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.75rem; font-weight: 600; color: var(--amber-ink);
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 50%; width: 1.7rem; height: 1.7rem;
+    display: grid; place-items: center;
+  }
+  .trace-item:not(:last-child)::after {
+    content: ""; position: absolute; left: 0.85rem; top: 1.85rem; bottom: 0.1rem;
+    width: 1px; background: var(--line);
+  }
+  .trace-item > div { padding-top: 0.1rem; font-size: 0.92rem; }
+  .trace-item b { font-weight: 650; }
+  .trace-item .who {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.74rem; color: var(--teal); display: block; margin-bottom: 0.1rem;
+  }
+
+  .glossary { font-size: 0.9rem; }
+  .glossary dt {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-weight: 600; color: var(--amber-ink); margin-top: 0.8rem; font-size: 0.85rem;
+  }
+  .glossary dt:first-child { margin-top: 0; }
+  .glossary dd { margin: 0.15rem 0 0; color: var(--ink); text-wrap: pretty; }
+
+  footer.finish {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--amber); border-radius: 0 10px 10px 0;
+    padding: 1.3rem 1.5rem; box-shadow: var(--shadow); font-size: 0.97rem;
+  }
+  footer.finish .eyebrow { margin-bottom: 0.6rem; }
+  footer.finish p { margin: 0 0 0.8rem; text-wrap: pretty; }
+  footer.finish p:last-child { margin-bottom: 0; }
+
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="eyebrow">Reference · Concepts</span>
+    <h1>How Kubernetes Actually Works</h1>
+    <p class="subtitle">
+      The model underneath the YAML — control loops, the object graph, how a
+      packet finds a pod, and why the whole system is built the way it is.
+    </p>
+    <div class="meta-row">
+      <span><strong>Scope:</strong> theory and mechanics</span>
+      <span><strong>Assumes:</strong> you know containers</span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="rail">
+    <div class="rail-label">Foundations</div>
+    <a href="#s1"><span class="n">1</span> The core idea</a>
+    <a href="#s2"><span class="n">2</span> Objects &amp; the API</a>
+    <a href="#s3"><span class="n">3</span> The components</a>
+    <div class="rail-label">Running things</div>
+    <a href="#s4"><span class="n">4</span> Pods</a>
+    <a href="#s5"><span class="n">5</span> Controllers</a>
+    <a href="#s6"><span class="n">6</span> Scheduling</a>
+    <a href="#s7"><span class="n">7</span> Resources &amp; QoS</a>
+    <div class="rail-label">Networking</div>
+    <a href="#s8"><span class="n">8</span> The network model</a>
+    <a href="#s9"><span class="n">9</span> Services</a>
+    <a href="#s10"><span class="n">10</span> DNS</a>
+    <a href="#s11"><span class="n">11</span> Getting in</a>
+    <a href="#s12"><span class="n">12</span> NetworkPolicy</a>
+    <div class="rail-label">State &amp; config</div>
+    <a href="#s13"><span class="n">13</span> Storage</a>
+    <a href="#s14"><span class="n">14</span> Config &amp; Secrets</a>
+    <div class="rail-label">Control</div>
+    <a href="#s15"><span class="n">15</span> Auth &amp; RBAC</a>
+    <a href="#s16"><span class="n">16</span> Admission</a>
+    <a href="#s17"><span class="n">17</span> CRDs &amp; operators</a>
+    <div class="rail-label">Putting it together</div>
+    <a href="#s18"><span class="n">18</span> Full trace</a>
+    <a href="#s19"><span class="n">19</span> Failure modes</a>
+    <a href="#s20"><span class="n">20</span> Glossary</a>
+  </nav>
+
+  <main>
+    <div class="intro">
+      <p>
+        Most Kubernetes explanations start with a list of components — apiserver,
+        scheduler, kubelet — and never say what holds them together. That gets
+        you a vocabulary but not a mental model, and it's why Kubernetes feels
+        arbitrary for a long time before it suddenly doesn't.
+      </p>
+      <p>
+        This guide goes the other way. There is exactly <strong>one idea</strong>
+        at the centre of Kubernetes, and every component is a consequence of it.
+        Once that idea is clear, the rest stops being a list to memorise and
+        becomes something you can reason about — including the failures.
+      </p>
+    </div>
+
+    <section class="step" id="s1">
+      <div class="step-head">
+        <span class="step-num">01</span>
+        <h2>The core idea: declare the destination, not the route</h2>
+      </div>
+
+      <p class="step-p">
+        Almost every system administration tool before Kubernetes was
+        <em>imperative</em>. You issued commands: start this process, copy that
+        file, open this port. The tool did what you said, in order, once. If it
+        half-finished, you owned the mess. If something drifted afterwards,
+        nobody noticed.
+      </p>
+
+      <p class="step-p">
+        Kubernetes is <em>declarative</em>. You never tell it to do anything.
+        You write down a description of the world you want, hand it over, and
+        the system continuously works to make reality match. "Three replicas of
+        this image exist" is a statement about how things should be, not an
+        instruction to start three containers.
+      </p>
+
+      <div class="why">
+        <b>The whole system in one sentence —</b>
+        <span>
+          Kubernetes stores your <em>desired state</em>, observes the
+          <em>actual state</em>, and runs a never-ending loop that tries to
+          close the gap between them.
+        </span>
+      </div>
+
+      <h3>The reconciliation loop</h3>
+      <p class="step-p">
+        That loop is the fundamental unit of the system. It looks like this,
+        and it never terminates:
+      </p>
+      <pre><code>for {
+    desired  := readFromAPI()      <span class="c">// what the user asked for</span>
+    actual   := observeWorld()     <span class="c">// what's really running</span>
+    if diff := compare(desired, actual); diff != nil {
+        act(diff)                  <span class="c">// take one step to close the gap</span>
+    }
+}</code></pre>
+
+      <p class="step-p">
+        A piece of code that runs this loop is called a <strong>controller</strong>.
+        Kubernetes is, essentially, several dozen controllers running
+        concurrently, each watching a small slice of the world and each caring
+        about exactly one kind of gap.
+      </p>
+
+      <h3>Level-triggered, not edge-triggered</h3>
+      <p class="step-p">
+        This distinction sounds academic and is actually the single most
+        important design decision in the system.
+      </p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th></th><th>Edge-triggered</th><th>Level-triggered</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Reacts to</td>
+              <td>Events — "a pod died"</td>
+              <td>State — "there are 2 pods, I want 3"</td>
+            </tr>
+            <tr>
+              <td>Miss an event</td>
+              <td>Permanently wrong</td>
+              <td>Next loop fixes it</td>
+            </tr>
+            <tr>
+              <td>Restart the controller</td>
+              <td>Lost all pending work</td>
+              <td>Re-observes, carries on</td>
+            </tr>
+            <tr>
+              <td>Duplicate event</td>
+              <td>Acts twice — bug</td>
+              <td>Second pass sees no gap, does nothing</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="step-p">
+        Kubernetes controllers are level-triggered. They do use a watch stream
+        for efficiency — reacting immediately beats polling — but the watch is
+        only a <em>hint to look sooner</em>. The decision is always made by
+        comparing full current state against full desired state. Every
+        controller also re-syncs on a timer regardless of events.
+      </p>
+
+      <div class="why">
+        <b>Why this makes everything else possible —</b>
+        <span>
+          it is what makes the system self-healing rather than merely automated.
+          A controller can crash mid-action, miss every event while it was down,
+          come back with no memory of what it was doing, and still converge —
+          because it never needed the history, only the present. This is also
+          why <code class="inline">kubectl apply</code> is safe to run a hundred
+          times.
+        </span>
+      </div>
+
+      <div class="gotcha">
+        <b>The consequence people trip on —</b>
+        <span>
+          nothing in Kubernetes is transactional or immediate. Applying a
+          manifest returns as soon as the <em>record</em> is stored, not when
+          the world matches it. Everything after that is eventual. When a pod
+          isn't running yet, the honest question is almost never "did the
+          command fail?" but "which controller is stuck, and what does it think
+          is wrong?"
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s2">
+      <div class="step-head">
+        <span class="step-num">02</span>
+        <h2>Objects: spec, status, and one door</h2>
+      </div>
+
+      <p class="step-p">
+        If controllers compare desired against actual, both have to be written
+        down somewhere. That is what a Kubernetes <strong>object</strong> is,
+        and it's why nearly every object has the same two-part shape:
+      </p>
+
+      <pre><code>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: streaming
+  labels: { app: web }
+<span class="ph">spec:</span>                      <span class="c"># DESIRED — written by you</span>
+  replicas: 3
+<span class="ph">status:</span>                    <span class="c"># ACTUAL — written by a controller</span>
+  replicas: 3
+  readyReplicas: 2
+  unavailableReplicas: 1</code></pre>
+
+      <div class="why">
+        <b>The most useful habit in Kubernetes —</b>
+        <span>
+          when something is wrong, read <code class="inline">status</code>, not
+          <code class="inline">spec</code>. <code class="inline">spec</code> is
+          just your own wish reflected back at you; it is true by construction
+          and tells you nothing. <code class="inline">status</code> is the
+          system reporting what it actually managed to achieve, and it is where
+          the answer lives. This is what <code class="inline">kubectl
+          describe</code> is really for.
+        </span>
+      </div>
+
+      <h3>Identity: names, namespaces, labels</h3>
+      <ul>
+        <li><strong>Name</strong> — unique per kind, per namespace. Renaming is
+          not a thing; you delete and create.</li>
+        <li><strong>Namespace</strong> — a scope for names, and the unit that
+          RBAC, quotas and NetworkPolicy attach to. Not a security boundary on
+          its own: pods in different namespaces can reach each other freely
+          unless a NetworkPolicy says otherwise.</li>
+        <li><strong>Labels</strong> — arbitrary key/value pairs that are
+          <em>queryable</em>. This is how objects find each other.</li>
+        <li><strong>Annotations</strong> — arbitrary key/value pairs that are
+          <em>not</em> queryable. For data meant for tools and humans, not
+          selectors.</li>
+      </ul>
+
+      <div class="why">
+        <b>Labels are the joining mechanism —</b>
+        <span>
+          there are no foreign keys and no direct references in Kubernetes. A
+          Service doesn't hold a list of its pods; it holds a
+          <em>label selector</em>, and membership is computed continuously.
+          That's why adding a label to a running pod can silently put it into
+          production traffic, and why a one-character typo in a selector
+          produces a Service with zero endpoints and no error message anywhere.
+        </span>
+      </div>
+
+      <h3>Ownership and cascading deletion</h3>
+      <p class="step-p">
+        Objects created by controllers carry an
+        <code class="inline">ownerReferences</code> field pointing at their
+        parent. This forms a tree — Deployment owns ReplicaSet owns Pod — and
+        the garbage collector uses it: delete the Deployment and everything
+        beneath it is removed, because each child records who it belongs to.
+        This is also how an orphaned ReplicaSet with no owner keeps running
+        forever after a botched delete.
+      </p>
+
+      <h3>Finalizers</h3>
+      <p class="step-p">
+        A <code class="inline">finalizer</code> is a string on an object that
+        blocks its deletion. When you delete such an object, the API server
+        only sets <code class="inline">deletionTimestamp</code>; the object
+        stays until the controller responsible for that finalizer does its
+        cleanup and removes the string.
+      </p>
+      <div class="gotcha">
+        <b>The classic hang —</b>
+        <span>
+          a namespace stuck <code class="inline">Terminating</code> forever is
+          almost always a finalizer whose controller is gone — frequently a
+          deleted operator that left CRs behind. Nothing is broken in
+          Kubernetes; a promise is simply outstanding and nobody is left to
+          keep it.
+        </span>
+      </div>
+
+      <h3>Everything goes through the API server</h3>
+      <p class="step-p">
+        No component reads or writes etcd directly except the API server. The
+        scheduler doesn't. The kubelet doesn't. Controllers don't. They all
+        speak HTTP to the same endpoint you do with
+        <code class="inline">kubectl</code> — with the same authentication, the
+        same RBAC, the same admission checks and the same audit log.
+      </p>
+      <div class="why">
+        <b>Why this matters —</b>
+        <span>
+          it means there are no privileged side channels. Every state change in
+          the cluster is a normal API request, which is what makes the whole
+          system uniformly observable, uniformly securable, and extensible by
+          anyone who can write an HTTP client. Your controller is not a
+          second-class citizen next to the built-in ones — it is literally the
+          same kind of thing.
+        </span>
+      </div>
+
+      <h3>Watches and optimistic concurrency</h3>
+      <p class="step-p">
+        Every object carries a <code class="inline">resourceVersion</code>.
+        Clients <code class="inline">WATCH</code> from a version and receive a
+        stream of changes since then, rather than polling. On write, a client
+        can send the version it read; if someone else has modified the object
+        in the meantime, the write is rejected with a conflict and the
+        controller retries from fresh state.
+      </p>
+      <p class="step-p">
+        No locks, no leases on the data. Concurrent controllers just retry —
+        which works precisely because they are level-triggered and losing a
+        round costs nothing.
+      </p>
+    </section>
+
+    <section class="step" id="s3">
+      <div class="step-head">
+        <span class="step-num">03</span>
+        <h2>The components, and what each one is a loop over</h2>
+      </div>
+
+      <div class="diagram">
+        <div class="dlayer">
+          <div class="dlayer-title">Control plane</div>
+          <div class="dboxes">
+            <div class="dbox teal"><b>etcd</b><span>the only durable state</span></div>
+            <div class="dbox accent"><b>kube-apiserver</b><span>the only door to it</span></div>
+            <div class="dbox"><b>kube-scheduler</b><span>pod → node</span></div>
+            <div class="dbox"><b>controller-manager</b><span>~30 controllers</span></div>
+          </div>
+        </div>
+        <div class="darrow">↕ &nbsp; every arrow here is HTTP to the apiserver &nbsp; ↕</div>
+        <div class="dlayer">
+          <div class="dlayer-title">On every node</div>
+          <div class="dboxes">
+            <div class="dbox accent"><b>kubelet</b><span>makes pods real</span></div>
+            <div class="dbox"><b>kube-proxy</b><span>makes Services real</span></div>
+            <div class="dbox"><b>container runtime</b><span>via CRI</span></div>
+            <div class="dbox"><b>CNI plugin</b><span>pod networking</span></div>
+          </div>
+        </div>
+      </div>
+
+      <h3>etcd</h3>
+      <p class="step-p">
+        A distributed key-value store using the Raft consensus algorithm. It is
+        the <em>only</em> stateful component in the entire system — everything
+        else can be killed and restarted with no data loss, because everything
+        else keeps its state here.
+      </p>
+      <p class="step-p">
+        Raft needs a quorum, which is why control-plane node counts are odd
+        (3, 5) — and why etcd is unusually sensitive to disk latency. A slow
+        disk causes missed heartbeats, which causes leader elections, which
+        stalls every write in the cluster. "The cluster feels slow" is very
+        often an etcd fsync problem.
+      </p>
+
+      <h3>kube-apiserver</h3>
+      <p class="step-p">
+        A REST server in front of etcd, and the only component that talks to
+        it. Each request runs a fixed pipeline:
+      </p>
+      <ol>
+        <li><strong>Authentication</strong> — who is this? (client cert, bearer token, ServiceAccount token)</li>
+        <li><strong>Authorization</strong> — may they do this? (RBAC)</li>
+        <li><strong>Mutating admission</strong> — modify the object before storing</li>
+        <li><strong>Schema validation</strong> — is it well-formed?</li>
+        <li><strong>Validating admission</strong> — accept or reject outright</li>
+        <li><strong>Persist</strong> to etcd</li>
+      </ol>
+      <p class="step-p">
+        It is stateless, so it scales horizontally — you can run several behind
+        a load balancer.
+      </p>
+
+      <h3>kube-scheduler</h3>
+      <p class="step-p">
+        One loop, one job: watch for pods with an empty
+        <code class="inline">spec.nodeName</code>, decide which node each should
+        run on, and write that decision back. It never starts a container — it
+        only fills in a field. Covered in depth in <a href="#s6">§6</a>.
+      </p>
+
+      <h3>kube-controller-manager</h3>
+      <p class="step-p">
+        A single binary running roughly thirty independent control loops in
+        goroutines. The Deployment controller, ReplicaSet controller, Job
+        controller, Node controller, EndpointSlice controller, ServiceAccount
+        controller, garbage collector and others all live here. They are bundled
+        for operational convenience; conceptually each is separate and none
+        knows about the others.
+      </p>
+
+      <h3>kubelet</h3>
+      <p class="step-p">
+        The agent on each node, and the component that actually causes
+        containers to exist. Its loop:
+      </p>
+      <ul>
+        <li>Watch the API server for pods where
+          <code class="inline">spec.nodeName == thisNode</code></li>
+        <li>For each, ensure the containers described are running, via the
+          <strong>CRI</strong> (Container Runtime Interface) — a gRPC API the
+          runtime implements</li>
+        <li>Call the <strong>CNI</strong> plugin to give the pod a network
+          namespace and an IP</li>
+        <li>Mount volumes, inject ConfigMaps and Secrets</li>
+        <li>Run probes; restart containers per <code class="inline">restartPolicy</code></li>
+        <li>Report observed state back into the pod's
+          <code class="inline">status</code></li>
+      </ul>
+      <div class="why">
+        <b>Note the direction —</b>
+        <span>
+          the kubelet <em>pulls</em> from the API server. The control plane
+          never connects to it to push work. That's why a node behind NAT with
+          no inbound connectivity works fine, and why a node losing contact
+          keeps running its existing pods quite happily — it simply stops
+          hearing about changes.
+        </span>
+      </div>
+
+      <h3>kube-proxy</h3>
+      <p class="step-p">
+        Watches Services and EndpointSlices and programs the kernel so that
+        traffic to a Service's virtual IP reaches a real pod. In the default
+        <code class="inline">iptables</code> mode it writes NAT rules; IPVS and
+        nftables modes exist for larger clusters. It handles no packets itself —
+        it only configures the kernel, which does all the work. See
+        <a href="#s9">§9</a>.
+      </p>
+    </section>
+
+    <section class="step" id="s4">
+      <div class="step-head">
+        <span class="step-num">04</span>
+        <h2>Pods: why the atom isn't a container</h2>
+      </div>
+
+      <p class="step-p">
+        Kubernetes never schedules a container. The smallest deployable unit is
+        a <strong>Pod</strong>: one or more containers that share a network
+        namespace, IPC namespace, and any volumes you define.
+      </p>
+
+      <h3>What sharing actually means</h3>
+      <ul>
+        <li>All containers in a pod share <strong>one IP address</strong> and one
+          port space. They reach each other on
+          <code class="inline">localhost</code>, and two of them cannot both
+          bind port 8080.</li>
+        <li>The IP belongs to the <em>pod</em>, not to any container. Containers
+          can restart and the address is unchanged.</li>
+        <li>Volumes are declared at pod level and mounted into whichever
+          containers need them.</li>
+      </ul>
+
+      <div class="why">
+        <b>The pause container —</b>
+        <span>
+          the namespace has to be owned by <em>something</em> that outlives
+          individual containers, or a crash-restart would drop the IP. So the
+          kubelet starts a tiny near-empty container first — the
+          <code class="inline">pause</code> container — whose only job is to
+          hold the namespaces open. Every other container in the pod joins its
+          namespaces. It's why every node has a pause image, and why you see
+          one extra container per pod at the runtime level that never appears
+          in your YAML.
+        </span>
+      </div>
+
+      <h3>When to put two containers in one pod</h3>
+      <p class="step-p">
+        The test is not "are these related?" — it's <em>"must these always be
+        scheduled onto the same machine and scale as a single unit?"</em> If
+        the answer is no, they are two pods. A web app and its database are
+        related and belong in separate pods. A web server and a log shipper
+        reading its files through a shared volume genuinely cannot be
+        separated — that's a sidecar.
+      </p>
+
+      <h3>Init containers</h3>
+      <p class="step-p">
+        Run to completion, in declared order, before any app container starts.
+        Each must exit 0 or the pod restarts. Useful for waiting on a
+        dependency, running a schema migration, or fetching config — and
+        because they're separate images, they can carry tools you don't want in
+        the runtime image.
+      </p>
+
+      <h3>Phases and conditions</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Phase</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr><td><code>Pending</code></td><td>Accepted, but not all containers running. Either unscheduled, or scheduled and still pulling images.</td></tr>
+            <tr><td><code>Running</code></td><td>Bound to a node, all containers created, at least one running.</td></tr>
+            <tr><td><code>Succeeded</code></td><td>All containers exited 0 and won't restart.</td></tr>
+            <tr><td><code>Failed</code></td><td>All terminated, at least one non-zero.</td></tr>
+            <tr><td><code>Unknown</code></td><td>The node stopped reporting.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="step-p">
+        Phase is a coarse summary. The detail is in
+        <code class="inline">status.conditions</code> —
+        <code class="inline">PodScheduled</code>,
+        <code class="inline">Initialized</code>,
+        <code class="inline">ContainersReady</code>,
+        <code class="inline">Ready</code> — which is where you find out
+        <em>which</em> step is stuck.
+      </p>
+
+      <h3>The three probes</h3>
+      <p class="step-p">
+        These are constantly confused, and they do completely different things.
+      </p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Probe</th><th>On failure</th><th>Answers</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>liveness</code></td>
+              <td><strong>Kills and restarts</strong> the container</td>
+              <td>"Is this wedged and beyond recovery?"</td>
+            </tr>
+            <tr>
+              <td><code>readiness</code></td>
+              <td><strong>Removes it from Service endpoints.</strong> Container keeps running</td>
+              <td>"Should it receive traffic right now?"</td>
+            </tr>
+            <tr>
+              <td><code>startup</code></td>
+              <td>Kills it — but <strong>suspends the other two</strong> until it first passes</td>
+              <td>"Has slow initialisation finished?"</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="gotcha">
+        <b>The classic outage —</b>
+        <span>
+          pointing a liveness probe at an endpoint that depends on a database.
+          The database has a blip, every replica's liveness probe fails at
+          once, Kubernetes restarts the entire fleet simultaneously, and now
+          you have a cold-start stampede on top of a database problem.
+          Liveness should test <em>only</em> whether the process itself is
+          healthy. Dependency checks belong in readiness, where failure removes
+          traffic instead of destroying the process.
+        </span>
+      </div>
+
+      <h3>Termination</h3>
+      <p class="step-p">
+        Deletion is not instant. The sequence is: the pod is marked terminating
+        and simultaneously removed from Service endpoints;
+        <code class="inline">preStop</code> hooks run;
+        <code class="inline">SIGTERM</code> is sent; Kubernetes waits up to
+        <code class="inline">terminationGracePeriodSeconds</code> (default 30);
+        then <code class="inline">SIGKILL</code>.
+      </p>
+      <p class="step-p">
+        Endpoint removal and SIGTERM race — they propagate through different
+        paths — so a container that exits immediately on SIGTERM can still drop
+        in-flight requests. Handling SIGTERM by finishing current work before
+        exiting is the difference between rolling updates that are invisible
+        and rolling updates that produce a spike of 502s.
+      </p>
+    </section>
+
+    <section class="step" id="s5">
+      <div class="step-head">
+        <span class="step-num">05</span>
+        <h2>Controllers: the workload objects</h2>
+      </div>
+
+      <p class="step-p">
+        Bare pods are rarely written by hand — nothing recreates them if the
+        node dies. Instead you declare a higher-level object and a controller
+        manages the pods beneath it.
+      </p>
+
+      <h3>Deployment → ReplicaSet → Pod</h3>
+      <p class="step-p">
+        The most common chain, and it's genuinely two controllers stacked:
+      </p>
+      <div class="diagram">
+        <div class="dlayer">
+          <div class="dlayer-title">Deployment controller — owns rollout strategy</div>
+          <div class="dboxes"><div class="dbox accent"><b>Deployment</b><span>replicas: 3, image: v2</span></div></div>
+        </div>
+        <div class="darrow">↓ creates a new ReplicaSet per pod-template change</div>
+        <div class="dlayer">
+          <div class="dlayer-title">ReplicaSet controller — owns "keep N alive"</div>
+          <div class="dboxes">
+            <div class="dbox"><b>ReplicaSet v1</b><span>scaled to 0</span></div>
+            <div class="dbox accent"><b>ReplicaSet v2</b><span>scaled to 3</span></div>
+          </div>
+        </div>
+        <div class="darrow">↓ creates/deletes to match its own count</div>
+        <div class="dlayer">
+          <div class="dlayer-title">Pods</div>
+          <div class="dboxes">
+            <div class="dbox teal"><b>pod-v2-a</b><span>Running</span></div>
+            <div class="dbox teal"><b>pod-v2-b</b><span>Running</span></div>
+            <div class="dbox teal"><b>pod-v2-c</b><span>Running</span></div>
+          </div>
+        </div>
+      </div>
+      <p class="step-p">
+        A ReplicaSet only knows how to hold a count steady. A Deployment adds
+        <em>versioning</em>: change the pod template and it creates a second
+        ReplicaSet, then shifts replicas from old to new, governed by
+        <code class="inline">maxSurge</code> (how many extra may exist during
+        the rollout) and <code class="inline">maxUnavailable</code> (how many
+        may be missing).
+      </p>
+      <p class="step-p">
+        Old ReplicaSets are kept at zero replicas rather than deleted — that is
+        what <code class="inline">kubectl rollout undo</code> uses. A rollback
+        is just scaling a previous ReplicaSet back up.
+      </p>
+
+      <h3>StatefulSet</h3>
+      <p class="step-p">
+        For workloads where the replicas are not interchangeable — databases,
+        message brokers, anything with a cluster identity. It provides four
+        guarantees a Deployment does not:
+      </p>
+      <ul>
+        <li><strong>Stable ordinal names</strong> —
+          <code class="inline">kafka-0</code>,
+          <code class="inline">kafka-1</code>, not random suffixes. A replacement
+          for <code class="inline">kafka-0</code> is also called
+          <code class="inline">kafka-0</code>.</li>
+        <li><strong>Stable network identity</strong> — each pod gets a resolvable
+          DNS name via a headless Service, so peers can address each other
+          individually.</li>
+        <li><strong>Stable storage</strong> —
+          <code class="inline">volumeClaimTemplates</code> creates one PVC per
+          pod, and a restarted <code class="inline">kafka-0</code> reattaches to
+          the same volume with the same data.</li>
+        <li><strong>Ordered operations</strong> — pod
+          <code class="inline">N</code> isn't created until
+          <code class="inline">N-1</code> is Ready; updates roll in reverse
+          ordinal order.</li>
+      </ul>
+      <div class="gotcha">
+        <b>PVCs outlive the StatefulSet —</b>
+        <span>
+          scaling down, or deleting the StatefulSet, does <em>not</em> delete
+          the PersistentVolumeClaims by default. This is deliberate — accidental
+          deletion of a database would otherwise be one command away — but it
+          surprises people who scale down to "clean up" and find the storage
+          still there, still billed, and still attached when they scale back up.
+        </span>
+      </div>
+
+      <h3>DaemonSet</h3>
+      <p class="step-p">
+        One pod per node, automatically, including on nodes that join later.
+        For things that are properties of a machine rather than of an
+        application: CNI agents, log collectors, node exporters, storage
+        drivers. DaemonSets usually carry tolerations so they run even on
+        tainted nodes — a log collector that skips your control-plane nodes
+        isn't much of a log collector.
+      </p>
+
+      <h3>Job and CronJob</h3>
+      <p class="step-p">
+        A <strong>Job</strong> runs pods until a specified number
+        <em>complete successfully</em>, rather than keeping them running
+        forever. <code class="inline">completions</code> sets how many successes
+        are needed, <code class="inline">parallelism</code> how many may run at
+        once, <code class="inline">backoffLimit</code> how many failures before
+        giving up. A <strong>CronJob</strong> is a controller that creates Jobs
+        on a schedule.
+      </p>
+      <div class="why">
+        <b>Why this matters for run-to-completion work —</b>
+        <span>
+          the Job model demands a fundamentally different program shape than a
+          Deployment. A Deployment container is a daemon: start, loop forever,
+          never exit — and exiting is a failure. A Job container must do
+          <em>one</em> unit of work and then <em>exit zero</em> — and not
+          exiting is the failure. A long-running consumer loop cannot be turned
+          into a Job by changing the manifest; the program has to be
+          restructured to take its input, act once, and terminate.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s6">
+      <div class="step-head">
+        <span class="step-num">06</span>
+        <h2>Scheduling: how a pod picks a node</h2>
+      </div>
+
+      <p class="step-p">
+        The scheduler watches for pods with no
+        <code class="inline">spec.nodeName</code>. For each, it runs two phases.
+      </p>
+
+      <h3>Phase 1 — Filtering</h3>
+      <p class="step-p">
+        Reduce all nodes to those that <em>could</em> host the pod. A node is
+        eliminated if any check fails:
+      </p>
+      <ul>
+        <li>Insufficient allocatable CPU/memory for the pod's <strong>requests</strong></li>
+        <li>Node doesn't match <code class="inline">nodeSelector</code> or required affinity</li>
+        <li>Node has a <strong>taint</strong> the pod doesn't <strong>tolerate</strong></li>
+        <li>Required ports already taken (for <code class="inline">hostPort</code>)</li>
+        <li>Required volume can't be attached there</li>
+      </ul>
+      <p class="step-p">
+        No survivors means the pod stays <code class="inline">Pending</code>,
+        with the reason recorded in its events. This is the single most common
+        thing to look at when a pod won't start.
+      </p>
+
+      <h3>Phase 2 — Scoring</h3>
+      <p class="step-p">
+        Rank the survivors and pick the best. Scoring favours spreading pods of
+        the same Service across nodes, balanced resource utilisation, and nodes
+        that already have the image cached. Then the scheduler issues a
+        <strong>Binding</strong> — an API write that sets
+        <code class="inline">nodeName</code>. That write is the entire act of
+        scheduling. The kubelet on that node notices and takes over.
+      </p>
+
+      <h3>Taints and tolerations — a repulsion mechanism</h3>
+      <p class="step-p">
+        A <strong>taint</strong> on a node repels pods. A
+        <strong>toleration</strong> on a pod lets it ignore a specific taint.
+        Three effects: <code class="inline">NoSchedule</code> (don't place new
+        pods), <code class="inline">PreferNoSchedule</code> (avoid if you can),
+        <code class="inline">NoExecute</code> (also evict pods already running
+        there).
+      </p>
+      <div class="why">
+        <b>Direction is the thing to keep straight —</b>
+        <span>
+          taints are the node saying "stay away unless you're special";
+          affinity is the pod saying "I want to be near X". Taints exclude by
+          default and require opt-in; affinity attracts. A dedicated GPU node
+          needs a taint — otherwise ordinary pods land on it and consume the
+          machine you set aside.
+        </span>
+      </div>
+
+      <h3>Affinity and anti-affinity</h3>
+      <ul>
+        <li><strong>Node affinity</strong> — place me on nodes with these labels.</li>
+        <li><strong>Pod affinity</strong> — place me near pods matching this
+          selector (co-locate with a cache).</li>
+        <li><strong>Pod anti-affinity</strong> — keep me away from them. This is
+          how you stop all three replicas of a database landing on one node and
+          losing everything together.</li>
+      </ul>
+      <p class="step-p">
+        Each is available as <code class="inline">required...</code> (a filter —
+        unsatisfiable means Pending) or
+        <code class="inline">preferred...</code> (a score — best effort).
+      </p>
+
+      <h3>Preemption</h3>
+      <p class="step-p">
+        Pods can carry a <code class="inline">PriorityClass</code>. If a
+        high-priority pod cannot be scheduled anywhere, the scheduler may evict
+        lower-priority pods to make room. Useful, and worth knowing about
+        before you discover it happening.
+      </p>
+      <div class="gotcha">
+        <b>Scheduling happens once —</b>
+        <span>
+          the scheduler places a pod and then forgets it. It does not
+          continuously rebalance. If the cluster becomes lopsided — because
+          nodes were added, or because a burst of pods landed together — nothing
+          moves existing pods to fix it. Rebalancing requires deleting pods so
+          they get scheduled afresh, or a separate tool built for it.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s7">
+      <div class="step-head">
+        <span class="step-num">07</span>
+        <h2>Requests, limits, and the CPU/memory asymmetry</h2>
+      </div>
+
+      <p class="step-p">
+        Two numbers per resource per container, and they do entirely different
+        jobs:
+      </p>
+      <ul>
+        <li><strong>request</strong> — what the <em>scheduler</em> reserves.
+          Used for placement decisions. Not enforced at runtime.</li>
+        <li><strong>limit</strong> — what the <em>kernel</em> enforces. Ignored
+          by the scheduler.</li>
+      </ul>
+
+      <div class="why">
+        <b>The consequence —</b>
+        <span>
+          a container with a large limit and no request will be scheduled onto
+          a node that cannot actually support it, because the scheduler was
+          never told it needed anything. Requests are how you communicate with
+          the scheduler; limits are how you communicate with the kernel. Setting
+          only one of them means half the system is guessing.
+        </span>
+      </div>
+
+      <h3>CPU and memory behave completely differently</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th></th><th>CPU</th><th>Memory</th></tr></thead>
+          <tbody>
+            <tr><td>Nature</td><td>Compressible — can be given less</td><td>Incompressible — can't un-allocate</td></tr>
+            <tr><td>Exceeding the limit</td><td><strong>Throttled</strong> by CFS quota. Runs slower.</td><td><strong>OOMKilled</strong> immediately.</td></tr>
+            <tr><td>Symptom</td><td>Latency, timeouts, no error anywhere</td><td>Exit code 137, container restart</td></tr>
+            <tr><td>Diagnosis</td><td>Hard — looks like a slow app</td><td>Easy — it's in the pod status</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="gotcha">
+        <b>CPU throttling is the nastiest resource bug in Kubernetes —</b>
+        <span>
+          nothing crashes, nothing logs an error, no event is emitted. The
+          application is simply paused for part of every 100 ms period, and
+          reports as tail latency that looks like a network or database problem.
+          If a service is mysteriously slow under load, check
+          <code class="inline">container_cpu_cfs_throttled_seconds_total</code>
+          before anything else.
+        </span>
+      </div>
+
+      <h3>QoS classes — derived, not declared</h3>
+      <p class="step-p">
+        Kubernetes assigns each pod a class based on what you set. It decides
+        who gets killed first when a node runs out of memory.
+      </p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Class</th><th>Condition</th><th>Eviction order</th></tr></thead>
+          <tbody>
+            <tr><td><code>Guaranteed</code></td><td>Every container sets both, and request == limit, for CPU <em>and</em> memory</td><td>Last</td></tr>
+            <tr><td><code>Burstable</code></td><td>At least one request set, but not matching the above</td><td>Middle</td></tr>
+            <tr><td><code>BestEffort</code></td><td>No requests or limits at all</td><td><strong>First</strong></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="step-p">
+        You cannot set the class directly — it falls out of your numbers.
+        Anything that must not be killed under pressure needs request equal to
+        limit on both resources.
+      </p>
+
+      <h3>Node pressure and eviction</h3>
+      <p class="step-p">
+        The kubelet watches memory, disk and inode pressure. Past a threshold it
+        evicts pods — BestEffort first, then Burstable exceeding their requests,
+        Guaranteed last. This is separate from OOMKill: eviction is a graceful
+        Kubernetes-level decision that reschedules the pod elsewhere, whereas
+        OOMKill is the kernel abruptly killing a process that crossed its own
+        limit.
+      </p>
+    </section>
+
+    <section class="step" id="s8">
+      <div class="step-head">
+        <span class="step-num">08</span>
+        <h2>The network model: flat, and deliberately so</h2>
+      </div>
+
+      <p class="step-p">
+        Kubernetes doesn't implement networking. It specifies a
+        <em>model</em> and requires the CNI plugin to satisfy it. Three rules:
+      </p>
+      <ol>
+        <li>Every pod gets its own IP address.</li>
+        <li>Any pod can reach any other pod, on any node,
+          <strong>without NAT</strong>.</li>
+        <li>The address a pod sees for itself is the same address others use to
+          reach it.</li>
+      </ol>
+
+      <div class="why">
+        <b>Why rule 3 sounds trivial and isn't —</b>
+        <span>
+          under Docker's default bridge networking, a container sees a private
+          address while the outside world reaches it through a mapped host
+          port. Anything that advertises its own address — service discovery,
+          clustered databases, Kafka brokers publishing their listener address —
+          breaks, because what it reports about itself is not usable by anyone
+          else. Kubernetes forbids that entire class of bug by construction.
+        </span>
+      </div>
+
+      <p class="step-p">
+        The cost is that pod IPs must be globally unique across the cluster,
+        which is why you allocate a large private range up front and why it must
+        not collide with anything else routable.
+      </p>
+
+      <h3>What a CNI plugin actually is</h3>
+      <p class="step-p">
+        Far simpler than it sounds: an executable in
+        <code class="inline">/opt/cni/bin</code>, configured by JSON in
+        <code class="inline">/etc/cni/net.d</code>. The kubelet runs it with
+        <code class="inline">ADD</code> when a pod starts and
+        <code class="inline">DEL</code> when it stops, passing the network
+        namespace path on stdin. <code class="inline">ADD</code> is expected to
+        create the interface, assign an IP, set up routes, and print the result
+        as JSON.
+      </p>
+      <p class="step-p">
+        Everything a CNI implementation does beyond that — cross-node routing,
+        encapsulation, NetworkPolicy enforcement — is its own design, not
+        Kubernetes'. That is why plugins differ so much:
+      </p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Plugin</th><th>Approach</th><th>NetworkPolicy</th></tr></thead>
+          <tbody>
+            <tr><td>Flannel</td><td>VXLAN overlay, minimal</td><td>None</td></tr>
+            <tr><td>Calico</td><td>Native routing (BGP) or VXLAN; iptables/eBPF dataplane</td><td>Full, plus its own extensions</td></tr>
+            <tr><td>Cilium</td><td>eBPF; can replace kube-proxy entirely</td><td>Full, including L7</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Overlay vs native routing</h3>
+      <p class="step-p">
+        Pod IPs aren't known to your physical network, so cross-node pod traffic
+        has to get there somehow. Either <strong>encapsulate</strong> — wrap the
+        pod packet inside a node-to-node packet (VXLAN, IPIP), which always
+        works but adds header overhead and lowers effective MTU — or use
+        <strong>native routing</strong>, telling the real network where each
+        node's pod range lives (usually via BGP), which is faster but needs
+        cooperation from your routers.
+      </p>
+      <p class="step-p">
+        Middle ground: encapsulate only when crossing a subnet boundary. Nodes
+        on the same L2 segment talk directly with no overhead; nodes further
+        apart fall back to encapsulation automatically.
+      </p>
+    </section>
+
+    <section class="step" id="s9">
+      <div class="step-head">
+        <span class="step-num">09</span>
+        <h2>Services: a virtual IP that isn't on any interface</h2>
+      </div>
+
+      <p class="step-p">
+        Pods are mortal and their IPs change constantly. A
+        <strong>Service</strong> is a stable name and address in front of a set
+        of them.
+      </p>
+
+      <h3>The ClusterIP is fiction</h3>
+      <p class="step-p">
+        This is the part that confuses everyone, and it's worth stating plainly:
+        <strong>a ClusterIP is not assigned to any network interface anywhere in
+        the cluster.</strong> Nothing listens on it. You cannot ping it
+        meaningfully. It exists only as a matching rule in the kernel's NAT
+        tables on every node.
+      </p>
+
+      <div class="diagram">
+        <div class="dlayer">
+          <div class="dlayer-title">A pod sends to the Service</div>
+          <div class="dboxes"><div class="dbox"><b>dst 10.96.14.7:80</b><span>the ClusterIP</span></div></div>
+        </div>
+        <div class="darrow">↓ &nbsp; netfilter, nat table &nbsp; ↓</div>
+        <div class="dlayer">
+          <div class="dlayer-title">kube-proxy's rules — written from EndpointSlices</div>
+          <div class="dboxes">
+            <div class="dbox accent"><b>KUBE-SERVICES</b><span>match on dst IP + port</span></div>
+            <div class="dbox accent"><b>DNAT, probabilistic</b><span>pick one endpoint</span></div>
+          </div>
+        </div>
+        <div class="darrow">↓ &nbsp; conntrack pins the flow &nbsp; ↓</div>
+        <div class="dlayer">
+          <div class="dlayer-title">Delivered to a real pod</div>
+          <div class="dboxes"><div class="dbox teal"><b>dst 192.168.115.12:8080</b><span>rewritten; the pod never sees the ClusterIP</span></div></div>
+        </div>
+      </div>
+
+      <p class="step-p">
+        The rewrite is done by the kernel on the <em>sending</em> node, before
+        the packet leaves. Load balancing is a probability chain across the
+        endpoint rules; conntrack then pins that flow so every packet in the
+        connection goes to the same pod.
+      </p>
+      <div class="gotcha">
+        <b>Two consequences that bite —</b>
+        <span>
+          load balancing is per-<em>connection</em>, not per-request. A client
+          holding one persistent HTTP/2 or gRPC connection sends every request
+          to the same pod — which is why gRPC appears not to load balance at
+          all. And because it's L4, the Service cannot inspect anything: no
+          path routing, no header routing, no retries.
+        </span>
+      </div>
+
+      <h3>EndpointSlices</h3>
+      <p class="step-p">
+        The Service's selector is evaluated continuously by the EndpointSlice
+        controller, which maintains the list of Ready pod IPs backing it.
+        kube-proxy watches these and rewrites its rules on change. Slices
+        replaced the older single Endpoints object because one object listing
+        every endpoint meant any single pod change pushed the entire list to
+        every node.
+      </p>
+      <p class="step-p">
+        Note <em>Ready</em>: a pod failing its readiness probe is removed from
+        the slice, so traffic stops. This is the whole mechanism connecting
+        readiness probes to load balancing.
+      </p>
+
+      <h3>Service types</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Type</th><th>What it adds</th></tr></thead>
+          <tbody>
+            <tr><td><code>ClusterIP</code></td><td>Default. Reachable only inside the cluster.</td></tr>
+            <tr><td><code>NodePort</code></td><td>Also opens the same port (30000–32767) on <em>every</em> node, forwarding to the Service.</td></tr>
+            <tr><td><code>LoadBalancer</code></td><td>NodePort, plus asks an external controller for a real IP. On a cloud that's the provider's API; on bare metal it needs something like MetalLB, or the Service sits at <code>&lt;pending&gt;</code> forever.</td></tr>
+            <tr><td><code>ExternalName</code></td><td>No proxying at all — just a CNAME in cluster DNS to an outside host.</td></tr>
+            <tr><td>Headless (<code>clusterIP: None</code>)</td><td>No virtual IP and no proxying. DNS returns the pod IPs directly.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="why">
+        <b>Headless is what makes StatefulSets work —</b>
+        <span>
+          a clustered system needs to address individual members, not a random
+          one. Load balancing across Kafka brokers would be actively wrong —
+          the client must reach the specific broker leading a partition. A
+          headless Service gives each pod its own DNS record and gets the
+          proxy out of the way entirely.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s10">
+      <div class="step-head">
+        <span class="step-num">10</span>
+        <h2>DNS: the naming scheme</h2>
+      </div>
+
+      <p class="step-p">
+        CoreDNS runs as a normal Deployment in the cluster and is itself
+        reachable through a Service. The kubelet writes that Service's address
+        into every pod's <code class="inline">/etc/resolv.conf</code>.
+      </p>
+      <pre><code><span class="ph">&lt;service&gt;</span>.<span class="ph">&lt;namespace&gt;</span>.svc.cluster.local     <span class="c"># → the ClusterIP</span>
+<span class="ph">&lt;pod&gt;</span>.<span class="ph">&lt;service&gt;</span>.<span class="ph">&lt;ns&gt;</span>.svc.cluster.local   <span class="c"># → a pod, headless only</span></code></pre>
+
+      <p class="step-p">
+        <code class="inline">resolv.conf</code> also carries a
+        <code class="inline">search</code> list, which is why short names work:
+        from inside namespace <code class="inline">streaming</code>,
+        <code class="inline">curl http://web</code> resolves because
+        <code class="inline">web.streaming.svc.cluster.local</code> is tried
+        automatically. Cross-namespace needs
+        <code class="inline">web.other-namespace</code>.
+      </p>
+      <p class="step-p">
+        For a headless Service, a query for the Service name returns
+        <em>all</em> pod IPs rather than one virtual IP — which is how a client
+        discovers every member of a cluster in one lookup.
+      </p>
+      <div class="gotcha">
+        <b>The search-path performance trap —</b>
+        <span>
+          <code class="inline">ndots:5</code> is the default. Any name with
+          fewer than five dots is tried against every search domain
+          <em>first</em>. So <code class="inline">api.github.com</code> —
+          two dots — generates several failing internal lookups before the real
+          one succeeds. On a DNS-heavy service this is a measurable latency
+          source, and the fix is a fully-qualified name with a trailing dot.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s11">
+      <div class="step-head">
+        <span class="step-num">11</span>
+        <h2>Getting traffic in from outside</h2>
+      </div>
+
+      <p class="step-p">
+        Services solve pod-to-pod. External traffic is a separate problem with
+        two answers, depending on whether the protocol is HTTP.
+      </p>
+
+      <h3>Ingress — HTTP only, L7</h3>
+      <p class="step-p">
+        An <strong>Ingress</strong> object is pure configuration: a set of
+        host/path rules and TLS settings. It does nothing by itself. An
+        <strong>Ingress controller</strong> — nginx, Traefik, HAProxy — runs as
+        a normal Deployment, watches Ingress objects, and reconfigures itself to
+        match.
+      </p>
+      <p class="step-p">
+        Because it terminates HTTP, it can do what a Service cannot: route by
+        hostname and path, terminate TLS centrally, rewrite paths, load balance
+        per-request rather than per-connection. One IP can serve many services.
+      </p>
+      <p class="step-p">
+        The controller itself still needs to be reachable from outside — usually
+        through a <code class="inline">LoadBalancer</code> Service. So Ingress
+        sits <em>on top of</em> the Service mechanism, it doesn't replace it.
+      </p>
+
+      <h3>L4 — everything that isn't HTTP</h3>
+      <p class="step-p">
+        RTMP, raw TCP, databases, anything binary: an Ingress controller cannot
+        route it, because there are no hosts or paths to route on. These need a
+        <code class="inline">LoadBalancer</code> Service directly — its own IP,
+        its own port, no L7 layer involved.
+      </p>
+      <div class="why">
+        <b>The general rule —</b>
+        <span>
+          if the protocol carries a hostname the proxy can read, it can share an
+          Ingress with everything else. If it doesn't, it needs its own address.
+          That's the real reason a media server's ingest port and a web app get
+          exposed by two different mechanisms.
+        </span>
+      </div>
+
+      <h3>Gateway API</h3>
+      <p class="step-p">
+        Ingress's successor. It splits one overloaded object into several with
+        distinct owners — <code class="inline">GatewayClass</code> and
+        <code class="inline">Gateway</code> for the infrastructure team,
+        <code class="inline">HTTPRoute</code>/<code class="inline">TCPRoute</code>
+        for application teams — and standardises features that were previously
+        vendor-specific annotations. It also handles non-HTTP protocols, which
+        Ingress never did. Ingress is not going away, but new designs should
+        look at Gateway API first.
+      </p>
+    </section>
+
+    <section class="step" id="s12">
+      <div class="step-head">
+        <span class="step-num">12</span>
+        <h2>NetworkPolicy: opt-in isolation</h2>
+      </div>
+
+      <p class="step-p">
+        By default the flat network means <em>every pod can reach every other
+        pod in the cluster</em>, across all namespaces. A compromised frontend
+        can talk straight to your database. NetworkPolicy is how that gets
+        restricted.
+      </p>
+
+      <div class="why">
+        <b>The rule that makes it make sense —</b>
+        <span>
+          a pod is unrestricted until it is <em>selected by at least one</em>
+          NetworkPolicy. The moment one policy selects it for a direction
+          (ingress or egress), that direction flips to <strong>default-deny</strong>
+          and only explicitly allowed traffic passes. Policies are purely
+          additive — there is no deny rule — so multiple policies union together.
+        </span>
+      </div>
+
+      <p class="step-p">
+        The common idiom follows directly: apply a policy selecting everything
+        with an empty allow list, which makes the namespace default-deny, then
+        add narrow policies granting each real path.
+      </p>
+      <pre><code>spec:
+  podSelector: {}            <span class="c"># every pod in this namespace</span>
+  policyTypes: [Ingress]     <span class="c"># ...is now default-deny for ingress</span>
+  <span class="c"># no ingress: rules == allow nothing</span></code></pre>
+
+      <div class="gotcha">
+        <b>Two things that catch people —</b>
+        <span>
+          policies are enforced by the <em>CNI plugin</em>, not by Kubernetes.
+          Apply one under a plugin that doesn't implement NetworkPolicy —
+          Flannel, for instance — and it is accepted, stored, and silently
+          enforces nothing. Second: an egress policy that forgets to allow UDP
+          port 53 to CoreDNS breaks all name resolution, which presents as
+          "everything is broken" rather than as a policy problem.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s13">
+      <div class="step-head">
+        <span class="step-num">13</span>
+        <h2>Storage: decoupling the claim from the disk</h2>
+      </div>
+
+      <p class="step-p">
+        Container filesystems die with the container. A <strong>Volume</strong>
+        is declared in the pod and survives container restarts — but not the pod
+        itself. Anything that must outlive the pod needs the PV/PVC pair.
+      </p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Object</th><th>Role</th><th>Owned by</th></tr></thead>
+          <tbody>
+            <tr><td><strong>PersistentVolume</strong></td><td>A real piece of storage that exists</td><td>Cluster admin / provisioner</td></tr>
+            <tr><td><strong>PersistentVolumeClaim</strong></td><td>A request: "10Gi, ReadWriteOnce"</td><td>Application author</td></tr>
+            <tr><td><strong>StorageClass</strong></td><td>A named recipe for creating PVs on demand</td><td>Cluster admin</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="why">
+        <b>Why the indirection —</b>
+        <span>
+          the application says what it needs; the cluster decides how to satisfy
+          it. The same manifest that gets a local directory on a laptop cluster
+          gets an EBS volume in AWS, with no change — because the PVC names a
+          <em>class</em> of storage, not a device.
+        </span>
+      </div>
+
+      <h3>Dynamic provisioning</h3>
+      <p class="step-p">
+        Without a StorageClass you must pre-create PVs by hand and hope one
+        matches. With one, creating a PVC triggers the provisioner to create
+        real storage and a matching PV automatically, then bind them.
+      </p>
+      <div class="gotcha">
+        <b>The silent failure —</b>
+        <span>
+          if no default StorageClass exists, a PVC is accepted without error and
+          sits in <code class="inline">Pending</code> — forever. The pod using
+          it also sits in <code class="inline">Pending</code>, because a pod
+          cannot start until its volumes are bound. Nothing reports an error;
+          there is simply no provisioner listening. Every stateful workload will
+          hang this way until a StorageClass exists, which is why it has to be
+          the first thing installed before any database, broker or object store.
+        </span>
+      </div>
+
+      <h3>Access modes</h3>
+      <ul>
+        <li><code class="inline">ReadWriteOnce</code> — one <em>node</em> may
+          mount it read-write. Most block storage. Note node, not pod.</li>
+        <li><code class="inline">ReadOnlyMany</code> — many nodes, read-only.</li>
+        <li><code class="inline">ReadWriteMany</code> — many nodes, read-write.
+          Needs a network filesystem; most block storage cannot do this.</li>
+      </ul>
+      <p class="step-p">
+        <code class="inline">ReadWriteOnce</code> is why a Deployment with a PVC
+        and more than one replica often deadlocks on rolling update: the new pod
+        can't mount the volume until the old one releases it, and the old one
+        won't terminate until the new one is Ready.
+      </p>
+
+      <h3>Reclaim policy</h3>
+      <p class="step-p">
+        On PVC deletion: <code class="inline">Delete</code> destroys the
+        underlying storage; <code class="inline">Retain</code> keeps it,
+        requiring manual cleanup. Dynamic provisioning usually defaults to
+        <code class="inline">Delete</code> — appropriate for scratch space,
+        alarming for a production database.
+      </p>
+
+      <h3>CSI</h3>
+      <p class="step-p">
+        The Container Storage Interface: the same idea as CRI and CNI. Storage
+        vendors implement a standard gRPC API and ship a driver, instead of
+        having code merged into Kubernetes itself. Every in-tree cloud storage
+        plugin has been migrated out to CSI.
+      </p>
+    </section>
+
+    <section class="step" id="s14">
+      <div class="step-head">
+        <span class="step-num">14</span>
+        <h2>ConfigMaps and Secrets</h2>
+      </div>
+
+      <p class="step-p">
+        Both hold key/value data and detach configuration from images. They are
+        near-identical in mechanics and differ mainly in handling.
+      </p>
+
+      <div class="gotcha">
+        <b>Secrets are not encrypted —</b>
+        <span>
+          the values are <strong>base64-encoded</strong>, which is an encoding,
+          not encryption, and trivially reversible. By default they are stored
+          in etcd in plaintext. Encryption at rest is a separate opt-in feature
+          the cluster operator must configure. Anyone who can read a Secret
+          through the API, or read etcd, has the value.
+        </span>
+      </div>
+      <p class="step-p">
+        What Secrets do give you: separate RBAC (you can grant ConfigMap access
+        without Secret access), exclusion from most logging and describe output,
+        and tmpfs mounting so values never touch node disk. Real protection
+        needs encryption at rest, tight RBAC, and keeping the source of truth
+        outside git — encrypted-in-repo tooling, or an external secret store.
+      </p>
+
+      <h3>Environment variable vs volume mount</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th></th><th>As env var</th><th>As mounted file</th></tr></thead>
+          <tbody>
+            <tr><td>Update on change</td><td><strong>Never</strong> — fixed at container start</td><td>Yes, automatically (up to ~a minute)</td></tr>
+            <tr><td>Visible in</td><td><code>/proc/&lt;pid&gt;/environ</code>, child processes, crash dumps</td><td>Only the file</td></tr>
+            <tr><td>Best for</td><td>Small, static values</td><td>Certificates, anything rotated</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="why">
+        <b>The trap in that first row —</b>
+        <span>
+          updating a ConfigMap consumed as environment variables changes nothing
+          in running pods, and no error is raised anywhere. The pods must be
+          restarted. Mounted files update in place, but the application still
+          has to notice and re-read them — the file changing does not reload
+          your config by itself.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s15">
+      <div class="step-head">
+        <span class="step-num">15</span>
+        <h2>Authentication, ServiceAccounts, RBAC</h2>
+      </div>
+
+      <h3>Two kinds of identity</h3>
+      <ul>
+        <li><strong>Users</strong> — humans. Kubernetes has no user object and
+          no user database. Identity comes from an external source: a client
+          certificate's subject, an OIDC token, an authenticating proxy. A
+          "user" is whatever the authenticator says it is.</li>
+        <li><strong>ServiceAccounts</strong> — real API objects, for processes
+          inside the cluster. Every pod gets one (<code class="inline">default</code>
+          if unspecified) and a token mounted at a well-known path.</li>
+      </ul>
+
+      <h3>RBAC</h3>
+      <p class="step-p">
+        Four object types, in two pairs:
+      </p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Object</th><th>Says</th><th>Scope</th></tr></thead>
+          <tbody>
+            <tr><td><code>Role</code></td><td>These verbs on these resources</td><td>One namespace</td></tr>
+            <tr><td><code>ClusterRole</code></td><td>Same, including cluster-scoped resources</td><td>Whole cluster</td></tr>
+            <tr><td><code>RoleBinding</code></td><td>Grants a Role (or ClusterRole) to subjects <em>in one namespace</em></td><td>One namespace</td></tr>
+            <tr><td><code>ClusterRoleBinding</code></td><td>Grants a ClusterRole everywhere</td><td>Whole cluster</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="why">
+        <b>The property that makes RBAC predictable —</b>
+        <span>
+          it is <strong>purely additive</strong>. There are no deny rules.
+          Permission is the union of every binding that applies to you, and
+          nothing can subtract from it. So "why can this account do X?" always
+          has a findable answer — some binding grants it — but revoking access
+          means finding and removing <em>every</em> grant, not adding a denial.
+        </span>
+      </div>
+      <p class="step-p">
+        A useful combination that's easy to miss: binding a
+        <strong>ClusterRole</strong> with a <strong>RoleBinding</strong> grants
+        those permissions only within that namespace. That's how you define a
+        role like "read pods and logs" once and reuse it per-namespace.
+      </p>
+      <div class="gotcha">
+        <b>The pod-level escalation path —</b>
+        <span>
+          RBAC guards the API, but a pod granted host access can bypass it
+          entirely. <code class="inline">privileged: true</code>,
+          <code class="inline">hostPID</code>,
+          <code class="inline">hostNetwork</code>, or a
+          <code class="inline">hostPath</code> mount of
+          <code class="inline">/</code> all lead to node root, and node root
+          reads every Secret of every pod on that node. Pod Security Admission
+          exists to enforce limits on those fields, and a cluster with careful
+          RBAC but no pod security policy has a fairly short path around it.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s16">
+      <div class="step-head">
+        <span class="step-num">16</span>
+        <h2>Admission control</h2>
+      </div>
+
+      <p class="step-p">
+        Between authorization and persistence, every request passes through
+        admission controllers — the last chance to modify or reject an object,
+        and the mechanism behind most cluster-wide policy.
+      </p>
+      <ul>
+        <li><strong>Mutating</strong> admission runs first and can
+          <em>change</em> the object: injecting sidecars, adding default labels,
+          setting resource defaults from a LimitRange.</li>
+        <li><strong>Validating</strong> admission runs second and can only
+          accept or reject: enforcing required labels, blocking
+          <code class="inline">:latest</code> tags, rejecting privileged pods.</li>
+      </ul>
+      <p class="step-p">
+        Both can be extended with <strong>webhooks</strong> — the API server
+        calls your HTTPS endpoint with the object and uses your verdict. This is
+        how service meshes inject proxies automatically and how policy engines
+        enforce organisational rules.
+      </p>
+      <div class="gotcha">
+        <b>Webhooks are in the critical path —</b>
+        <span>
+          a webhook configured <code class="inline">failurePolicy: Fail</code>
+          whose backing pods are down blocks every matching API write in the
+          cluster. If the webhook's own namespace is in scope, you get a
+          deadlock: the pods can't start because admission is failing, and
+          admission is failing because the pods can't start. Namespace exclusions
+          on system namespaces exist precisely for this.
+        </span>
+      </div>
+      <p class="step-p">
+        Newer clusters also support <strong>ValidatingAdmissionPolicy</strong> —
+        CEL expressions evaluated inside the API server, no webhook server to
+        run or keep alive. Less powerful than a webhook, but with none of the
+        availability risk.
+      </p>
+    </section>
+
+    <section class="step" id="s17">
+      <div class="step-head">
+        <span class="step-num">17</span>
+        <h2>CRDs and operators: extending the model</h2>
+      </div>
+
+      <p class="step-p">
+        A <strong>CustomResourceDefinition</strong> registers a new object kind
+        with the API server. After applying one, the cluster has a genuinely new
+        resource type — with the same schema validation,
+        <code class="inline">kubectl</code> support, RBAC, watch semantics and
+        <code class="inline">spec</code>/<code class="inline">status</code>
+        shape as any built-in.
+      </p>
+      <p class="step-p">
+        A CRD alone does nothing at all. It gives you a place to store
+        structured data. On its own, applying a custom resource achieves exactly
+        as much as writing to a database.
+      </p>
+
+      <div class="why">
+        <b>Operator = CRD + controller —</b>
+        <span>
+          the pattern is: define a resource describing what you want, then run a
+          controller that watches it and reconciles the world to match — the
+          exact loop from <a href="#s1">§1</a>. A <code class="inline">Kafka</code>
+          resource describing a three-broker cluster is inert until a controller
+          reads it and creates the StatefulSets, Services, ConfigMaps and PVCs
+          that constitute one. The operator encodes what a human operator would
+          otherwise do by hand, including the hard parts — ordered upgrades,
+          failover, rebalancing.
+        </span>
+      </div>
+
+      <p class="step-p">
+        This is why so much infrastructure ships as an operator now. The pattern
+        is uniform enough that you can predict the shape of an unfamiliar one:
+        install CRDs, install the controller, apply a custom resource, watch its
+        <code class="inline">status</code> converge.
+      </p>
+      <div class="gotcha">
+        <b>Install order is not optional —</b>
+        <span>
+          CRDs must be registered before any resource of that kind is applied,
+          or the API server rejects it with
+          <code class="inline">no matches for kind</code> — it genuinely does
+          not know the type exists yet. Some projects bundle CRDs with the
+          controller manifest and some ship them separately, so this is a
+          frequent first-run failure. Deleting a CRD is worse: it deletes
+          <em>every object of that kind</em> in the cluster.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s18">
+      <div class="step-head">
+        <span class="step-num">18</span>
+        <h2>Full trace: <code>kubectl apply</code> to serving traffic</h2>
+      </div>
+
+      <p class="step-p">
+        Everything above, in sequence. Watch how no component ever calls
+        another — each only reads and writes objects, and the next one notices.
+      </p>
+
+      <div class="trace">
+        <div class="trace-item"><div>
+          <span class="who">kubectl</span>
+          Reads your YAML, resolves the resource type, and issues an HTTP
+          request to the API server. Nothing clever happens client-side.
+        </div></div>
+        <div class="trace-item"><div>
+          <span class="who">kube-apiserver</span>
+          Authenticates you, checks RBAC, runs mutating admission (defaults get
+          filled in), validates the schema, runs validating admission, and
+          writes the Deployment to etcd. <b>The request returns here</b> — the
+          object exists, and not one container has been created.
+        </div></div>
+        <div class="trace-item"><div>
+          <span class="who">deployment controller</span>
+          Its watch fires. It sees a Deployment with no matching ReplicaSet for
+          this pod template, so it creates one with
+          <code class="inline">replicas: 3</code>, stamped with an
+          <code class="inline">ownerReference</code> back to the Deployment.
+        </div></div>
+        <div class="trace-item"><div>
+          <span class="who">replicaset controller</span>
+          Its watch fires. Desired 3, observed 0. It creates three Pod objects —
+          each with <code class="inline">spec.nodeName</code> empty, because
+          placement is not its job.
+        </div></div>
+        <div class="trace-item"><div>
+          <span class="who">kube-scheduler</span>
+          Sees three unbound pods. For each: filters nodes that can't fit or
+          don't tolerate, scores the rest, picks one, and writes a Binding —
+          setting <code class="inline">nodeName</code>. Still nothing running.
+        </div></div>
+        <div class="trace-item"><div>
+          <span class="who">kubelet</span>
+          On that node, notices a pod now bound to it. Calls the CRI to pull
+          images and create the sandbox — the <code class="inline">pause</code>
+          container holding the namespaces — then calls the CNI plugin, which
+          creates the interface and assigns a pod IP.
+        </div></div>
+        <div class="trace-item"><div>
+          <span class="who">kubelet</span>
+          Mounts volumes, projects ConfigMaps and Secrets, runs init containers
+          to completion, then starts the app containers. Begins running probes.
+        </div></div>
+        <div class="trace-item"><div>
+          <span class="who">kubelet</span>
+          Writes observed state into the pod's <code class="inline">status</code>
+          — phase, IP, container states. When the readiness probe passes, the
+          <code class="inline">Ready</code> condition flips to true.
+        </div></div>
+        <div class="trace-item"><div>
+          <span class="who">endpointslice controller</span>
+          Sees a newly-Ready pod whose labels match a Service selector, and adds
+          its IP to that Service's EndpointSlice.
+        </div></div>
+        <div class="trace-item"><div>
+          <span class="who">kube-proxy</span>
+          On <b>every</b> node, sees the EndpointSlice change and rewrites the
+          local NAT rules so the Service's ClusterIP can now DNAT to this new
+          pod. Traffic starts flowing to it.
+        </div></div>
+        <div class="trace-item"><div>
+          <span class="who">deployment controller</span>
+          Watches replica counts climb, updates the Deployment's
+          <code class="inline">status</code>, and — during a rollout — scales the
+          old ReplicaSet down as the new one becomes available, within
+          <code class="inline">maxSurge</code>/<code class="inline">maxUnavailable</code>.
+        </div></div>
+      </div>
+
+      <div class="why">
+        <b>The thing to take from this —</b>
+        <span>
+          eleven steps, zero direct calls between components. Every handoff is
+          "write an object" followed by "someone else's watch fires". Add a new
+          controller and it participates in exactly the same way. Remove one and
+          the pipeline simply stalls at that point, with the objects sitting
+          there describing precisely how far it got — which is why
+          <code class="inline">kubectl get</code> at each level tells you where
+          something is stuck.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s19">
+      <div class="step-head">
+        <span class="step-num">19</span>
+        <h2>Reading failures</h2>
+      </div>
+
+      <p class="step-p">
+        Most Kubernetes debugging is locating <em>which loop is stuck</em>. The
+        trace above is the map: find the last step that completed, and the
+        problem is in the next one.
+      </p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Symptom</th><th>Stuck at</th><th>Usual cause</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>Pending</code>, no node assigned</td>
+              <td>Scheduler filtering</td>
+              <td>Insufficient resources, unsatisfiable affinity, untolerated taint. The events say which.</td>
+            </tr>
+            <tr>
+              <td><code>Pending</code>, node assigned</td>
+              <td>Kubelet, before start</td>
+              <td>Volume won't mount — often a PVC with no provisioner.</td>
+            </tr>
+            <tr>
+              <td><code>ContainerCreating</code>, stuck</td>
+              <td>CNI or volume mount</td>
+              <td>CNI plugin failing to allocate, or a missing ConfigMap/Secret referenced by the pod.</td>
+            </tr>
+            <tr>
+              <td><code>ImagePullBackOff</code></td>
+              <td>CRI image pull</td>
+              <td>Wrong name/tag, private registry with no imagePullSecret, or rate limiting.</td>
+            </tr>
+            <tr>
+              <td><code>CrashLoopBackOff</code></td>
+              <td>The container itself</td>
+              <td>It starts and exits. Kubernetes is working correctly — <code>logs --previous</code> has the answer.</td>
+            </tr>
+            <tr>
+              <td>Exit code 137</td>
+              <td>Kernel OOM killer</td>
+              <td>Exceeded its memory limit. Raise the limit or fix the leak.</td>
+            </tr>
+            <tr>
+              <td>Running but no traffic</td>
+              <td>EndpointSlice</td>
+              <td>Readiness probe failing, or the Service selector doesn't match the pod labels. Check for zero endpoints.</td>
+            </tr>
+            <tr>
+              <td>Intermittent slowness under load</td>
+              <td>CFS throttling</td>
+              <td>CPU limit too low. Silent — no event, no log, no restart.</td>
+            </tr>
+            <tr>
+              <td>Service <code>&lt;pending&gt;</code> forever</td>
+              <td>No LB controller</td>
+              <td><code>type: LoadBalancer</code> on bare metal with nothing implementing it.</td>
+            </tr>
+            <tr>
+              <td>Namespace <code>Terminating</code> forever</td>
+              <td>A finalizer</td>
+              <td>A controller that owed cleanup is gone. Usually a removed operator.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="why">
+        <b>The three commands that answer most of it —</b>
+        <span>
+          <code class="inline">kubectl describe</code> for events and conditions
+          (the events at the bottom are usually the whole answer),
+          <code class="inline">kubectl logs --previous</code> for a container
+          that already died, and
+          <code class="inline">kubectl get endpointslices</code> when something
+          is running but unreachable.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s20">
+      <div class="step-head">
+        <span class="step-num">20</span>
+        <h2>Glossary</h2>
+      </div>
+      <dl class="glossary">
+        <dt>Reconciliation loop</dt>
+        <dd>Continuously compare desired state to actual state and take one step to close the gap. The core pattern of the entire system.</dd>
+        <dt>Level-triggered</dt>
+        <dd>Acting on current state rather than on events. Makes controllers tolerant of crashes, missed messages and duplicates.</dd>
+        <dt>Controller</dt>
+        <dd>Any process running a reconciliation loop over some resource.</dd>
+        <dt>Operator</dt>
+        <dd>A controller for a custom resource — domain knowledge about running a specific system, encoded as software.</dd>
+        <dt>spec / status</dt>
+        <dd>Desired state, written by you / observed state, written by a controller. Debug the second.</dd>
+        <dt>Pod</dt>
+        <dd>The scheduling unit: containers sharing a network namespace, IPC and volumes. Has the IP.</dd>
+        <dt>Sandbox / pause container</dt>
+        <dd>The near-empty container that holds a pod's namespaces open so containers can restart without losing the IP.</dd>
+        <dt>ClusterIP</dt>
+        <dd>A virtual address that exists only as kernel NAT rules. Not assigned to any interface.</dd>
+        <dt>EndpointSlice</dt>
+        <dd>The live list of Ready pod IPs behind a Service. What kube-proxy programs from.</dd>
+        <dt>Headless Service</dt>
+        <dd><code>clusterIP: None</code> — DNS returns pod IPs directly, no proxying. How StatefulSet members are addressed.</dd>
+        <dt>CRI / CNI / CSI</dt>
+        <dd>The runtime, network and storage plugin interfaces. Kubernetes defines the contract; vendors implement it.</dd>
+        <dt>Taint / toleration</dt>
+        <dd>A node repelling pods / a pod's exemption from a specific taint.</dd>
+        <dt>QoS class</dt>
+        <dd>Guaranteed, Burstable or BestEffort — derived from your requests and limits, and it sets eviction order.</dd>
+        <dt>Requests / limits</dt>
+        <dd>What the scheduler reserves / what the kernel enforces. CPU over limit throttles; memory over limit kills.</dd>
+        <dt>PV / PVC / StorageClass</dt>
+        <dd>Storage that exists / a request for storage / a recipe for creating it on demand.</dd>
+        <dt>Finalizer</dt>
+        <dd>A string blocking deletion until its controller does cleanup and removes it. Cause of most stuck deletions.</dd>
+        <dt>ownerReference</dt>
+        <dd>A child's pointer to its parent. Drives cascading deletion.</dd>
+        <dt>Admission controller</dt>
+        <dd>Runs between authorization and storage; mutating ones rewrite objects, validating ones accept or reject.</dd>
+        <dt>CRD</dt>
+        <dd>Registers a new resource kind with the API server. Inert without a controller watching it.</dd>
+      </dl>
+    </section>
+
+    <footer class="finish">
+      <span class="eyebrow">The short version</span>
+      <p>
+        Kubernetes stores the world you want and runs dozens of small loops that
+        each fix one kind of difference between that and the world you have. It
+        is level-triggered, so it converges from any state rather than depending
+        on a correct sequence of events. Everything moves through one API, which
+        is why one auth model, one audit log and one extension mechanism cover
+        the whole system.
+      </p>
+      <p>
+        Components never call each other. They write objects and watch objects.
+        Understanding any feature — built-in or third-party — reduces to two
+        questions: <em>which object holds the desired state, and which
+        controller is watching it?</em>
+      </p>
+    </footer>
+  </main>
+</div>

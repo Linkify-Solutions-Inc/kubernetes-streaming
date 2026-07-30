@@ -1,0 +1,1382 @@
+<title>Kubernetes Cluster Setup — kubernetes-streaming</title>
+<style>
+  :root {
+    --paper: #eef1f4;
+    --surface: #ffffff;
+    --surface-dim: #e4e8ec;
+    --ink: #1b232c;
+    --ink-dim: #57626d;
+    --line: #ccd3d9;
+    --amber: #a35f22;
+    --amber-ink: #7c4718;
+    --teal: #2d5f74;
+    --teal-bg: #dfe9ec;
+    --ok: #2f6b3e;
+    --ok-bg: #dfeee2;
+    --warn: #9a3d3d;
+    --warn-bg: #f2e0e0;
+    --code-bg: #1b232c;
+    --code-ink: #e7ebee;
+    --code-dim: #93a1ac;
+    --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161c;
+      --surface: #1a2029;
+      --surface-dim: #212833;
+      --ink: #e7ebee;
+      --ink-dim: #93a1ac;
+      --line: #2c3542;
+      --amber: #e0954f;
+      --amber-ink: #f0b378;
+      --teal: #7fb3c9;
+      --teal-bg: #1c2e35;
+      --ok: #7cc190;
+      --ok-bg: #1a2d20;
+      --warn: #e08a8a;
+      --warn-bg: #2e1c1c;
+      --code-bg: #0d1116;
+      --code-ink: #e7ebee;
+      --code-dim: #6b7885;
+      --code-key: #e0954f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+    --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+    --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+    --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+    --code-bg: #0d1116; --code-ink: #e7ebee;
+    --code-dim: #6b7885; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1f4; --surface: #ffffff; --surface-dim: #e4e8ec;
+    --ink: #1b232c; --ink-dim: #57626d; --line: #ccd3d9;
+    --amber: #a35f22; --amber-ink: #7c4718; --teal: #2d5f74; --teal-bg: #dfe9ec;
+    --ok: #2f6b3e; --ok-bg: #dfeee2; --warn: #9a3d3d; --warn-bg: #f2e0e0;
+    --code-bg: #1b232c; --code-ink: #e7ebee;
+    --code-dim: #93a1ac; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.55;
+    font-size: 16px;
+  }
+
+  ::selection { background: var(--amber); color: #fff; }
+  a { color: var(--amber-ink); }
+
+  code, pre, kbd {
+    font-family: "Cascadia Code", "Cascadia Mono", ui-monospace, "SF Mono", Consolas,
+      "Liberation Mono", monospace;
+  }
+
+  .topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .topbar-inner { max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem 1.75rem; }
+  .eyebrow {
+    display: inline-block;
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--amber-ink);
+    background: color-mix(in srgb, var(--amber) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    padding: 0.2rem 0.55rem;
+    border-radius: 3px;
+  }
+  h1 {
+    margin: 0.65rem 0 0.35rem;
+    font-size: 1.9rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+  }
+  .subtitle {
+    margin: 0 0 1rem;
+    color: var(--ink-dim);
+    font-size: 1.02rem;
+    max-width: 64ch;
+    text-wrap: pretty;
+  }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem;
+    font-size: 0.85rem; color: var(--ink-dim);
+  }
+  .meta-row strong { color: var(--ink); font-weight: 600; }
+  .meta-row code {
+    background: var(--surface-dim); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.82rem;
+  }
+
+  .layout {
+    max-width: 920px; margin: 0 auto; padding: 2rem 1.5rem 5rem;
+    display: grid; grid-template-columns: 200px minmax(0, 1fr);
+    gap: 2.5rem; align-items: start;
+  }
+  @media (max-width: 800px) {
+    .layout { grid-template-columns: 1fr; }
+    .rail { display: none; }
+  }
+
+  .rail {
+    position: sticky; top: 2rem; display: flex;
+    flex-direction: column; gap: 0.15rem; max-height: calc(100vh - 4rem);
+    overflow-y: auto;
+  }
+  .rail-label {
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 0.6rem;
+  }
+  .rail-label + .rail-label { margin-top: 1rem; }
+  .rail a {
+    display: flex; gap: 0.55rem; align-items: baseline;
+    padding: 0.35rem 0 0.35rem 0.75rem; font-size: 0.87rem;
+    color: var(--ink-dim); text-decoration: none;
+    border-left: 2px solid var(--line); margin-left: -1px;
+  }
+  .rail a:hover { color: var(--ink); border-left-color: var(--amber); }
+  .rail a .n {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber-ink); font-size: 0.8rem; flex-shrink: 0;
+  }
+
+  main { min-width: 0; }
+
+  .intro { color: var(--ink-dim); max-width: 68ch; margin: 0 0 2rem; font-size: 1rem; }
+  .intro strong { color: var(--ink); }
+  .intro p { margin: 0 0 0.9rem; }
+
+  .step {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.5rem 1.6rem 1.7rem;
+    margin-bottom: 1.5rem; box-shadow: var(--shadow); scroll-margin-top: 1.5rem;
+  }
+  .step-head {
+    display: flex; align-items: baseline; gap: 0.85rem;
+    margin-bottom: 0.9rem; flex-wrap: wrap;
+  }
+  .step-num {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber); font-size: 1.05rem; font-weight: 600;
+  }
+  .step h2 { margin: 0; font-size: 1.2rem; font-weight: 650; letter-spacing: -0.005em; }
+  .step h3 {
+    margin: 1.5rem 0 0.6rem; font-size: 0.98rem; font-weight: 650;
+    letter-spacing: -0.005em;
+  }
+  .context-chip {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--teal); background: var(--teal-bg);
+    border-radius: 999px; padding: 0.18rem 0.65rem; white-space: nowrap;
+  }
+
+  .why, .confirm, .gotcha {
+    display: flex; gap: 0.7rem; border-radius: 0 6px 6px 0;
+    padding: 0.8rem 0.95rem; margin: 0 0 1rem; font-size: 0.92rem;
+    text-wrap: pretty;
+  }
+  .why { background: var(--teal-bg); border-left: 3px solid var(--teal); color: var(--ink); }
+  .why b { color: var(--teal); font-weight: 700; }
+  .confirm { background: var(--ok-bg); border-left: 3px solid var(--ok); margin: 1rem 0 0; }
+  .confirm b { color: var(--ok); font-weight: 700; }
+  .gotcha { background: var(--warn-bg); border-left: 3px solid var(--warn); }
+  .gotcha b { color: var(--warn); font-weight: 700; }
+
+  p.step-p { margin: 0 0 1rem; color: var(--ink); text-wrap: pretty; }
+  p.step-p:last-child { margin-bottom: 0; }
+  .step ul, .step ol { margin: 0 0 1rem; padding-left: 1.3rem; }
+  .step li { margin-bottom: 0.4rem; text-wrap: pretty; }
+  .step li:last-child { margin-bottom: 0; }
+
+  .cmd-label {
+    font-size: 0.78rem; color: var(--ink-dim); margin: 0.9rem 0 0.35rem;
+    font-family: "Cascadia Code", ui-monospace, monospace;
+  }
+  .cmd-label:first-child { margin-top: 0; }
+
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+    padding: 0.85rem 1rem; margin: 0 0 0.2rem; overflow-x: auto;
+    font-size: 0.86rem; line-height: 1.6;
+  }
+  pre code { color: inherit; }
+  pre .c { color: var(--code-dim); }
+  pre .ph { color: var(--code-key); }
+  pre.out { background: var(--surface-dim); color: var(--ink); border: 1px solid var(--line); }
+  pre.out .c { color: var(--ink-dim); }
+
+  code.inline {
+    background: var(--surface-dim); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.87em;
+  }
+
+  .tbl-wrap { overflow-x: auto; margin: 0 0 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.89rem; min-width: 480px; }
+  th, td {
+    text-align: left; padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  th {
+    font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-dim); font-weight: 600;
+  }
+  td code { font-size: 0.85em; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  /* layered network diagram */
+  .diagram {
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.1rem; margin: 0 0 1.2rem;
+  }
+  .dlayer {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 0.75rem 0.85rem; margin-bottom: 0.55rem;
+  }
+  .dlayer:last-child { margin-bottom: 0; }
+  .dlayer-title {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--amber-ink); margin-bottom: 0.5rem;
+  }
+  .dboxes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .dbox {
+    border: 1px solid var(--line); border-radius: 5px;
+    padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--paper);
+  }
+  .dbox b { display: block; font-weight: 650; font-size: 0.82rem; }
+  .dbox span {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; color: var(--ink-dim);
+  }
+  .dbox.accent { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 8%, var(--paper)); }
+  .dbox.teal { border-color: var(--teal); background: var(--teal-bg); }
+  .darrow {
+    text-align: center; color: var(--ink-dim); font-size: 0.9rem;
+    margin: 0.15rem 0; font-family: "Cascadia Code", ui-monospace, monospace;
+  }
+
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 1rem; font-size: 0.89rem; }
+  .kv dt { color: var(--ink-dim); font-family: "Cascadia Code", ui-monospace, monospace; font-size: 0.82rem; }
+  .kv dd { margin: 0; }
+
+  footer.finish {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--amber); border-radius: 0 10px 10px 0;
+    padding: 1.3rem 1.5rem; box-shadow: var(--shadow); font-size: 0.97rem;
+  }
+  footer.finish .eyebrow { margin-bottom: 0.6rem; }
+  footer.finish p { margin: 0 0 0.8rem; text-wrap: pretty; }
+  footer.finish p:last-child { margin-bottom: 0; }
+
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+  @media (prefers-reduced-motion: no-preference) {
+    .step { transition: border-color 0.15s ease; }
+  }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="eyebrow">Phase 2 · Kubernetes, Stage 1</span>
+    <h1>Standing Up the Cluster</h1>
+    <p class="subtitle">
+      From password-only SSH to a working single-node kubeadm cluster with
+      Calico, MetalLB and ingress-nginx — every decision, every gotcha, and
+      the one networking problem that nearly made <code class="inline">type:
+      LoadBalancer</code> useless on this box.
+    </p>
+    <div class="meta-row">
+      <span><strong>Box:</strong> <code>aayush-internserver</code></span>
+      <span><strong>LAN:</strong> <code>10.50.0.2/24</code></span>
+      <span><strong>Tailscale:</strong> <code>100.64.0.9</code></span>
+      <span><strong>Built:</strong> 2026-07-28</span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+  <nav class="rail">
+    <div class="rail-label">Access</div>
+    <a href="#s1"><span class="n">1</span> Key-based SSH</a>
+    <a href="#s2"><span class="n">2</span> Passwordless sudo</a>
+    <a href="#s3"><span class="n">3</span> Surveying the box</a>
+    <div class="rail-label">Host prep</div>
+    <a href="#s4"><span class="n">4</span> Preflight</a>
+    <a href="#s5"><span class="n">5</span> containerd</a>
+    <a href="#s6"><span class="n">6</span> Version choice</a>
+    <div class="rail-label">Cluster</div>
+    <a href="#s7"><span class="n">7</span> kubeadm init</a>
+    <a href="#s8"><span class="n">8</span> The taint</a>
+    <a href="#s9"><span class="n">9</span> Calico</a>
+    <a href="#s10"><span class="n">10</span> MetalLB</a>
+    <a href="#s11"><span class="n">11</span> ingress-nginx</a>
+    <div class="rail-label">Reachability</div>
+    <a href="#s12"><span class="n">12</span> The routing problem</a>
+    <a href="#s13"><span class="n">13</span> kubectl remotely</a>
+    <div class="rail-label">Proof</div>
+    <a href="#s14"><span class="n">14</span> Smoke test</a>
+    <a href="#s15"><span class="n">15</span> Open items</a>
+  </nav>
+
+  <main>
+    <div class="intro">
+      <p>
+        Phase 1 of this project runs as a Docker Compose stack. Phase 2 moves
+        the same services onto Kubernetes on the same Ubuntu box — a
+        deliberately self-managed <strong>kubeadm</strong> cluster rather than
+        k3s or microk8s, because the point of this project is to understand the
+        pieces, not to hide them.
+      </p>
+      <p>
+        This document covers <strong>stage 1</strong>: getting a cluster that
+        exists, schedules pods, routes traffic, and can be driven from a laptop.
+        No application workloads yet — those come next, starting with Strimzi
+        and the stateful layer.
+      </p>
+      <p>
+        Everything below was executed against the real box. Where something
+        failed the first time, the failure is written down rather than
+        smoothed over — the failures are the interesting part.
+      </p>
+    </div>
+
+    <div class="diagram">
+      <div class="dlayer">
+        <div class="dlayer-title">Client</div>
+        <div class="dboxes">
+          <div class="dbox"><b>MacBook</b><span>100.64.0.92</span></div>
+          <div class="dbox"><b>OBS / streamers</b><span>via MagicDNS</span></div>
+        </div>
+      </div>
+      <div class="darrow">↓ &nbsp; WireGuard tunnel (Tailscale) &nbsp; ↓</div>
+      <div class="dlayer">
+        <div class="dlayer-title">Host — Ubuntu 24.04, 12 cores / 15 GiB</div>
+        <div class="dboxes">
+          <div class="dbox teal"><b>tailscale0</b><span>100.64.0.9/32</span></div>
+          <div class="dbox teal"><b>ens18</b><span>10.50.0.2/24</span></div>
+          <div class="dbox"><b>containerd 2.2.5</b><span>CRI enabled</span></div>
+          <div class="dbox"><b>dockerd 29.6.1</b><span>Compose + CI runner</span></div>
+        </div>
+      </div>
+      <div class="darrow">↓</div>
+      <div class="dlayer">
+        <div class="dlayer-title">Cluster — kubeadm v1.35.7, single node</div>
+        <div class="dboxes">
+          <div class="dbox"><b>control plane</b><span>etcd · apiserver · scheduler · cm</span></div>
+          <div class="dbox"><b>Calico v3.32.1</b><span>pods on 192.168.0.0/16</span></div>
+          <div class="dbox"><b>CoreDNS</b><span>10.96.0.0/12</span></div>
+        </div>
+      </div>
+      <div class="darrow">↓</div>
+      <div class="dlayer">
+        <div class="dlayer-title">Edge — where traffic enters</div>
+        <div class="dboxes">
+          <div class="dbox accent"><b>ingress-nginx</b><span>L7 · 10.50.0.240:80</span></div>
+          <div class="dbox accent"><b>MetalLB pool</b><span>L4 · 10.50.0.241-254</span></div>
+        </div>
+      </div>
+    </div>
+
+    <section class="step" id="s1">
+      <div class="step-head">
+        <span class="step-num">01</span>
+        <h2>Key-based SSH, without breaking what was there</h2>
+        <span class="context-chip">laptop → box</span>
+      </div>
+      <p class="step-p">
+        The starting position was a password in a <code class="inline">.env</code>
+        file. Two constraints made this less trivial than
+        <code class="inline">ssh-copy-id</code> usually is: the
+        <code class="inline">fatima</code> account already had one authorized
+        key that had to survive, and the password could not be allowed to leak
+        into shell history or the process table.
+      </p>
+
+      <div class="why">
+        <b>Why a dedicated key —</b>
+        <span>
+          the laptop already held five keys for other hosts, including one for
+          <code class="inline">aayush@100.64.0.9</code> — the same box, a
+          different account. Reusing that key would have merged two identities
+          that are deliberately separate. A per-account key also means
+          revoking access to <code class="inline">fatima</code> later is a
+          one-line change that touches nothing else.
+        </span>
+      </div>
+
+      <div class="cmd-label">generate</div>
+      <pre><code>ssh-keygen -t ed25519 -f ~/.ssh/id_ed25519_intern-fatima -N "" \
+  -C "aayush@macbook -&gt; fatima@aayush-InternServer"</code></pre>
+
+      <p class="step-p" style="margin-top: 1rem;">
+        <code class="inline">ssh-copy-id</code> is the right tool because it
+        <em>appends</em> to <code class="inline">authorized_keys</code> and
+        refuses to install a key that is already present — it cannot clobber
+        the existing entry. The problem is that it prompts for the password
+        interactively. <code class="inline">sshpass</code> was not installed,
+        so macOS's built-in <code class="inline">expect</code> drove the prompt
+        instead, reading the password from an environment variable rather than
+        from <code class="inline">argv</code>:
+      </p>
+
+      <div class="cmd-label">copyid.exp — deleted immediately afterwards</div>
+      <pre><code><span class="c">#!/usr/bin/expect -f</span>
+set timeout 30
+set pw $env(SRV_PW)
+spawn ssh-copy-id -o StrictHostKeyChecking=accept-new \
+  -o PreferredAuthentications=password -o PubkeyAuthentication=no \
+  -i [lindex $argv 0] [lindex $argv 1]
+expect {
+    -re "(?i)password:" { send "$pw\r"; exp_continue }
+    eof
+}</code></pre>
+
+      <div class="why">
+        <b>Why those two <code class="inline">-o</code> flags —</b>
+        <span>
+          without <code class="inline">PreferredAuthentications=password</code>
+          and <code class="inline">PubkeyAuthentication=no</code>, SSH would try
+          every key in the agent first. On a box that already trusts one of
+          those keys, it could authenticate silently and the
+          <code class="inline">expect</code> block would sit waiting for a
+          password prompt that never arrives, until it times out.
+        </span>
+      </div>
+
+      <div class="confirm">
+        <b>Verified —</b>
+        <span>
+          reading <code class="inline">authorized_keys</code> back showed both
+          entries: the pre-existing <code class="inline">fatima@streaming-project</code>
+          key and the new one. The comment field is what makes this checkable
+          at a glance, which is the whole reason for setting
+          <code class="inline">-C</code>.
+        </span>
+      </div>
+
+      <p class="step-p" style="margin-top: 1rem;">
+        Finally an alias, so the account is addressable by name. The existing
+        <code class="inline">Host 100.64.0.9</code> block still maps to
+        <code class="inline">aayush</code> and was left untouched — SSH matches
+        <code class="inline">Host</code> patterns literally, so the two blocks
+        never collide.
+      </p>
+      <pre><code>Host intern-fatima
+  HostName 100.64.0.9
+  User fatima
+  IdentityFile ~/.ssh/id_ed25519_intern-fatima
+  IdentitiesOnly yes</code></pre>
+    </section>
+
+    <section class="step" id="s2">
+      <div class="step-head">
+        <span class="step-num">02</span>
+        <h2>Passwordless sudo, installed safely</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <p class="step-p">
+        <code class="inline">kubeadm</code> is almost entirely privileged work —
+        writing to <code class="inline">/etc/kubernetes</code>, restarting
+        <code class="inline">containerd</code>, editing sysctls, loading kernel
+        modules. A password prompt in the middle of that is not just annoying,
+        it breaks non-interactive automation outright.
+      </p>
+
+      <div class="gotcha">
+        <b>The risk —</b>
+        <span>
+          a syntactically invalid file in <code class="inline">/etc/sudoers.d/</code>
+          can break <code class="inline">sudo</code> for
+          <em>everyone on the machine</em>, and the usual way to fix that is
+          <code class="inline">sudo</code>. On a box with four other user
+          accounts, that is a genuinely bad outcome.
+        </span>
+      </div>
+
+      <p class="step-p">
+        So the file is validated <em>before</em> it is placed, not after. It is
+        written to <code class="inline">/tmp</code>, checked with
+        <code class="inline">visudo -cf</code>, and only then installed with the
+        correct mode and ownership in one atomic
+        <code class="inline">install</code> call:
+      </p>
+
+      <pre><code>echo "fatima ALL=(ALL) NOPASSWD:ALL" &gt; /tmp/.sudoers-fatima
+visudo -cf /tmp/.sudoers-fatima          <span class="c"># parse before installing</span>
+install -m 0440 -o root -g root /tmp/.sudoers-fatima \
+  /etc/sudoers.d/90-fatima-nopasswd
+rm -f /tmp/.sudoers-fatima
+visudo -c                                 <span class="c"># re-verify the whole tree</span></code></pre>
+
+      <p class="step-p" style="margin-top: 1rem;">
+        The password for this one bootstrapping call was piped over the SSH
+        channel directly into <code class="inline">sudo -S</code>, which reads
+        it from stdin. It never appears in <code class="inline">argv</code>,
+        so it is invisible to <code class="inline">ps</code> on the remote host,
+        and it never touches shell history on either end.
+      </p>
+
+      <div class="gotcha">
+        <b>Found while verifying —</b>
+        <span>
+          the final <code class="inline">visudo -c</code> flagged a
+          <em>pre-existing, unrelated</em> file:
+          <code class="inline">/etc/sudoers.d/interns</code> has mode
+          <code class="inline">0644</code> instead of
+          <code class="inline">0440</code>. <code class="inline">sudo</code>
+          silently ignores any file in that directory with loose permissions —
+          so whatever privileges that file was meant to grant have never been
+          in effect. Left alone, since it belongs to someone else's setup, but
+          worth someone knowing.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s3">
+      <div class="step-head">
+        <span class="step-num">03</span>
+        <h2>Surveying before touching anything</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <p class="step-p">
+        kubeadm makes permanent, host-wide changes. Everything it needs to know
+        about was checked first, and several findings changed the plan.
+      </p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead>
+            <tr><th>Finding</th><th>Consequence</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Ubuntu 24.04.4, 12 cores, 15 GiB RAM, 75 GB free</td>
+              <td>Matches the ~2.3 cores/live-transcode benchmark in SPEC.md — the 3–4 concurrent stream ceiling still holds.</td>
+            </tr>
+            <tr>
+              <td>4 GB swap file active at <code>/swap.img</code></td>
+              <td>kubelet refuses to start with swap on by default. Must be disabled <em>and</em> removed from <code>/etc/fstab</code>, or the cluster dies on reboot.</td>
+            </tr>
+            <tr>
+              <td>Docker 29.6.1 present, zero project containers running</td>
+              <td>Safe to restart containerd. Docker must survive — the Compose stack and the CI runner both need it.</td>
+            </tr>
+            <tr>
+              <td>GitHub Actions runner active as <code>gha-runner</code></td>
+              <td>SPEC.md claimed it wasn't installed. Stale doc, corrected.</td>
+            </tr>
+            <tr>
+              <td>Docker bridges occupy <code>172.17–172.20.0.0/16</code></td>
+              <td>Rules out the default <code>172.16/12</code>-adjacent ranges for the pod network.</td>
+            </tr>
+            <tr>
+              <td>LAN is <code>10.50.0.0/24</code> on <code>ens18</code></td>
+              <td>Rules out a <code>10.x</code> pod CIDR that would overlap.</td>
+            </tr>
+            <tr>
+              <td>Four other user accounts on the box</td>
+              <td>kubeadm rewrites large parts of iptables. Flagged before proceeding.</td>
+            </tr>
+            <tr>
+              <td>Hostname is <code>aayush-InternServer</code> — mixed case</td>
+              <td>Kubernetes node names must be lowercase RFC-1123. Pinned explicitly rather than left to chance.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="step-p">
+        A full <code class="inline">/24</code> ping sweep of the LAN came back
+        with exactly two live hosts — the gateway at
+        <code class="inline">.1</code> and the box itself at
+        <code class="inline">.2</code>. That number matters later: it is what
+        makes carving an address pool out of that subnet safe.
+      </p>
+    </section>
+
+    <section class="step" id="s4">
+      <div class="step-head">
+        <span class="step-num">04</span>
+        <h2>Host preflight</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <p class="step-p">
+        Three changes, each fixing a specific way the kubelet or the pod network
+        would otherwise fail.
+      </p>
+
+      <h3>Swap off, permanently</h3>
+      <div class="why">
+        <b>Why —</b>
+        <span>
+          the scheduler's whole model assumes a pod's memory request maps to
+          real RAM. Swap breaks that: a pod that should be evicted instead
+          gets silently paged to disk, and latency-sensitive work — like an
+          ffmpeg transcode holding a live stream — degrades in a way no metric
+          obviously explains. Kubernetes' answer is to refuse to run at all.
+        </span>
+      </div>
+      <pre><code>sudo swapoff -a
+sudo sed -i.bak '/\s<span class="ph">swap</span>\s/s/^/#/' /etc/fstab   <span class="c"># survives reboot</span></code></pre>
+      <p class="step-p" style="margin-top: 0.7rem; font-size: 0.9rem; color: var(--ink-dim);">
+        The <code class="inline">sed</code> is the load-bearing half.
+        <code class="inline">swapoff -a</code> alone lasts until the next boot,
+        at which point the kubelet would refuse to start and the cluster would
+        come back dead.
+      </p>
+
+      <h3>Kernel modules</h3>
+      <div class="why">
+        <b>Why —</b>
+        <span>
+          <code class="inline">overlay</code> is the filesystem driver
+          containerd layers images with.
+          <code class="inline">br_netfilter</code> is what makes bridged traffic
+          traverse iptables at all — without it, kube-proxy's Service rules
+          exist but never match anything, and Services fail in a way that looks
+          like a DNS problem.
+        </span>
+      </div>
+      <pre><code>printf 'overlay\nbr_netfilter\n' | sudo tee /etc/modules-load.d/k8s.conf
+sudo modprobe overlay &amp;&amp; sudo modprobe br_netfilter</code></pre>
+
+      <h3>sysctls</h3>
+      <pre><code>net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1</code></pre>
+      <p class="step-p" style="margin-top: 0.7rem;">
+        The first two activate what <code class="inline">br_netfilter</code>
+        makes possible. <code class="inline">ip_forward</code> lets the host
+        route between interfaces at all — required for pod-to-pod traffic, and
+        it turns out to be required again in
+        <a href="#s12">step 12</a> for an entirely different reason.
+      </p>
+      <div class="confirm">
+        <b>Verified —</b>
+        <span>
+          <code class="inline">swapon --show</code> empty,
+          <code class="inline">lsmod</code> lists both modules,
+          <code class="inline">sysctl</code> reads back
+          <code class="inline">1</code> for all three.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s5">
+      <div class="step-head">
+        <span class="step-num">05</span>
+        <h2>containerd — the one Docker already installed</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <p class="step-p">
+        Docker does not implement Kubernetes' Container Runtime Interface;
+        that is why <code class="inline">dockershim</code> was removed back in
+        v1.24. But Docker <em>ships</em> containerd, which does implement CRI.
+        The box already had containerd 2.2.5 running underneath dockerd.
+      </p>
+
+      <p class="step-p">Inspecting its config explained why kubeadm couldn't see it:</p>
+      <pre class="out"><code>disabled_plugins = ["cri"]</code></pre>
+
+      <p class="step-p" style="margin-top: 0.8rem;">
+        Docker deliberately disables the CRI plugin, because Docker doesn't use
+        it and leaving it on would expose an unauthenticated container-creation
+        API. Two options followed: install a second containerd alongside the
+        first, or enable CRI on the existing one.
+      </p>
+
+      <div class="why">
+        <b>Why reuse it —</b>
+        <span>
+          two containerd instances means two image caches, two sets of
+          snapshots, and double the disk for images used by both. It also
+          creates a genuinely confusing failure mode where
+          <code class="inline">docker images</code> and
+          <code class="inline">crictl images</code> disagree about what exists
+          on the box. One runtime, two clients, is the cleaner model — and it
+          is what a managed node does anyway.
+        </span>
+      </div>
+
+      <pre><code><span class="c"># keep Docker's original, then regenerate from scratch</span>
+sudo cp /etc/containerd/config.toml /etc/containerd/config.toml.docker-orig
+sudo sh -c 'containerd config default &gt; /etc/containerd/config.toml'
+sudo sed -i 's/<span class="ph">SystemdCgroup = false</span>/<span class="ph">SystemdCgroup = true</span>/' /etc/containerd/config.toml
+sudo systemctl restart containerd</code></pre>
+
+      <div class="why">
+        <b>Why <code class="inline">SystemdCgroup = true</code> —</b>
+        <span>
+          Ubuntu boots with systemd as the sole writer of the cgroup tree. If
+          containerd also writes to it directly (the
+          <code class="inline">cgroupfs</code> driver), two managers end up with
+          different views of the same resource limits. The documented symptom
+          is instability under memory pressure — which is exactly the condition
+          a box running concurrent transcodes lives in. kubelet defaults to the
+          systemd driver, so the runtime has to match.
+        </span>
+      </div>
+
+      <div class="confirm">
+        <b>Verified —</b>
+        <span>
+          config regenerated at <code class="inline">version = 3</code> with
+          <code class="inline">disabled_plugins = []</code>. Both
+          <code class="inline">containerd</code> and
+          <code class="inline">docker</code> reported
+          <code class="inline">active</code> after the restart, and the sandbox
+          image in the config
+          (<code class="inline">registry.k8s.io/pause:3.10.1</code>) matched
+          what <code class="inline">kubeadm config images list</code> expects —
+          a mismatch there causes every pod to pull a second pause image.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s6">
+      <div class="step-head">
+        <span class="step-num">06</span>
+        <h2>Picking a Kubernetes version</h2>
+        <span class="context-chip">decision</span>
+      </div>
+      <p class="step-p">
+        Latest stable was <strong>v1.36.3</strong>. The cluster runs
+        <strong>v1.35.7</strong>, one minor behind, on purpose.
+      </p>
+      <p class="step-p">
+        The constraint is not Kubernetes itself but everything that has to sit
+        on top of it. Calico v3.32 — the current release — documents testing
+        against Kubernetes 1.34, 1.35 and 1.36. Picking 1.35 lands in the middle
+        of that window rather than at its edge, which leaves room for MetalLB,
+        KEDA and Strimzi, all of which have to be added later and none of which
+        certify against a brand-new minor on day one.
+      </p>
+      <div class="why">
+        <b>Why not just take latest —</b>
+        <span>
+          on a learning cluster, time spent debugging a genuine ecosystem
+          incompatibility teaches you about that specific bug, not about
+          Kubernetes. One minor of slack buys out most of that class of
+          problem for free.
+        </span>
+      </div>
+      <pre><code>sudo apt-get install -y kubelet kubeadm kubectl
+sudo apt-mark hold kubelet kubeadm kubectl</code></pre>
+      <div class="why">
+        <b>Why the hold —</b>
+        <span>
+          an unattended <code class="inline">apt upgrade</code> that bumps
+          kubelet a minor version out from under a running control plane is a
+          well-known way to break a cluster. Kubernetes upgrades are a
+          deliberate, ordered procedure —
+          <code class="inline">apt-mark hold</code> makes sure they stay
+          deliberate.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s7">
+      <div class="step-head">
+        <span class="step-num">07</span>
+        <h2>kubeadm init, from a config file</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <p class="step-p">
+        Everything went into <code class="inline">k8s/cluster/kubeadm-config.yaml</code>
+        rather than a line of CLI flags. A config file is diffable, reviewable,
+        and — because it is committed — it answers "why is the pod CIDR that?"
+        six months from now without anyone having to reconstruct a shell command
+        from memory.
+      </p>
+
+      <h3>The three decisions embedded in it</h3>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Field</th><th>Value</th><th>Reasoning</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>advertiseAddress</code></td>
+              <td><code>10.50.0.2</code></td>
+              <td>Must be a real routable interface address. The Tailscale IP is a <code>/32</code> with no subnet — usable as a cert SAN, but not as the address the control plane binds and advertises.</td>
+            </tr>
+            <tr>
+              <td><code>podSubnet</code></td>
+              <td><code>192.168.0.0/16</code></td>
+              <td>The only large private block not already spoken for. <code>10.x</code> collides with the LAN; <code>172.16–31.x</code> collides with Docker's four bridges. An overlap here produces intermittent, extremely confusing routing failures.</td>
+            </tr>
+            <tr>
+              <td><code>nodeRegistration.name</code></td>
+              <td><code>aayush-internserver</code></td>
+              <td>The hostname has capitals; node names must be lowercase RFC-1123. Pinned explicitly instead of relying on kubeadm to normalise it.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Certificate SANs — the part that pays off later</h3>
+      <pre><code>apiServer:
+  certSANs:
+    - 10.50.0.2
+    - <span class="ph">100.64.0.9</span>                              <span class="c"># Tailscale</span>
+    - <span class="ph">aayush-internserver.hs.aayushpathak.com</span>  <span class="c"># MagicDNS</span>
+    - localhost
+    - 127.0.0.1</code></pre>
+      <div class="why">
+        <b>Why this matters —</b>
+        <span>
+          TLS certificates are bound to the names they were issued for. An API
+          server certificate that only lists
+          <code class="inline">10.50.0.2</code> will be rejected by
+          <code class="inline">kubectl</code> connecting to
+          <code class="inline">100.64.0.9</code>, even though it is the same
+          machine. Adding SANs afterwards means regenerating the certificate
+          and restarting the control plane. Adding them at
+          <code class="inline">init</code> time costs nothing.
+        </span>
+      </div>
+
+      <p class="step-p">
+        <code class="inline">--dry-run</code> first — it runs every preflight
+        check and renders the full manifest set without writing anything
+        permanent. Then the real thing:
+      </p>
+      <pre><code>sudo kubeadm config images pull --config kubeadm-config.yaml
+sudo kubeadm init --config kubeadm-config.yaml</code></pre>
+      <p class="step-p" style="margin-top: 0.7rem; font-size: 0.9rem; color: var(--ink-dim);">
+        Pulling images separately is worth the extra line: it separates
+        "the registry is unreachable" from "the cluster failed to
+        initialise", which otherwise arrive as the same timeout.
+      </p>
+
+      <div class="confirm">
+        <b>Result —</b>
+        <span>
+          control plane up in about 20 seconds. etcd 3.6.6, apiserver,
+          scheduler and controller-manager all <code class="inline">Running</code>;
+          CoreDNS <code class="inline">Pending</code>, which is correct — there
+          is no pod network yet for it to attach to.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s8">
+      <div class="step-head">
+        <span class="step-num">08</span>
+        <h2>Removing the control-plane taint</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <p class="step-p">
+        kubeadm taints the control-plane node
+        <code class="inline">NoSchedule</code> by default, so ordinary
+        workloads never land on the machine running etcd. On a multi-node
+        cluster that is exactly right. On a one-node cluster it means nothing
+        can ever be scheduled.
+      </p>
+      <pre><code>kubectl taint nodes --all node-role.kubernetes.io/control-plane-</code></pre>
+      <p class="step-p" style="margin-top: 0.7rem;">
+        The trailing <code class="inline">-</code> is the removal syntax, and
+        it is easy to miss when reading.
+      </p>
+      <div class="gotcha">
+        <b>Trade-off worth naming —</b>
+        <span>
+          this genuinely removes a safety property. A transcode pod that
+          exhausts memory now sits on the same node as etcd, and etcd is
+          latency-sensitive enough that heavy neighbours can cause leader
+          elections. This is precisely why the resource
+          <code class="inline">requests</code>/<code class="inline">limits</code>
+          on the transcode workload — sized from the ~2.3 cores / ~1 GiB
+          benchmark — stop being optional once real workloads land.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s9">
+      <div class="step-head">
+        <span class="step-num">09</span>
+        <h2>Calico — the pod network</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <p class="step-p">
+        Until a CNI plugin is installed the node reports
+        <code class="inline">NotReady</code> and CoreDNS stays
+        <code class="inline">Pending</code>. Kubernetes deliberately ships no
+        default: it defines the interface and leaves the implementation open.
+      </p>
+
+      <div class="why">
+        <b>Why Calico over Flannel or Cilium —</b>
+        <span>
+          Flannel is the simplest, but implements no NetworkPolicy at all,
+          which would leave half of Kubernetes networking untaught and every
+          pod able to reach every other pod forever. Cilium's eBPF dataplane is
+          the most interesting technically, but adds a second novel system to
+          debug at the same time as the cluster itself. Calico supports
+          NetworkPolicy properly, is the most common kubeadm pairing (so its
+          failure modes are well documented), and is closest to what EKS will
+          look like in Phase 3.
+        </span>
+      </div>
+
+      <div class="gotcha">
+        <b>Where this failed the first time —</b>
+        <span>
+          applying the operator and then the
+          <code class="inline">Installation</code> CR — the sequence in most
+          tutorials — produced
+          <code class="inline">no matches for kind "Installation" in version
+          "operator.tigera.io/v1"</code>. In Calico 3.3x the CRDs were split
+          into a separate <code class="inline">operator-crds.yaml</code>
+          manifest. The operator deployment alone no longer registers the types
+          it consumes, so the CRDs must be applied <em>first</em>.
+        </span>
+      </div>
+
+      <pre><code>kubectl create -f .../v3.32.1/manifests/<span class="ph">operator-crds.yaml</span>     <span class="c"># first</span>
+kubectl create -f .../v3.32.1/manifests/tigera-operator.yaml
+kubectl -n tigera-operator rollout status deploy/tigera-operator
+kubectl create -f calico-installation.yaml</code></pre>
+
+      <p class="step-p" style="margin-top: 1rem;">
+        The <code class="inline">Installation</code> CR sets
+        <code class="inline">encapsulation: VXLANCrossSubnet</code> — encapsulate
+        only when traffic crosses a subnet boundary. On one node nothing does,
+        so pod traffic stays unencapsulated and pays no VXLAN overhead, while
+        the setting is already correct if a second node is ever joined.
+      </p>
+
+      <div class="confirm">
+        <b>Verified —</b>
+        <span>
+          <code class="inline">kubectl get tigerastatus</code> showed all four
+          components <code class="inline">Available=True</code>,
+          <code class="inline">Degraded=False</code>. The node flipped to
+          <code class="inline">Ready</code> and both CoreDNS pods picked up
+          addresses in <code class="inline">192.168.115.0/24</code> — a
+          <code class="inline">/26</code> block carved from the configured
+          pod CIDR, exactly as intended.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s10">
+      <div class="step-head">
+        <span class="step-num">10</span>
+        <h2>MetalLB — making <code>type: LoadBalancer</code> mean something</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <p class="step-p">
+        On a cloud provider, creating a <code class="inline">LoadBalancer</code>
+        Service triggers a controller that calls the provider's API and
+        provisions a real load balancer. On bare metal there is no such
+        controller, so the Service sits at
+        <code class="inline">EXTERNAL-IP: &lt;pending&gt;</code> forever.
+        MetalLB fills that role.
+      </p>
+
+      <div class="why">
+        <b>Why bother, when NodePort exists —</b>
+        <span>
+          MediaMTX's RTMP port is not HTTP, so it cannot go behind an Ingress —
+          it needs L4. NodePort would work, but only on ports 30000–32767, and
+          the manifests would then have to be rewritten for Phase 3 where a
+          real cloud load balancer <em>is</em> available. MetalLB makes the
+          Phase 2 manifest identical to the Phase 3 one:
+          <code class="inline">type: LoadBalancer</code>, port 1935. The
+          mechanism underneath changes; the declaration does not.
+        </span>
+      </div>
+
+      <h3>Choosing the pool</h3>
+      <p class="step-p">
+        MetalLB needs IPs it can claim on the local segment. This is where the
+        earlier ping sweep pays off: the entire
+        <code class="inline">10.50.0.0/24</code> contained exactly two hosts, so
+        the top <code class="inline">/28</code> —
+        <code class="inline">10.50.0.240</code> through
+        <code class="inline">.254</code> — is demonstrably free rather than
+        assumed free.
+      </p>
+      <pre><code>apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata: { name: lan-pool, namespace: metallb-system }
+spec:
+  addresses: [ <span class="ph">10.50.0.240-10.50.0.254</span> ]</code></pre>
+
+      <p class="step-p" style="margin-top: 1rem;">
+        L2 mode rather than BGP: BGP requires a router willing to peer, and the
+        gateway here is not under our control. In L2 mode one node answers ARP
+        for each pool address, so from the LAN's perspective the IP simply
+        appears on the network.
+      </p>
+
+      <div class="why">
+        <b>One check worth doing —</b>
+        <span>
+          MetalLB's L2 mode requires <code class="inline">strictARP: true</code>
+          when kube-proxy runs in <strong>IPVS</strong> mode. This cluster's
+          kube-proxy is in the default <strong>iptables</strong> mode, where the
+          setting is not needed — confirmed by reading the kube-proxy ConfigMap
+          rather than assuming the default.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s11">
+      <div class="step-head">
+        <span class="step-num">11</span>
+        <h2>ingress-nginx — L7 routing</h2>
+        <span class="context-chip">on the box</span>
+      </div>
+      <p class="step-p">
+        Three of the five services — <code class="inline">web</code>,
+        <code class="inline">upload-api</code>,
+        <code class="inline">ingest-webhook</code> — are plain HTTP and can
+        share one entry point, routed by host and path. That is what an Ingress
+        controller does, and it replaces the separate host ports each service
+        binds under Compose today.
+      </p>
+
+      <div class="gotcha">
+        <b>The variant matters —</b>
+        <span>
+          ingress-nginx publishes several deployment manifests. The
+          <code class="inline">baremetal</code> one creates a
+          <strong>NodePort</strong> Service; the
+          <code class="inline">cloud</code> one creates a
+          <strong>LoadBalancer</strong> Service. Because MetalLB is installed,
+          <code class="inline">cloud</code> is the correct choice here — the
+          intuitive-sounding "baremetal" would bypass the load balancer that
+          was just set up.
+        </span>
+      </div>
+
+      <div class="confirm">
+        <b>Verified —</b>
+        <span>
+          the Service moved from <code class="inline">&lt;pending&gt;</code> to
+          <code class="inline">10.50.0.240</code> within seconds, which is
+          itself the proof that MetalLB's controller is working.
+        </span>
+      </div>
+      <pre class="out"><code>NAME                       TYPE           EXTERNAL-IP   PORT(S)
+ingress-nginx-controller   LoadBalancer   10.50.0.240   80:32091/TCP,443:31550/TCP</code></pre>
+    </section>
+
+    <section class="step" id="s12">
+      <div class="step-head">
+        <span class="step-num">12</span>
+        <h2>The routing problem that nearly sank it</h2>
+        <span class="context-chip">the interesting one</span>
+      </div>
+      <p class="step-p">
+        At this point the cluster worked and
+        <code class="inline">curl http://10.50.0.240/</code> returned nginx's
+        default backend — <em>from the box</em>. From the MacBook it timed out.
+      </p>
+
+      <p class="step-p">The reason is a mismatch nothing had forced into the open yet:</p>
+      <ul>
+        <li>Every human and every OBS client reaches this box over
+          <strong>Tailscale</strong>, at <code class="inline">100.64.0.9</code>.</li>
+        <li>Tailscale advertises that address as a bare
+          <code class="inline">/32</code> — one host, no subnet behind it.</li>
+        <li>MetalLB hands out addresses on
+          <code class="inline">10.50.0.0/24</code>, a network that exists only
+          on the far side of that <code class="inline">/32</code>.</li>
+      </ul>
+      <p class="step-p">
+        So the laptop had no route to <code class="inline">10.50.0.240</code>
+        at all. Every LoadBalancer IP the cluster could ever assign was, from
+        the perspective of every actual user, invisible.
+      </p>
+
+      <div class="why">
+        <b>The fix —</b>
+        <span>
+          make the box a Tailscale <strong>subnet router</strong> for exactly
+          the pool range, so the tunnel carries a route to those fifteen
+          addresses and nothing else.
+        </span>
+      </div>
+      <pre><code>sudo tailscale set --advertise-routes=<span class="ph">10.50.0.240/28</span></code></pre>
+      <p class="step-p" style="margin-top: 0.7rem;">
+        <code class="inline">tailscale set</code> rather than
+        <code class="inline">tailscale up</code>: <code class="inline">up</code>
+        re-applies the <em>entire</em> preference set from its flags, silently
+        resetting anything not restated on the command line.
+        <code class="inline">set</code> changes one preference.
+      </p>
+      <p class="step-p">
+        Advertising only <code class="inline">/28</code> rather than the whole
+        <code class="inline">/24</code> is deliberate: nothing on the tailnet
+        gains a route to the gateway or to anything else that might later
+        appear on that LAN.
+      </p>
+
+      <h3>Does this actually work? MetalLB L2 is ARP-based</h3>
+      <p class="step-p">
+        This deserved checking rather than assuming, because the two mechanisms
+        appear to conflict. MetalLB L2 works by <em>answering ARP requests</em>
+        for pool addresses — but a packet arriving through the Tailscale tunnel
+        never triggers an ARP resolution on the LAN. If MetalLB's ARP responder
+        were the only thing making those IPs work, subnet-routed traffic would
+        fall straight through.
+      </p>
+      <p class="step-p">It works, and the reason is that ARP is not what does the work:</p>
+
+      <div class="diagram">
+        <div class="dlayer">
+          <div class="dlayer-title">Packet path — laptop to a LoadBalancer IP</div>
+          <div class="dboxes"><div class="dbox">dst <b>10.50.0.240:80</b><span>enters on tailscale0</span></div></div>
+        </div>
+        <div class="darrow">↓ &nbsp; ip_forward = 1, so the host is willing to forward &nbsp; ↓</div>
+        <div class="dlayer">
+          <div class="dlayer-title">netfilter — nat table, PREROUTING</div>
+          <div class="dboxes">
+            <div class="dbox accent"><b>KUBE-SERVICES</b><span>matches on destination IP only</span></div>
+            <div class="dbox accent"><b>DNAT</b><span>→ 192.168.115.x:80 (a pod)</span></div>
+          </div>
+        </div>
+        <div class="darrow">↓ &nbsp; routing decision happens <b>after</b> DNAT &nbsp; ↓</div>
+        <div class="dlayer">
+          <div class="dlayer-title">Delivered</div>
+          <div class="dboxes"><div class="dbox teal"><b>Calico veth → pod</b><span>never reaches the LAN, never ARPs</span></div></div>
+        </div>
+      </div>
+
+      <p class="step-p">
+        kube-proxy's iptables rules live in <code class="inline">PREROUTING</code>
+        and match purely on destination address — they do not care which
+        interface the packet arrived on. A forwarded packet is rewritten to a
+        pod IP <em>before</em> the kernel makes its routing decision, so it is
+        never sent out onto <code class="inline">ens18</code> and no ARP
+        resolution is ever needed. MetalLB's ARP responder only matters for
+        hosts physically on the <code class="inline">10.50.0.0/24</code>
+        segment. The two mechanisms are independent paths to the same iptables
+        rules.
+      </p>
+
+      <div class="gotcha">
+        <b>Still outstanding —</b>
+        <span>
+          advertising a route is a request, not a grant. It must be
+          <strong>approved in the Tailscale admin console</strong> before any
+          peer receives it. Until then
+          <code class="inline">10.50.0.240</code> answers only from the box
+          itself — confirmed, as it currently still times out from the laptop.
+          The reasoning above is verified; the end-to-end path is not, and
+          cannot be until that approval happens.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s13">
+      <div class="step-head">
+        <span class="step-num">13</span>
+        <h2>kubectl from the laptop</h2>
+        <span class="context-chip">laptop</span>
+      </div>
+      <p class="step-p">
+        The API server is a different matter from LoadBalancer IPs — it listens
+        on <code class="inline">10.50.0.2:6443</code>, but the kubelet binds
+        <code class="inline">0.0.0.0</code>, so it is already reachable at
+        <code class="inline">100.64.0.9:6443</code> over Tailscale. The only
+        thing needed was the certificate SAN added back in
+        <a href="#s7">step 7</a>.
+      </p>
+      <p class="step-p">
+        So the entire remote-access setup is: copy the admin credentials,
+        rewrite one URL, merge.
+      </p>
+      <pre><code>ssh intern-fatima 'sudo cat /etc/kubernetes/admin.conf' &gt; /tmp/admin.conf
+sed -i '' 's|https://10.50.0.2:6443|https://<span class="ph">100.64.0.9</span>:6443|' /tmp/admin.conf
+KUBECONFIG=~/.kube/config:/tmp/admin.conf kubectl config view --flatten &gt; /tmp/merged
+cp ~/.kube/config ~/.kube/config.bak-$(date +%Y%m%d-%H%M%S)
+install -m 600 /tmp/merged ~/.kube/config
+rm -f /tmp/admin.conf /tmp/merged</code></pre>
+
+      <div class="why">
+        <b>Why the merge dance —</b>
+        <span>
+          the laptop already had a <code class="inline">kind-streamly</code>
+          context. Overwriting <code class="inline">~/.kube/config</code> would
+          have silently destroyed it.
+          <code class="inline">config view --flatten</code> across a
+          <code class="inline">KUBECONFIG</code> list is the supported way to
+          combine them, and the timestamped backup exists because merges are
+          easier to undo than to debug.
+        </span>
+      </div>
+
+      <div class="confirm">
+        <b>Verified —</b>
+        <span>
+          both contexts present, and
+          <code class="inline">kubectl get nodes</code> against context
+          <code class="inline">streaming-k8s</code> returns the node over
+          Tailscale from the MacBook with no tunnel, proxy or SSH hop.
+        </span>
+      </div>
+      <div class="gotcha">
+        <b>Minor —</b>
+        <span>
+          the laptop's <code class="inline">kubectl</code> is v1.34.1 against a
+          v1.35.7 server. That is within the supported ±1 minor skew, so it
+          works, but it is worth bringing up to match.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s14">
+      <div class="step-head">
+        <span class="step-num">14</span>
+        <h2>Proving it works</h2>
+        <span class="context-chip">verification</span>
+      </div>
+      <p class="step-p">
+        A cluster reporting <code class="inline">Ready</code> proves very
+        little. <code class="inline">smoke-test.yaml</code> exercises every
+        layer that was just built, including both traffic shapes the real
+        services will need.
+      </p>
+
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>What it proves</th><th>How</th><th>Result</th></tr></thead>
+          <tbody>
+            <tr><td>Scheduling works (taint removed)</td><td>2-replica Deployment reaches Ready</td><td>✓</td></tr>
+            <tr><td>Calico assigns pod IPs</td><td>Pods get <code>192.168.115.11</code>, <code>.12</code></td><td>✓</td></tr>
+            <tr><td>CoreDNS resolves Services</td><td><code>nslookup</code> from a throwaway busybox pod</td><td>✓</td></tr>
+            <tr><td>MetalLB assigns from the pool</td><td>Second LoadBalancer gets <code>10.50.0.241</code></td><td>✓</td></tr>
+            <tr><td><strong>L7</strong> — the <code>web</code>/<code>upload-api</code> shape</td><td>Host-header routing through ingress-nginx</td><td>✓</td></tr>
+            <tr><td><strong>L4</strong> — the MediaMTX RTMP shape</td><td>Bare <code>type: LoadBalancer</code>, no Ingress</td><td>✓</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p class="step-p">
+        The L4 test is the one that matters most, because it is a direct
+        rehearsal of how RTMP will be exposed — a Service with its own IP and
+        no HTTP anywhere in the path:
+      </p>
+      <pre class="out"><code>$ curl -s http://10.50.0.241:8080/
+Hostname: whoami-b69bf89bf-p7fhq
+IP: 192.168.115.12</code></pre>
+
+      <div class="gotcha">
+        <b>The L7 test failed on first attempt —</b>
+        <span>
+          <code class="inline">503 Service Temporarily Unavailable</code>. Not a
+          misconfiguration: the <code class="inline">curl</code> ran immediately
+          after <code class="inline">rollout status</code> returned, and
+          ingress-nginx had not yet observed the new EndpointSlice. Retried a
+          few seconds later it returned 200, alternating between both pod
+          hostnames — which incidentally also proves the controller is load
+          balancing rather than pinning to one backend.
+        </span>
+      </div>
+
+      <div class="confirm">
+        <b>Final state —</b>
+        <span>
+          19 of 19 pods <code class="inline">Running</code>, node
+          <code class="inline">Ready</code>,
+          <code class="inline">kubelet</code> and
+          <code class="inline">containerd</code> both
+          <code class="inline">enabled</code> at boot, swap gone from
+          <code class="inline">fstab</code>, and — checked deliberately — the
+          GitHub Actions runner still <code class="inline">active</code> and
+          Docker still healthy after the containerd reconfigure.
+        </span>
+      </div>
+    </section>
+
+    <section class="step" id="s15">
+      <div class="step-head">
+        <span class="step-num">15</span>
+        <h2>What's open</h2>
+        <span class="context-chip">next</span>
+      </div>
+
+      <h3>Needs a human</h3>
+      <ul>
+        <li><strong>Approve the Tailscale subnet route</strong> —
+          <code class="inline">10.50.0.240/28</code> on
+          <code class="inline">aayush-internserver</code>. Until this happens no
+          LoadBalancer IP is reachable off-box. Verify with
+          <code class="inline">curl -I http://10.50.0.240/</code> from the
+          laptop; a 404 from nginx's default backend is success.</li>
+        <li><strong>Upgrade the laptop's kubectl</strong> to 1.35 to match the server.</li>
+        <li><strong><code>/etc/sudoers.d/interns</code></strong> is mode
+          <code class="inline">0644</code> and therefore being ignored entirely
+          by sudo. Pre-existing, unrelated, and not ours to change — but
+          someone probably believes it is working.</li>
+      </ul>
+
+      <h3>Blocking the next stage</h3>
+      <div class="gotcha">
+        <b>No StorageClass exists yet —</b>
+        <span>
+          nothing in this build provisions storage. The next stage begins with
+          Postgres, MinIO and Kafka, all of which want
+          <code class="inline">PersistentVolumeClaim</code>s — and every one of
+          them will sit in <code class="inline">Pending</code> forever with no
+          provisioner installed. On a single node the straightforward answer is
+          the local-path provisioner; that decision should be made before any
+          StatefulSet is applied, not after.
+        </span>
+      </div>
+
+      <h3>Then, in dependency order</h3>
+      <ol>
+        <li><strong>Kafka via Strimzi</strong> — operator plus
+          <code class="inline">Kafka</code>/<code class="inline">KafkaTopic</code>
+          CRs, KRaft mode, with the partition counts KEDA's
+          <code class="inline">ScaledJob</code> concurrency depends on.</li>
+        <li><strong>Postgres and MinIO</strong> as StatefulSets.</li>
+        <li><strong>The three HTTP services</strong> as Deployments behind the
+          Ingress that already exists; <strong>MediaMTX</strong> via the L4
+          LoadBalancer shape rehearsed above.</li>
+        <li><strong>Secrets via SOPS</strong> — the current
+          <code class="inline">.env</code> has already caused one real outage
+          through silent drift.</li>
+        <li><strong>transcode-worker as two KEDA <code>ScaledJob</code>s</strong> —
+          the one item here that is a genuine code change, not a deployment
+          change: today's persistent <code class="inline">while True</code>
+          consumer loop has to become a one-shot entrypoint that handles a
+          single unit of work and exits.</li>
+      </ol>
+    </section>
+
+    <footer class="finish">
+      <span class="eyebrow">Stage 1 complete</span>
+      <p>
+        A single-node kubeadm cluster on Kubernetes v1.35.7, with Calico
+        providing pod networking and NetworkPolicy, MetalLB making
+        <code class="inline">type: LoadBalancer</code> real on bare metal, and
+        ingress-nginx handling L7 — driveable from a laptop over Tailscale.
+      </p>
+      <p>
+        Reproducing it takes <code class="inline">k8s/cluster/README.md</code>;
+        the reasoning behind each choice lives in
+        <code class="inline">SPEC.md</code> under <em>Phase 2 cluster</em>.
+        Nothing here is a workload yet — that starts with storage.
+      </p>
+    </footer>
+  </main>
+</div>

@@ -1,0 +1,29 @@
+# MetalLB address pool for the Phase 2 single-node cluster.
+# Prereq: kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.16.0/config/manifests/metallb-native.yaml
+#
+# 10.50.0.0/24 is the box's LAN (ens18) and holds exactly two hosts: the
+# gateway .1 and the box itself .2 (verified by a full /24 ping sweep), so
+# the top /28 is free. This range is also what gets advertised as a Tailscale
+# subnet route from the box -- without that, these IPs are reachable only
+# from the box itself. See SPEC.md.
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: lan-pool
+  namespace: metallb-system
+spec:
+  addresses:
+    - 10.50.0.240-10.50.0.254
+---
+# L2 mode: the speaker answers ARP for pool IPs on ens18. BGP would need a
+# cooperating router; the gateway here is not under our control.
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: lan-pool-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - lan-pool
+  interfaces:
+    - ens18
