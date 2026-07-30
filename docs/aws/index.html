@@ -1,0 +1,760 @@
+<title>Deploying the streaming platform on AWS &#8212; a course</title>
+<style>
+  :root {
+    --paper: #eef1f4;
+    --surface: #ffffff;
+    --surface-dim: #e4e8ec;
+    --ink: #1b232c;
+    --ink-dim: #57626d;
+    --line: #ccd3d9;
+    --amber: #a35f22;
+    --amber-ink: #7c4718;
+    --teal: #2d5f74;
+    --teal-bg: #dfe9ec;
+    --ok: #2f6b3e;
+    --ok-bg: #dfeee2;
+    --warn: #9a3d3d;
+    --warn-bg: #f2e0e0;
+    --code-bg: #1b232c;
+    --code-ink: #e7ebee;
+    --code-dim: #93a1ac;
+    --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+      --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+      --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+      --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+      --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+    --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+    --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+    --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+    --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1f4; --surface: #ffffff; --surface-dim: #e4e8ec;
+    --ink: #1b232c; --ink-dim: #57626d; --line: #ccd3d9;
+    --amber: #a35f22; --amber-ink: #7c4718; --teal: #2d5f74; --teal-bg: #dfe9ec;
+    --ok: #2f6b3e; --ok-bg: #dfeee2; --warn: #9a3d3d; --warn-bg: #f2e0e0;
+    --code-bg: #1b232c; --code-ink: #e7ebee; --code-dim: #93a1ac; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6; font-size: 16px;
+  }
+  ::selection { background: var(--amber); color: #fff; }
+  a { color: var(--amber-ink); }
+  code, pre, kbd {
+    font-family: "Cascadia Code", "Cascadia Mono", ui-monospace, "SF Mono", Consolas,
+      "Liberation Mono", monospace;
+  }
+
+  .topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .topbar-inner { max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 1.75rem; }
+  .eyebrow {
+    display: inline-block; font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--amber-ink); background: color-mix(in srgb, var(--amber) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    padding: 0.2rem 0.55rem; border-radius: 3px;
+  }
+  h1 {
+    margin: 0.65rem 0 0.35rem; font-size: 1.95rem; font-weight: 700;
+    letter-spacing: -0.015em; text-wrap: balance;
+  }
+  .subtitle {
+    margin: 0 0 1rem; color: var(--ink-dim); font-size: 1.02rem;
+    max-width: 64ch; text-wrap: pretty;
+  }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem;
+    font-size: 0.85rem; color: var(--ink-dim);
+  }
+  .meta-row strong { color: var(--ink); font-weight: 600; }
+
+  .layout {
+    max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 5rem;
+    display: grid; grid-template-columns: 210px minmax(0, 1fr);
+    gap: 2.5rem; align-items: start;
+  }
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+    .rail { display: none; }
+  }
+
+  .rail {
+    position: sticky; top: 1.5rem; display: flex; flex-direction: column;
+    gap: 0.1rem; max-height: calc(100vh - 3rem); overflow-y: auto;
+    padding-right: 0.4rem;
+  }
+  .rail-label {
+    font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 0.45rem;
+  }
+  .rail-label + .rail-label, .rail a + .rail-label { margin-top: 1.1rem; }
+  .rail a {
+    display: flex; gap: 0.5rem; align-items: baseline;
+    padding: 0.3rem 0 0.3rem 0.7rem; font-size: 0.85rem;
+    color: var(--ink-dim); text-decoration: none;
+    border-left: 2px solid var(--line); margin-left: -1px;
+  }
+  .rail a:hover { color: var(--ink); border-left-color: var(--amber); }
+  .rail a .n {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber-ink); font-size: 0.78rem; flex-shrink: 0;
+  }
+
+  main { min-width: 0; }
+
+  .intro { color: var(--ink-dim); max-width: 68ch; margin: 0 0 2rem; }
+  .intro strong { color: var(--ink); }
+  .intro p { margin: 0 0 0.9rem; text-wrap: pretty; }
+
+  .step {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.5rem 1.6rem 1.7rem;
+    margin-bottom: 1.5rem; box-shadow: var(--shadow); scroll-margin-top: 1.5rem;
+  }
+  .step-head {
+    display: flex; align-items: baseline; gap: 0.85rem;
+    margin-bottom: 0.9rem; flex-wrap: wrap;
+  }
+  .step-num {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber); font-size: 1.05rem; font-weight: 600;
+  }
+  .step h2 { margin: 0; font-size: 1.2rem; font-weight: 650; letter-spacing: -0.008em; }
+  .step h3 {
+    margin: 1.6rem 0 0.6rem; font-size: 0.99rem; font-weight: 650;
+    letter-spacing: -0.005em;
+  }
+  .step h3:first-child { margin-top: 0; }
+  .step h4 {
+    margin: 1.1rem 0 0.4rem; font-size: 0.9rem; font-weight: 650;
+    color: var(--ink-dim); letter-spacing: 0.01em;
+  }
+  .context-chip {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--teal); background: var(--teal-bg);
+    border-radius: 999px; padding: 0.18rem 0.65rem; white-space: nowrap;
+  }
+
+  .why, .confirm, .gotcha {
+    display: flex; gap: 0.7rem; border-radius: 0 6px 6px 0;
+    padding: 0.8rem 0.95rem; margin: 0 0 1rem;
+    font-size: 0.92rem; text-wrap: pretty;
+  }
+  .why { background: var(--teal-bg); border-left: 3px solid var(--teal); }
+  .why b { color: var(--teal); font-weight: 700; }
+  .confirm { background: var(--ok-bg); border-left: 3px solid var(--ok); }
+  .confirm b { color: var(--ok); font-weight: 700; }
+  .gotcha { background: var(--warn-bg); border-left: 3px solid var(--warn); }
+  .gotcha b { color: var(--warn); font-weight: 700; }
+
+  p.step-p { margin: 0 0 1rem; text-wrap: pretty; }
+  p.step-p:last-child { margin-bottom: 0; }
+  .step ul, .step ol { margin: 0 0 1rem; padding-left: 1.35rem; }
+  .step li { margin-bottom: 0.45rem; text-wrap: pretty; }
+  .step li:last-child { margin-bottom: 0; }
+  .step ul ul, .step ol ol, .step ul ol { margin: 0.4rem 0 0; }
+
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+    padding: 0.85rem 1rem; margin: 0 0 1rem; overflow-x: auto;
+    font-size: 0.85rem; line-height: 1.6;
+  }
+  pre code { color: inherit; }
+  pre .c { color: var(--code-dim); }
+  pre .ph { color: var(--code-key); }
+  pre.out {
+    background: var(--surface-dim); color: var(--ink); border: 1px solid var(--line);
+  }
+  pre.out .c { color: var(--ink-dim); }
+  code.inline {
+    background: var(--surface-dim); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.87em; word-break: break-word;
+  }
+
+  .tbl-wrap { overflow-x: auto; margin: 0 0 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 460px; }
+  th, td {
+    text-align: left; padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  th {
+    font-size: 0.73rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-dim); font-weight: 600;
+  }
+  td code { font-size: 0.85em; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .diagram {
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.1rem; margin: 0 0 1.2rem;
+  }
+  .dlayer {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 0.75rem 0.85rem; margin-bottom: 0.55rem;
+  }
+  .dlayer:last-child { margin-bottom: 0; }
+  .dlayer-title {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--amber-ink); margin-bottom: 0.5rem;
+  }
+  .dboxes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .dbox {
+    border: 1px solid var(--line); border-radius: 5px;
+    padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--paper);
+  }
+  .dbox b { display: block; font-weight: 650; font-size: 0.82rem; }
+  .dbox span {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; color: var(--ink-dim);
+  }
+  .dbox.accent {
+    border-color: var(--amber);
+    background: color-mix(in srgb, var(--amber) 8%, var(--paper));
+  }
+  .dbox.teal { border-color: var(--teal); background: var(--teal-bg); }
+  .darrow {
+    text-align: center; color: var(--ink-dim); font-size: 0.88rem;
+    margin: 0.15rem 0; font-family: "Cascadia Code", ui-monospace, monospace;
+  }
+
+  /* numbered end-to-end trace */
+  .trace { margin: 0 0 1.2rem; counter-reset: tr; }
+  .trace-item {
+    display: grid; grid-template-columns: 1.7rem minmax(0, 1fr);
+    gap: 0.85rem; padding-bottom: 1rem; position: relative;
+  }
+  .trace-item::before {
+    counter-increment: tr; content: counter(tr);
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.75rem; font-weight: 600; color: var(--amber-ink);
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 50%; width: 1.7rem; height: 1.7rem;
+    display: grid; place-items: center;
+  }
+  .trace-item:not(:last-child)::after {
+    content: ""; position: absolute; left: 0.85rem; top: 1.85rem; bottom: 0.1rem;
+    width: 1px; background: var(--line);
+  }
+  .trace-item > div { padding-top: 0.1rem; font-size: 0.92rem; }
+  .trace-item b { font-weight: 650; }
+  .trace-item .who {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.74rem; color: var(--teal); display: block; margin-bottom: 0.1rem;
+  }
+
+  .glossary { font-size: 0.9rem; }
+  .glossary dt {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-weight: 600; color: var(--amber-ink); margin-top: 0.8rem; font-size: 0.85rem;
+  }
+  .glossary dt:first-child { margin-top: 0; }
+  .glossary dd { margin: 0.15rem 0 0; color: var(--ink); text-wrap: pretty; }
+
+  footer.finish {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--amber); border-radius: 0 10px 10px 0;
+    padding: 1.3rem 1.5rem; box-shadow: var(--shadow); font-size: 0.97rem;
+  }
+  footer.finish .eyebrow { margin-bottom: 0.6rem; }
+  footer.finish p { margin: 0 0 0.8rem; text-wrap: pretty; }
+  footer.finish p:last-child { margin-bottom: 0; }
+
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  /* ---- additions for the AWS course ---------------------------------- */
+
+  /* Section-level variants of the three callouts: they hold whole sections
+     (headings, tables, code) rather than a single sentence. */
+  .why.section, .confirm.section, .gotcha.section {
+    display: block; border-radius: 0 8px 8px 0;
+    padding: 1.15rem 1.3rem 1.25rem; margin: 0 0 1.4rem; font-size: 1rem;
+  }
+  .why.section { background: color-mix(in srgb, var(--teal-bg) 60%, var(--surface)); }
+  .confirm.section { background: color-mix(in srgb, var(--ok-bg) 55%, var(--surface)); }
+  .gotcha.section { background: color-mix(in srgb, var(--warn-bg) 55%, var(--surface)); }
+  .section > h3:first-child { margin-top: 0; }
+  .why.section > h3:first-child { color: var(--teal); }
+  .confirm.section > h3:first-child { color: var(--ok); }
+  .gotcha.section > h3:first-child { color: var(--warn); }
+  .section > *:last-child { margin-bottom: 0; }
+  .section pre.out { background: var(--surface); }
+
+  .step h4 { color: var(--ink); font-size: 0.95rem; }
+
+  .modnav {
+    font-size: 0.85rem; color: var(--ink-dim); margin: 0 0 1.2rem;
+    padding-bottom: 0.8rem; border-bottom: 1px solid var(--line);
+  }
+
+  blockquote {
+    margin: 0 0 1rem; padding: 0.1rem 0 0.1rem 1rem;
+    border-left: 3px solid var(--line); color: var(--ink-dim);
+  }
+  blockquote p.step-p:last-child { margin-bottom: 0; }
+
+  .step li > pre, .step li > .tbl-wrap { margin-top: 0.5rem; }
+
+  .pager {
+    display: flex; flex-wrap: wrap; gap: 0.75rem 1rem;
+    justify-content: space-between; margin-top: 1.5rem;
+    font-size: 0.9rem;
+  }
+  .pager a { text-decoration: none; }
+  .pager a:hover { text-decoration: underline; }
+
+  .rail a.home { border-left-color: var(--amber); color: var(--ink); }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="eyebrow">Course &middot; AWS &middot; EKS</span>
+    <h1>Deploying the streaming platform on AWS &#8212; a course</h1>
+    <p class="subtitle">A hands-on course, not a reference manual. Seventeen modules, worked in order, that take the streaming platform from <code class="inline">docker compose up</code> to a live stream on EKS.</p>
+    <div class="meta-row">
+      <span><strong>Region:</strong> us-east-1</span>
+      <span><strong>Cluster:</strong> streaming</span>
+      <span><strong>Cost:</strong> ~$240/month all-on</span>
+      <span><strong>Milestone:</strong> Module 13</span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+<nav class="rail">
+  <div class="rail-label">Course index</div>
+  <a href="#what-you-already-have"><span class="n">&sect;</span> What you already have</a>
+  <a href="#what-youre-building"><span class="n">&sect;</span> What you're building</a>
+  <a href="#the-modules"><span class="n">&sect;</span> The modules</a>
+  <a href="#before-you-start"><span class="n">&sect;</span> Before you start</a>
+  <a href="#conventions-used-throughout"><span class="n">&sect;</span> Conventions used throughout</a>
+  <a href="#what-this-costs"><span class="n">&sect;</span> What this costs</a>
+  <a href="#when-you-get-stuck"><span class="n">&sect;</span> When you get stuck</a>
+  <div class="rail-label">Parts</div>
+  <a href="part-1-foundations.html"><span class="n">I</span> Foundations</a>
+  <a href="part-2-platform.html"><span class="n">II</span> Platform</a>
+  <a href="part-3-data-layer.html"><span class="n">III</span> Data layer</a>
+  <a href="part-4-application.html"><span class="n">IV</span> The application</a>
+  <a href="part-5-elastic.html"><span class="n">V</span> Elastic and automated</a>
+</nav>
+
+<main>
+<div class="intro"><p class="step-p">This is a hands-on course, not a reference manual. You work through it in order, one module at a time, and at the end you have the whole streaming platform running on AWS: someone pushes RTMP from OBS, and someone else watches it in a browser over HTTPS.</p>
+<p class="step-p">Every module has the same shape:</p>
+<div class="trace">
+  <div class="trace-item"><div><strong>What you're building</strong> &#8212; the one-paragraph goal.</div></div>
+  <div class="trace-item"><div><strong>Why it works this way</strong> &#8212; the reasoning. Read this part. The commands are the easy bit; understanding <em>why</em> EKS wants this shape is the thing you're actually here for.</div></div>
+  <div class="trace-item"><div><strong>Do it</strong> &#8212; commands and YAML you can copy.</div></div>
+  <div class="trace-item"><div><strong>Verify</strong> &#8212; a checkpoint with the exact output you should see. Do not move to the next module until this passes.</div></div>
+  <div class="trace-item"><div><strong>What breaks</strong> &#8212; the failure modes for this step, and the command that tells you which one you hit.</div></div>
+</div>
+<p class="step-p">You will break things. That's fine and it's budgeted for. Module 16 covers teardown, and Module 1 sets a billing alarm before you create anything that costs money.</p></div>
+
+<section class="step" id="what-you-already-have">
+  <div class="step-head">
+    <h2>What you already have</h2>
+  </div>
+<p class="step-p">The platform runs today as Docker Compose (<code class="inline">docker-compose.yml</code>) &#8212; five Python services plus MediaMTX, Postgres, MinIO and Kafka. There is also a single-node Kubernetes cluster on a bare-metal box under <code class="inline">k8s/cluster/</code>, built with kubeadm. That box is <em>not</em> what this course uses. It was a rehearsal; this is the real thing.</p>
+<p class="step-p">Read <code class="inline">SPEC.md</code> first if you haven't. In particular the section on how a stream flows through the system, because you'll be debugging that flow in Module 13.</p>
+</section>
+
+<section class="step" id="what-youre-building">
+  <div class="step-head">
+    <h2>What you're building</h2>
+  </div>
+<div class="diagram">
+  <div class="dlayer">
+    <div class="dlayer-title">DNS &mdash; Route 53</div>
+    <div class="dboxes">
+      <div class="dbox accent"><b>k8s.linkifysolutions.com</b><span>delegated hosted zone</span></div>
+      <div class="dbox"><b>stream.k8s&hellip;</b><span>web UI</span></div>
+      <div class="dbox"><b>cdn.k8s&hellip;</b><span>HLS</span></div>
+      <div class="dbox"><b>rtmp.k8s&hellip;</b><span>ingest</span></div>
+    </div>
+  </div>
+  <div class="darrow">&darr;</div>
+  <div class="dlayer">
+    <div class="dlayer-title">Edge</div>
+    <div class="dboxes">
+      <div class="dbox accent"><b>ALB</b><span>HTTPS, ACM cert</span></div>
+      <div class="dbox accent"><b>CloudFront</b><span>OAC &rarr; S3</span></div>
+      <div class="dbox accent"><b>NLB</b><span>TCP :1935</span></div>
+    </div>
+  </div>
+  <div class="darrow">&darr;</div>
+  <div class="dlayer">
+    <div class="dlayer-title">EKS cluster &mdash; namespace streaming</div>
+    <div class="dboxes">
+      <div class="dbox"><b>web</b><span>FastAPI + Jinja</span></div>
+      <div class="dbox"><b>upload-api</b><span>uploads &rarr; S3 raw/</span></div>
+      <div class="dbox"><b>mediamtx</b><span>RTMP :1935</span></div>
+      <div class="dbox"><b>ingest-webhook</b><span>auth publish/unpublish</span></div>
+      <div class="dbox teal"><b>transcode Jobs</b><span>KEDA ScaledJob + Karpenter</span></div>
+      <div class="dbox"><b>analytics-worker</b><span>view events</span></div>
+      <div class="dbox teal"><b>Strimzi Kafka</b><span>namespace kafka</span></div>
+    </div>
+  </div>
+  <div class="darrow">&darr;</div>
+  <div class="dlayer">
+    <div class="dlayer-title">Managed data</div>
+    <div class="dboxes">
+      <div class="dbox accent"><b>RDS Postgres</b><span>four tables</span></div>
+      <div class="dbox accent"><b>S3 bucket</b><span>hls/ raw/</span></div>
+      <div class="dbox accent"><b>Secrets Manager</b><span>streaming/*</span></div>
+    </div>
+  </div>
+</div>
+<pre class="out"><code>                                  Route 53  (k8s.linkifysolutions.com)
+                                        |
+        +-------------------------------+--------------------------------+
+        |                               |                                |
+   stream.k8s...                   cdn.k8s...                       rtmp.k8s...
+        |                               |                                |
+      [ALB]  HTTPS, ACM cert       [CloudFront]  &lt;--- OAC ---        [NLB]  TCP :1935
+        |                               |                                |
+        |                          [S3 bucket]                           |
+        |                          hls/  raw/                            |
+        |                               ^                                |
+        |                               |  writes HLS                    |
+  +-----+---------------------------------------------------------------+---------+
+  |     |                          EKS cluster                           |         |
+  |     v                               |                                v         |
+  |  [web]  [upload-api]          [transcode Jobs]                  [mediamtx]     |
+  |     |        |                  KEDA + Karpenter                     |         |
+  |     |        |                       ^                               |         |
+  |     |        |                       |                        [ingest-webhook] |
+  |     |        +---------+-------------+-------------+------------------+        |
+  |     |                  |                           |                           |
+  |     |             [Strimzi Kafka]           [analytics-worker]                 |
+  |     |                                              |                           |
+  +-----+----------------------------------------------+---------------------------+
+        |                                              |
+        +---------------------- [RDS Postgres] --------+</code></pre>
+<p class="step-p">The pieces that change from Compose:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Compose today</th>
+<th>On AWS</th>
+<th>Module</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">postgres</code> container</td>
+<td>RDS Postgres (managed)</td>
+<td>8</td>
+</tr>
+<tr>
+<td><code class="inline">minio</code> container</td>
+<td>S3 bucket + CloudFront</td>
+<td>9</td>
+</tr>
+<tr>
+<td><code class="inline">kafka</code> container</td>
+<td>Strimzi operator, in-cluster</td>
+<td>10</td>
+</tr>
+<tr>
+<td><code class="inline">mediamtx</code> host port 1935</td>
+<td>NLB, TCP passthrough</td>
+<td>12</td>
+</tr>
+<tr>
+<td><code class="inline">web</code> / <code class="inline">upload-api</code> host ports</td>
+<td>one ALB Ingress, HTTPS</td>
+<td>12</td>
+</tr>
+<tr>
+<td><code class="inline">transcode-worker</code> long-running container</td>
+<td>KEDA <code class="inline">ScaledJob</code>, one Job per stream</td>
+<td>14</td>
+</tr>
+<tr>
+<td><code class="inline">.env</code> file</td>
+<td>AWS Secrets Manager + External Secrets Operator</td>
+<td>7</td>
+</tr>
+<tr>
+<td><code class="inline">docker compose up</code> on a self-hosted runner</td>
+<td>ArgoCD, pull-based</td>
+<td>15</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">Kafka stays inside the cluster rather than moving to MSK. That's deliberate: MSK Serverless has a ~$100/month floor even when idle, and running an operator is a genuinely useful thing to learn. Postgres and object storage move to managed services because nobody should be running their own database on a learning cluster.</p>
+</section>
+
+<section class="step" id="the-modules">
+  <div class="step-head">
+    <h2>The modules</h2>
+  </div>
+<h4 id="part-i-foundations">Part I &#8212; Foundations</h4>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>#</th>
+<th>Module</th>
+<th>You'll have</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>0</td>
+<td><a href="part-1-foundations.html#m00">Pre-flight: the code must change first</a></td>
+<td>Code that <em>can</em> run on AWS</td>
+</tr>
+<tr>
+<td>1</td>
+<td><a href="part-1-foundations.html#m01">AWS account, access, and not getting a surprise bill</a></td>
+<td>SSO login, MFA, a budget alarm</td>
+</tr>
+<tr>
+<td>2</td>
+<td><a href="part-1-foundations.html#m02">The VPC</a></td>
+<td>Network design you can defend</td>
+</tr>
+<tr>
+<td>3</td>
+<td><a href="part-1-foundations.html#m03">The EKS cluster</a></td>
+<td><code class="inline">kubectl get nodes</code> returning nodes</td>
+</tr>
+</tbody></table></div>
+<h4 id="part-ii-platform">Part II &#8212; Platform</h4>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>#</th>
+<th>Module</th>
+<th>You'll have</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>4</td>
+<td><a href="part-2-platform.html#m04">Add-ons and the storage blocker</a></td>
+<td>A default gp3 StorageClass</td>
+</tr>
+<tr>
+<td>5</td>
+<td><a href="part-2-platform.html#m05">DNS, certificates, load balancer controller</a></td>
+<td>A real HTTPS hostname</td>
+</tr>
+<tr>
+<td>6</td>
+<td><a href="part-2-platform.html#m06">Karpenter</a></td>
+<td>Nodes that appear when needed</td>
+</tr>
+<tr>
+<td>7</td>
+<td><a href="part-2-platform.html#m07">Secrets</a></td>
+<td>No credentials in git</td>
+</tr>
+</tbody></table></div>
+<h4 id="part-iii-data-layer">Part III &#8212; Data layer</h4>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>#</th>
+<th>Module</th>
+<th>You'll have</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>8</td>
+<td><a href="part-3-data-layer.html#m08">RDS Postgres</a></td>
+<td>The four tables, on RDS</td>
+</tr>
+<tr>
+<td>9</td>
+<td><a href="part-3-data-layer.html#m09">S3 and CloudFront</a></td>
+<td>HLS served from a CDN</td>
+</tr>
+<tr>
+<td>10</td>
+<td><a href="part-3-data-layer.html#m10">Kafka with Strimzi</a></td>
+<td>Five topics, operator-managed</td>
+</tr>
+</tbody></table></div>
+<h4 id="part-iv-the-application">Part IV &#8212; The application</h4>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>#</th>
+<th>Module</th>
+<th>You'll have</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>11</td>
+<td><a href="part-4-application.html#m11">Running the services</a></td>
+<td>All five services green</td>
+</tr>
+<tr>
+<td>12</td>
+<td><a href="part-4-application.html#m12">Exposing it to the world</a></td>
+<td>Public HTTPS + public RTMP</td>
+</tr>
+<tr>
+<td>13</td>
+<td><a href="part-4-application.html#m13">Your first stream</a></td>
+<td><strong>A working stream, end to end</strong></td>
+</tr>
+</tbody></table></div>
+<h4 id="part-v-elastic-and-automated">Part V &#8212; Elastic and automated</h4>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>#</th>
+<th>Module</th>
+<th>You'll have</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>14</td>
+<td><a href="part-5-elastic.html#m14">Transcoding that scales</a></td>
+<td>One Job per stream, nodes on demand</td>
+</tr>
+<tr>
+<td>15</td>
+<td><a href="part-5-elastic.html#m15">GitOps with ArgoCD</a></td>
+<td>Deploys without <code class="inline">kubectl</code></td>
+</tr>
+<tr>
+<td>16</td>
+<td><a href="part-5-elastic.html#m16">Monitoring, cost, and teardown</a></td>
+<td>Dashboards, and a way to stop paying</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">Module 13 is the milestone. Everything before it is setup; everything after it is making the setup good. If you have limited time, get to 13.</p>
+</section>
+
+<section class="step" id="before-you-start">
+  <div class="step-head">
+    <h2>Before you start</h2>
+  </div>
+<p class="step-p">You need:</p>
+<ul>
+<li>An AWS account you can create IAM Identity Center users in (Module 1 covers this).</li>
+<li>Access to DNS for <code class="inline">linkifysolutions.com</code>, to delegate the <code class="inline">k8s.</code> subdomain. Ask before you touch the parent zone.</li>
+<li>A machine with a terminal. macOS or Linux. On Windows use WSL2.</li>
+<li>The repo cloned, and <code class="inline">docker compose up</code> working locally at least once, so you know what "working" looks like before you try to reproduce it on AWS.</li>
+</ul>
+<p class="step-p">Tool versions are pinned in Module 1. Install them there, not now.</p>
+</section>
+
+<section class="step" id="conventions-used-throughout">
+  <div class="step-head">
+    <h2>Conventions used throughout</h2>
+  </div>
+<p class="step-p">These are fixed across every module. If a command in one module disagrees with this table, this table wins &#8212; tell whoever wrote the module.</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Thing</th>
+<th>Value</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>AWS region</td>
+<td><code class="inline">us-east-1</code></td>
+</tr>
+<tr>
+<td>AWS CLI profile</td>
+<td><code class="inline">linkify-streaming</code></td>
+</tr>
+<tr>
+<td>EKS cluster name</td>
+<td><code class="inline">streaming</code></td>
+</tr>
+<tr>
+<td>Kubernetes namespaces</td>
+<td><code class="inline">streaming</code> (apps), <code class="inline">kafka</code>, <code class="inline">keda</code>, <code class="inline">karpenter</code>, <code class="inline">argocd</code>, <code class="inline">external-secrets</code></td>
+</tr>
+<tr>
+<td>DNS zone</td>
+<td><code class="inline">k8s.linkifysolutions.com</code></td>
+</tr>
+<tr>
+<td>Web UI</td>
+<td><code class="inline">stream.k8s.linkifysolutions.com</code></td>
+</tr>
+<tr>
+<td>HLS / CDN</td>
+<td><code class="inline">cdn.k8s.linkifysolutions.com</code></td>
+</tr>
+<tr>
+<td>RTMP ingest</td>
+<td><code class="inline">rtmp.k8s.linkifysolutions.com</code></td>
+</tr>
+<tr>
+<td>S3 bucket</td>
+<td><code class="inline">linkify-streaming-media-&lt;accountid&gt;</code></td>
+</tr>
+<tr>
+<td>Secrets Manager prefix</td>
+<td><code class="inline">streaming/</code></td>
+</tr>
+<tr>
+<td>Manifests live in</td>
+<td><code class="inline">k8s/</code> (Kustomize base + overlays)</td>
+</tr>
+<tr>
+<td>Container images</td>
+<td><code class="inline">ghcr.io/linkify-solutions-inc/kubernetes-streaming-&lt;service&gt;</code></td>
+</tr>
+</tbody></table></div>
+<p class="step-p">Shell blocks assume you have exported <code class="inline">AWS_PROFILE=linkify-streaming</code> and <code class="inline">AWS_REGION=us-east-1</code>. Module 1 sets these up.</p>
+<p class="step-p">Placeholders look like <code class="inline">&lt;accountid&gt;</code> or <code class="inline">&lt;your-value&gt;</code>. Anything in angle brackets, you substitute. Anything not in angle brackets, type literally.</p>
+</section>
+
+<section class="step" id="what-this-costs">
+  <div class="step-head">
+    <h2>What this costs</h2>
+  </div>
+<p class="step-p">Roughly <strong>$240/month</strong> if you leave everything running 24/7. Module 16 has the line-by-line table and two changes that bring it to about <strong>$170</strong> &#8212; putting the node group on spot capacity, and scaling the nodes to zero overnight.</p>
+<p class="step-p">The single biggest line item is the EKS control plane at <strong>$73/month, fixed</strong>. There is no way to make that cheaper; it's the price of a managed control plane, and it's roughly half your budget before you've run a single pod. Knowing that shapes every other decision in this course &#8212; it's why there's one NAT gateway instead of three, and why Kafka isn't on MSK.</p>
+<p class="step-p">Two habits that will save you real money:</p>
+<ol>
+<li><strong>Set the budget alarm in Module 1 before you create anything.</strong> Not after.</li>
+<li><strong>Scale the node group to zero when you stop for the day.</strong> The control plane, RDS and the load balancers still bill, but the EC2 instances are the part that adds up fastest.</li>
+</ol>
+<p class="step-p">Module 16's teardown section is not optional reading. Several AWS resources keep billing after you delete the cluster &#8212; load balancers created by Kubernetes objects, CloudFront distributions, S3 object versions &#8212; and they're easy to leave running for months without noticing.</p>
+</section>
+
+<section class="step" id="when-you-get-stuck">
+  <div class="step-head">
+    <h2>When you get stuck</h2>
+  </div>
+<p class="step-p">Work the "What breaks" section of the module you're on first &#8212; it's ordered by how often each failure actually happens.</p>
+<p class="step-p">Past that, the general method: <strong>find the thing that isn't Ready, then ask it why.</strong></p>
+<pre><code>kubectl get pods -A | grep -v Running | grep -v Completed
+kubectl describe pod <span class="ph">&lt;name&gt;</span> -n <span class="ph">&lt;namespace&gt;</span>       <span class="c"># Events at the bottom</span>
+kubectl logs <span class="ph">&lt;name&gt;</span> -n <span class="ph">&lt;namespace&gt;</span> --previous    <span class="c"># --previous if it's crash-looping</span></code></pre>
+<p class="step-p">For AWS-side resources, the console's own error messages are usually accurate; the CLI equivalent is <code class="inline">aws &lt;service&gt; describe-&lt;thing&gt;</code>. For anything that involves a load balancer not appearing, the answer is almost always in the AWS Load Balancer Controller's logs:</p>
+<pre><code>kubectl logs -n kube-system deploy/aws-load-balancer-controller</code></pre>
+<p class="step-p"><code class="inline">docs/kubernetes-explained.html</code> in this repo covers the Kubernetes concepts themselves &#8212; reconciliation loops, why a Pending pod is Pending, how Services actually route. If a module assumes something about Kubernetes you don't have yet, that's where it is.</p>
+</section>
+
+<footer class="finish">
+  <span class="eyebrow">Start here</span>
+  <p>Module 13 is the milestone. Everything before it is setup; everything after it is making the setup good. If you have limited time, get to 13.</p>
+  <p><a href="part-1-foundations.html#m00">Begin with Module 0 &mdash; Pre-flight: the code must change first &rarr;</a></p>
+</footer>
+</main>
+</div>

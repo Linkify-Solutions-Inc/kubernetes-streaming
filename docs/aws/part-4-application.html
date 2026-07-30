@@ -1,0 +1,1381 @@
+<title>AWS/EKS &mdash; Part IV: The application</title>
+<style>
+  :root {
+    --paper: #eef1f4;
+    --surface: #ffffff;
+    --surface-dim: #e4e8ec;
+    --ink: #1b232c;
+    --ink-dim: #57626d;
+    --line: #ccd3d9;
+    --amber: #a35f22;
+    --amber-ink: #7c4718;
+    --teal: #2d5f74;
+    --teal-bg: #dfe9ec;
+    --ok: #2f6b3e;
+    --ok-bg: #dfeee2;
+    --warn: #9a3d3d;
+    --warn-bg: #f2e0e0;
+    --code-bg: #1b232c;
+    --code-ink: #e7ebee;
+    --code-dim: #93a1ac;
+    --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+      --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+      --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+      --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+      --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+    --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+    --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+    --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+    --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1f4; --surface: #ffffff; --surface-dim: #e4e8ec;
+    --ink: #1b232c; --ink-dim: #57626d; --line: #ccd3d9;
+    --amber: #a35f22; --amber-ink: #7c4718; --teal: #2d5f74; --teal-bg: #dfe9ec;
+    --ok: #2f6b3e; --ok-bg: #dfeee2; --warn: #9a3d3d; --warn-bg: #f2e0e0;
+    --code-bg: #1b232c; --code-ink: #e7ebee; --code-dim: #93a1ac; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6; font-size: 16px;
+  }
+  ::selection { background: var(--amber); color: #fff; }
+  a { color: var(--amber-ink); }
+  code, pre, kbd {
+    font-family: "Cascadia Code", "Cascadia Mono", ui-monospace, "SF Mono", Consolas,
+      "Liberation Mono", monospace;
+  }
+
+  .topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .topbar-inner { max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 1.75rem; }
+  .eyebrow {
+    display: inline-block; font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--amber-ink); background: color-mix(in srgb, var(--amber) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    padding: 0.2rem 0.55rem; border-radius: 3px;
+  }
+  h1 {
+    margin: 0.65rem 0 0.35rem; font-size: 1.95rem; font-weight: 700;
+    letter-spacing: -0.015em; text-wrap: balance;
+  }
+  .subtitle {
+    margin: 0 0 1rem; color: var(--ink-dim); font-size: 1.02rem;
+    max-width: 64ch; text-wrap: pretty;
+  }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem;
+    font-size: 0.85rem; color: var(--ink-dim);
+  }
+  .meta-row strong { color: var(--ink); font-weight: 600; }
+
+  .layout {
+    max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 5rem;
+    display: grid; grid-template-columns: 210px minmax(0, 1fr);
+    gap: 2.5rem; align-items: start;
+  }
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+    .rail { display: none; }
+  }
+
+  .rail {
+    position: sticky; top: 1.5rem; display: flex; flex-direction: column;
+    gap: 0.1rem; max-height: calc(100vh - 3rem); overflow-y: auto;
+    padding-right: 0.4rem;
+  }
+  .rail-label {
+    font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 0.45rem;
+  }
+  .rail-label + .rail-label, .rail a + .rail-label { margin-top: 1.1rem; }
+  .rail a {
+    display: flex; gap: 0.5rem; align-items: baseline;
+    padding: 0.3rem 0 0.3rem 0.7rem; font-size: 0.85rem;
+    color: var(--ink-dim); text-decoration: none;
+    border-left: 2px solid var(--line); margin-left: -1px;
+  }
+  .rail a:hover { color: var(--ink); border-left-color: var(--amber); }
+  .rail a .n {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber-ink); font-size: 0.78rem; flex-shrink: 0;
+  }
+
+  main { min-width: 0; }
+
+  .intro { color: var(--ink-dim); max-width: 68ch; margin: 0 0 2rem; }
+  .intro strong { color: var(--ink); }
+  .intro p { margin: 0 0 0.9rem; text-wrap: pretty; }
+
+  .step {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.5rem 1.6rem 1.7rem;
+    margin-bottom: 1.5rem; box-shadow: var(--shadow); scroll-margin-top: 1.5rem;
+  }
+  .step-head {
+    display: flex; align-items: baseline; gap: 0.85rem;
+    margin-bottom: 0.9rem; flex-wrap: wrap;
+  }
+  .step-num {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber); font-size: 1.05rem; font-weight: 600;
+  }
+  .step h2 { margin: 0; font-size: 1.2rem; font-weight: 650; letter-spacing: -0.008em; }
+  .step h3 {
+    margin: 1.6rem 0 0.6rem; font-size: 0.99rem; font-weight: 650;
+    letter-spacing: -0.005em;
+  }
+  .step h3:first-child { margin-top: 0; }
+  .step h4 {
+    margin: 1.1rem 0 0.4rem; font-size: 0.9rem; font-weight: 650;
+    color: var(--ink-dim); letter-spacing: 0.01em;
+  }
+  .context-chip {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--teal); background: var(--teal-bg);
+    border-radius: 999px; padding: 0.18rem 0.65rem; white-space: nowrap;
+  }
+
+  .why, .confirm, .gotcha {
+    display: flex; gap: 0.7rem; border-radius: 0 6px 6px 0;
+    padding: 0.8rem 0.95rem; margin: 0 0 1rem;
+    font-size: 0.92rem; text-wrap: pretty;
+  }
+  .why { background: var(--teal-bg); border-left: 3px solid var(--teal); }
+  .why b { color: var(--teal); font-weight: 700; }
+  .confirm { background: var(--ok-bg); border-left: 3px solid var(--ok); }
+  .confirm b { color: var(--ok); font-weight: 700; }
+  .gotcha { background: var(--warn-bg); border-left: 3px solid var(--warn); }
+  .gotcha b { color: var(--warn); font-weight: 700; }
+
+  p.step-p { margin: 0 0 1rem; text-wrap: pretty; }
+  p.step-p:last-child { margin-bottom: 0; }
+  .step ul, .step ol { margin: 0 0 1rem; padding-left: 1.35rem; }
+  .step li { margin-bottom: 0.45rem; text-wrap: pretty; }
+  .step li:last-child { margin-bottom: 0; }
+  .step ul ul, .step ol ol, .step ul ol { margin: 0.4rem 0 0; }
+
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+    padding: 0.85rem 1rem; margin: 0 0 1rem; overflow-x: auto;
+    font-size: 0.85rem; line-height: 1.6;
+  }
+  pre code { color: inherit; }
+  pre .c { color: var(--code-dim); }
+  pre .ph { color: var(--code-key); }
+  pre.out {
+    background: var(--surface-dim); color: var(--ink); border: 1px solid var(--line);
+  }
+  pre.out .c { color: var(--ink-dim); }
+  code.inline {
+    background: var(--surface-dim); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.87em; word-break: break-word;
+  }
+
+  .tbl-wrap { overflow-x: auto; margin: 0 0 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 460px; }
+  th, td {
+    text-align: left; padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  th {
+    font-size: 0.73rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-dim); font-weight: 600;
+  }
+  td code { font-size: 0.85em; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .diagram {
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.1rem; margin: 0 0 1.2rem;
+  }
+  .dlayer {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 0.75rem 0.85rem; margin-bottom: 0.55rem;
+  }
+  .dlayer:last-child { margin-bottom: 0; }
+  .dlayer-title {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--amber-ink); margin-bottom: 0.5rem;
+  }
+  .dboxes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .dbox {
+    border: 1px solid var(--line); border-radius: 5px;
+    padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--paper);
+  }
+  .dbox b { display: block; font-weight: 650; font-size: 0.82rem; }
+  .dbox span {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; color: var(--ink-dim);
+  }
+  .dbox.accent {
+    border-color: var(--amber);
+    background: color-mix(in srgb, var(--amber) 8%, var(--paper));
+  }
+  .dbox.teal { border-color: var(--teal); background: var(--teal-bg); }
+  .darrow {
+    text-align: center; color: var(--ink-dim); font-size: 0.88rem;
+    margin: 0.15rem 0; font-family: "Cascadia Code", ui-monospace, monospace;
+  }
+
+  /* numbered end-to-end trace */
+  .trace { margin: 0 0 1.2rem; counter-reset: tr; }
+  .trace-item {
+    display: grid; grid-template-columns: 1.7rem minmax(0, 1fr);
+    gap: 0.85rem; padding-bottom: 1rem; position: relative;
+  }
+  .trace-item::before {
+    counter-increment: tr; content: counter(tr);
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.75rem; font-weight: 600; color: var(--amber-ink);
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 50%; width: 1.7rem; height: 1.7rem;
+    display: grid; place-items: center;
+  }
+  .trace-item:not(:last-child)::after {
+    content: ""; position: absolute; left: 0.85rem; top: 1.85rem; bottom: 0.1rem;
+    width: 1px; background: var(--line);
+  }
+  .trace-item > div { padding-top: 0.1rem; font-size: 0.92rem; }
+  .trace-item b { font-weight: 650; }
+  .trace-item .who {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.74rem; color: var(--teal); display: block; margin-bottom: 0.1rem;
+  }
+
+  .glossary { font-size: 0.9rem; }
+  .glossary dt {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-weight: 600; color: var(--amber-ink); margin-top: 0.8rem; font-size: 0.85rem;
+  }
+  .glossary dt:first-child { margin-top: 0; }
+  .glossary dd { margin: 0.15rem 0 0; color: var(--ink); text-wrap: pretty; }
+
+  footer.finish {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--amber); border-radius: 0 10px 10px 0;
+    padding: 1.3rem 1.5rem; box-shadow: var(--shadow); font-size: 0.97rem;
+  }
+  footer.finish .eyebrow { margin-bottom: 0.6rem; }
+  footer.finish p { margin: 0 0 0.8rem; text-wrap: pretty; }
+  footer.finish p:last-child { margin-bottom: 0; }
+
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  /* ---- additions for the AWS course ---------------------------------- */
+
+  /* Section-level variants of the three callouts: they hold whole sections
+     (headings, tables, code) rather than a single sentence. */
+  .why.section, .confirm.section, .gotcha.section {
+    display: block; border-radius: 0 8px 8px 0;
+    padding: 1.15rem 1.3rem 1.25rem; margin: 0 0 1.4rem; font-size: 1rem;
+  }
+  .why.section { background: color-mix(in srgb, var(--teal-bg) 60%, var(--surface)); }
+  .confirm.section { background: color-mix(in srgb, var(--ok-bg) 55%, var(--surface)); }
+  .gotcha.section { background: color-mix(in srgb, var(--warn-bg) 55%, var(--surface)); }
+  .section > h3:first-child { margin-top: 0; }
+  .why.section > h3:first-child { color: var(--teal); }
+  .confirm.section > h3:first-child { color: var(--ok); }
+  .gotcha.section > h3:first-child { color: var(--warn); }
+  .section > *:last-child { margin-bottom: 0; }
+  .section pre.out { background: var(--surface); }
+
+  .step h4 { color: var(--ink); font-size: 0.95rem; }
+
+  .modnav {
+    font-size: 0.85rem; color: var(--ink-dim); margin: 0 0 1.2rem;
+    padding-bottom: 0.8rem; border-bottom: 1px solid var(--line);
+  }
+
+  blockquote {
+    margin: 0 0 1rem; padding: 0.1rem 0 0.1rem 1rem;
+    border-left: 3px solid var(--line); color: var(--ink-dim);
+  }
+  blockquote p.step-p:last-child { margin-bottom: 0; }
+
+  .step li > pre, .step li > .tbl-wrap { margin-top: 0.5rem; }
+
+  .pager {
+    display: flex; flex-wrap: wrap; gap: 0.75rem 1rem;
+    justify-content: space-between; margin-top: 1.5rem;
+    font-size: 0.9rem;
+  }
+  .pager a { text-decoration: none; }
+  .pager a:hover { text-decoration: underline; }
+
+  .rail a.home { border-left-color: var(--amber); color: var(--ink); }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="eyebrow">AWS &middot; EKS course &middot; Part IV</span>
+    <h1>The application</h1>
+    <p class="subtitle">All five services running, an ALB and an NLB carrying public traffic, and the end-to-end stream that proves the whole thing works.</p>
+    <div class="meta-row">
+      <span><strong>Modules:</strong> 11&ndash;13</span>
+      <span><strong>Region:</strong> us-east-1</span>
+      <span><strong>Cluster:</strong> streaming</span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+<nav class="rail">
+  <div class="rail-label">Part IV &mdash; The application</div>
+  <a href="#m11"><span class="n">11</span> Running the services</a>
+  <a href="#m12"><span class="n">12</span> Exposing it to the world</a>
+  <a href="#m13"><span class="n">13</span> Your first stream</a>
+  <div class="rail-label">Course</div>
+  <a href="index.html" class="home"><span class="n">&#8617;</span> Course index</a>
+  <a href="part-1-foundations.html"><span class="n">I</span> Foundations</a>
+  <a href="part-2-platform.html"><span class="n">II</span> Platform</a>
+  <a href="part-3-data-layer.html"><span class="n">III</span> Data layer</a>
+  <a href="part-5-elastic.html"><span class="n">V</span> Elastic and automated</a>
+</nav>
+
+<main>
+<section class="step" id="m11">
+  <div class="step-head">
+    <span class="step-num">11</span>
+    <h2>Running the services</h2>
+  </div>
+<p class="modnav">Prerequisites: <a href="part-3-data-layer.html#m08">Module 8</a> (RDS, schema applied), <a href="part-3-data-layer.html#m09">Module 9</a> (bucket, CloudFront), <a href="part-3-data-layer.html#m10">Module 10</a> (Kafka, five topics), <a href="part-2-platform.html#m07">Module 7</a> (<code class="inline">streaming-db</code> syncing). ---</p>
+<h3 id="m11-what-youre-building">What you're building</h3>
+<p class="step-p">All five Python services plus MediaMTX, running in the <code class="inline">streaming</code> namespace as Deployments, reading their configuration from a ConfigMap and a Secret, with health probes that report the truth. Nothing is reachable from the internet yet &#8212; that's Module 12. At the end of this module every pod is <code class="inline">Running</code>, and a <code class="inline">kubectl port-forward</code> to <code class="inline">web</code> renders the homepage in your browser.</p>
+<p class="step-p">You also establish the manifest layout that every module from here to the end uses.</p>
+<div class="why section">
+<h3 id="m11-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m11-kustomize-base-plus-overlays">Kustomize base plus overlays</h4>
+<p class="step-p">Every manifest in this course lives under <code class="inline">k8s/</code>, organised as a Kustomize <strong>base</strong> with two <strong>overlays</strong>. Four reasons, in the order they'll matter to you:</p>
+<p class="step-p"><strong>ArgoCD consumes it natively.</strong> In <a href="part-5-elastic.html#m15">Module 15</a> you point an ArgoCD <code class="inline">Application</code> at a directory containing a <code class="inline">kustomization.yaml</code> and it renders it. No plugin, no <code class="inline">repo-server</code> custom image, no chart repository to host. If you used Helm for your own services you'd be teaching ArgoCD how to template before you could deploy anything.</p>
+<p class="step-p"><strong>There is no templating language to learn.</strong> <code class="inline">kubectl kustomize k8s/apps/overlays/prod</code> prints the exact YAML the cluster will receive. You can pipe it to a file and diff it against <code class="inline">kubectl get -o yaml</code>. When something is wrong you are reading Kubernetes objects, not chasing a value through three levels of <code class="inline">{{ .Values.x | default .Values.y }}</code>. An intern debugging a Helm chart learns Helm; an intern debugging Kustomize output learns Kubernetes.</p>
+<p class="step-p"><strong>The dev overlay keeps the bare-metal box working.</strong> The kubeadm box from Phase 2 runs Postgres and MinIO in-cluster behind ingress-nginx. EKS runs RDS and S3 behind an ALB. Those two environments share about 95% of their manifests. That is the textbook base-plus-overlay case, and it has a second benefit: the dev overlay is a tripwire. The moment <code class="inline">base/</code> starts assuming an ALB or an RDS hostname, the dev overlay stops making sense, and you notice.</p>
+<p class="step-p"><strong><code class="inline">configMapGenerator</code> gives you free rolling restarts.</strong> It appends a hash of the content to the ConfigMap's name &#8212; <code class="inline">streaming-config-g96ttgh296</code>. Change a value, the name changes, every Deployment that references it has a new pod template, and Kubernetes rolls it. Without this you hand-roll a checksum annotation and forget to update it exactly once, then spend an afternoon wondering why your config change did nothing.</p>
+<p class="step-p">The honest cost: Kustomize has no conditionals, so five near-identical Deployments are five near-identical files. Accept it. Patch files are the price, and they're greppable, which a Helm <code class="inline">if</code> is not.</p>
+<p class="step-p">Helm is still used in this course &#8212; but only for other people's software (Strimzi, KEDA, the load balancer controller, ArgoCD), wrapped in ArgoCD <code class="inline">Application</code>s. Never for our five services.</p>
+<h4 id="m11-the-tree">The tree</h4>
+<pre class="out"><code>k8s/
+&#9500;&#9472;&#9472; cluster/                       # UNCHANGED &#8212; kubeadm bring-up for the bare-metal box
+&#9500;&#9472;&#9472; infra/                         # custom resources we own (StorageClass, Kafka, secrets)
+&#9492;&#9472;&#9472; apps/
+    &#9500;&#9472;&#9472; base/                      # the truth
+    &#9474;   &#9500;&#9472;&#9472; kustomization.yaml
+    &#9474;   &#9500;&#9472;&#9472; namespace.yaml
+    &#9474;   &#9500;&#9472;&#9472; config.env             # non-secret config -&gt; configMapGenerator
+    &#9474;   &#9500;&#9472;&#9472; web/{deployment,service}.yaml
+    &#9474;   &#9500;&#9472;&#9472; upload-api/{serviceaccount,deployment,service}.yaml
+    &#9474;   &#9500;&#9472;&#9472; ingest-webhook/{deployment,service,networkpolicy}.yaml
+    &#9474;   &#9500;&#9472;&#9472; analytics-worker/deployment.yaml
+    &#9474;   &#9492;&#9472;&#9472; transcode-worker/{serviceaccount,deployment}.yaml
+    &#9500;&#9472;&#9472; mediamtx/                  # its own root &#8212; NOT part of apps/base
+    &#9474;   &#9500;&#9472;&#9472; base/                  # cloud-neutral; dev uses this directly
+    &#9474;   &#9474;   &#9500;&#9472;&#9472; kustomization.yaml
+    &#9474;   &#9474;   &#9492;&#9472;&#9472; {deployment,service,pdb}.yaml + mediamtx.yml
+    &#9474;   &#9492;&#9472;&#9472; overlays/aws/          # EKS only
+    &#9474;       &#9500;&#9472;&#9472; kustomization.yaml
+    &#9474;       &#9500;&#9472;&#9472; service-rtmp-nlb.yaml      # Module 12
+    &#9474;       &#9492;&#9472;&#9472; patches/mediamtx-placement.yaml
+    &#9492;&#9472;&#9472; overlays/
+        &#9500;&#9472;&#9472; dev/                   # kubeadm box: in-cluster Postgres + MinIO
+        &#9474;   &#9500;&#9472;&#9472; kustomization.yaml #     ../../base + ../../mediamtx/base
+        &#9474;   &#9500;&#9472;&#9472; config.env
+        &#9474;   &#9492;&#9472;&#9472; patches/{web,upload-api,ingest-webhook,transcode-worker}.yaml
+        &#9492;&#9472;&#9472; prod/                  # EKS
+            &#9500;&#9472;&#9472; kustomization.yaml # &lt;-- CI writes the image tags HERE (Module 15)
+            &#9500;&#9472;&#9472; config.env
+            &#9492;&#9472;&#9472; ingress-alb.yaml       # Module 12</code></pre>
+<p class="step-p">One line each, for the README you'll write later:</p>
+<ul>
+<li><code class="inline">apps/base</code> &#8212; our five services. This is the truth.</li>
+<li><code class="inline">apps/mediamtx</code> &#8212; the RTMP server, on its own. It is a separate kustomize root because <a href="part-5-elastic.html#m15">Module 15</a> gives it a separate, manually-synced ArgoCD Application: restarting MediaMTX ends every live broadcast, so it must not ride along with a routine deploy of the five services. Two Applications cannot own the same objects, so being outside <code class="inline">apps/base/</code> is what makes that gate real. It splits base/overlay like everything else &#8212; <code class="inline">mediamtx/base</code> is cloud-neutral and is what the dev overlay pulls in, <code class="inline">mediamtx/overlays/aws</code> adds the public RTMP NLB Service (which has to be owned by the same Application as the pods it targets) and the node placement.</li>
+<li><code class="inline">apps/overlays</code> &#8212; the deltas. If it contains an ARN or an account id, it belongs here and not in base.</li>
+<li><code class="inline">infra/</code> &#8212; custom resources we author that need an operator's CRDs.</li>
+<li><code class="inline">cluster/</code> &#8212; the old kubeadm box. Do not edit it in this course.</li>
+</ul>
+<h4 id="m11-probes-done-properly">Probes done properly</h4>
+<p class="step-p">This is the part of the module that is actually about Kubernetes rather than about YAML.</p>
+<p class="step-p">A <strong>liveness</strong> probe answers exactly one question: <em>is this process wedged such that only a restart can fix it?</em> A <strong>readiness</strong> probe answers a different one: <em>should this pod receive traffic right now?</em> Conflating them is the single most common way to turn a brief dependency outage into a long self-inflicted one.</p>
+<p class="step-p">Look at what <code class="inline">upload-api</code> ships today (<code class="inline">services/upload-api/main.py</code>):</p>
+<pre><code>@app.get("/health")
+def health():
+    checks = {}
+    try:
+        with pg_connect() as conn:
+            conn.execute("SELECT 1")
+        checks["postgres"] = "ok"
+    except Exception as exc:
+        checks["postgres"] = f"error: {exc}"
+    try:
+        s3_client().head_bucket(Bucket="media")
+        checks["minio"] = "ok"
+    except Exception as exc:
+        checks["minio"] = f"error: {exc}"
+    return checks</code></pre>
+<p class="step-p">Two independent problems.</p>
+<p class="step-p"><strong>It is wrong as a liveness probe.</strong> It does a real <code class="inline">SELECT 1</code> against Postgres and a real <code class="inline">head_bucket</code> against S3. Wire that to liveness and an RDS hiccup &#8212; a failover, a maintenance window, a connection storm &#8212; fails the probe on <em>every</em> <code class="inline">upload-api</code> replica at once. The kubelet restarts them all. They come up, fail again, and enter <code class="inline">CrashLoopBackOff</code>, where the backoff grows to five minutes. Your outage now outlives the RDS blip by minutes, and the restart storm hammers RDS while it is trying to recover. A dead database is not a wedged process.</p>
+<p class="step-p"><strong>It also returns 200 unconditionally, which is a live bug.</strong> It builds <code class="inline">checks = {"postgres": "error: ...", "minio": "error: ..."}</code> and returns the dict. FastAPI serialises that with status 200. So it can never fail. Wire it to readiness and you will watch it stay Ready straight through a total database outage and conclude that probes don't work.</p>
+<p class="step-p">The fix is a small code change, and here it is exactly. Three endpoints instead of one:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Endpoint</th>
+<th>Body</th>
+<th>Status</th>
+<th>Used by</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">GET /livez</code></td>
+<td><code class="inline">{"status":"ok"}</code></td>
+<td>always 200</td>
+<td>liveness + startup</td>
+</tr>
+<tr>
+<td><code class="inline">GET /readyz</code></td>
+<td>per-dependency checks</td>
+<td><strong>503 if any fail</strong></td>
+<td>readiness</td>
+</tr>
+<tr>
+<td><code class="inline">GET /health</code></td>
+<td>unchanged (verbose, always 200)</td>
+<td>200</td>
+<td>humans, <code class="inline">curl</code> from a shell</td>
+</tr>
+</tbody></table></div>
+<pre><code>@app.get("/livez")
+def livez():
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+def readyz(response: Response):
+    checks, ok = {}, True
+    try:
+        with pg_connect() as conn:
+            conn.execute("SELECT 1")
+        checks["postgres"] = "ok"
+    except Exception as exc:  <span class="c"># noqa: BLE001</span>
+        checks["postgres"], ok = f"error: {exc}", False
+    try:
+        s3_client().head_bucket(Bucket=S3_BUCKET)
+        checks["s3"] = "ok"
+    except Exception as exc:  <span class="c"># noqa: BLE001</span>
+        checks["s3"], ok = f"error: {exc}", False
+    if not ok:
+        response.status_code = 503
+    return checks</code></pre>
+<p class="step-p"><code class="inline">Response</code> comes from <code class="inline">fastapi</code>. This is the change <a href="part-1-foundations.html#m00">Module 0</a> already landed &#8212; if you skipped it, land it now, because the manifests below reference both paths.</p>
+<p class="step-p">Two things to know about <code class="inline">/readyz</code> before you set the period:</p>
+<ul>
+<li>It opens a <strong>new Postgres connection every 10 seconds per pod</strong>. The code has no pooling; <code class="inline">pg_connect()</code> builds a fresh connection per call. At two replicas that's twelve TLS handshakes a minute against RDS, forever. Acceptable at this scale, and the strongest single argument for adding <code class="inline">psycopg_pool.ConnectionPool</code> later.</li>
+<li><code class="inline">head_bucket</code> is a real S3 request. The cost is negligible; the latency is not always. <code class="inline">timeoutSeconds: 5</code> keeps a slow S3 from holding the probe open past its own period.</li>
+</ul>
+<p class="step-p"><code class="inline">web</code> and <code class="inline">ingest-webhook</code> already have a trivial <code class="inline">/health</code> that returns <code class="inline">{"status":"ok"}</code>. Module 0 adds <code class="inline">/livez</code> as an alias and leaves <code class="inline">/health</code> in place. Both use <code class="inline">/livez</code> for all three probes.</p>
+<p class="step-p"><code class="inline">ingest-webhook</code>'s readiness is trivial <strong>on purpose</strong>, and this deserves saying out loud because it looks like an oversight: it has database dependencies and does not check them. MediaMTX's <code class="inline">authHTTPAddress</code> is a hard gate. If zero <code class="inline">ingest-webhook</code> pods are Ready, nobody on the platform can go live at all. A DB-dependent readiness check turns a thirty-second RDS blip into a total ingest outage, when the honest signal &#8212; a 500 from the handler on the one request that hit the bad moment &#8212; would have been enough.</p>
+<p class="step-p"><code class="inline">analytics-worker</code> has no HTTP server at all today. Module 0 adds a twelve-line health thread, because a Kafka consumer that quietly stops polling &#8212; rebalance storm, broker gone, an exception swallowed in a loop &#8212; is a real failure mode that a probe-less Deployment will never notice:</p>
+<pre><code>LAST_POLL = time.time()
+
+
+class _H(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200 if time.time() - LAST_POLL &lt; 60 else 503)
+        self.end_headers()
+
+    def log_message(self, *a):
+        pass
+
+
+threading.Thread(
+    target=lambda: http.server.HTTPServer(("", 8000), _H).serve_forever(),
+    daemon=True,
+).start()</code></pre>
+<p class="step-p">Set <code class="inline">LAST_POLL = time.time()</code> on each loop iteration and point liveness at it.</p>
+<p class="step-p"><code class="inline">transcode-worker</code> gets no probes in this module. It has no HTTP surface, and an exec probe against a busy encoder buys nothing. Module 14 makes the question moot: a Job either completes or it doesn't.</p>
+<h4 id="m11-config-wiring-and-why-envfrom-is-banned-here">Config wiring, and why <code class="inline">envFrom</code> is banned here</h4>
+<p class="step-p">Every service reads its configuration as <code class="inline">os.environ["KEY"]</code> at import time. A missing key is a <code class="inline">KeyError</code> traceback inside <code class="inline">CrashLoopBackOff</code>, discovered several minutes after a deploy, naming exactly one of possibly several missing variables.</p>
+<p class="step-p">Three layers fix this, cheapest first.</p>
+<p class="step-p"><strong>Never use bare <code class="inline">envFrom</code>.</strong> <code class="inline">envFrom: {secretRef: {name: streaming-db}}</code> projects whatever keys happen to be in the Secret and silently omits the ones that aren't. The container starts, the app dies at import. Enumerate every variable explicitly instead:</p>
+<pre><code>env:
+  - name: POSTGRES_DSN
+    valueFrom:
+      secretKeyRef:
+        name: streaming-db
+        key: POSTGRES_DSN        <span class="c"># optional defaults to false</span>
+  - name: KAFKA_BOOTSTRAP_SERVERS
+    valueFrom:
+      configMapKeyRef:
+        name: streaming-config
+        key: KAFKA_BOOTSTRAP_SERVERS</code></pre>
+<p class="step-p">With <code class="inline">optional</code> at its default of <code class="inline">false</code>, a missing key means the kubelet <strong>refuses to create the container</strong>. The pod sits in <code class="inline">CreateContainerConfigError</code> with the message <code class="inline">couldn't find key POSTGRES_DSN in Secret streaming/streaming-db</code>. That is a named, greppable failure carrying the exact key &#8212; and critically, it is not a crash-loop, so the old ReplicaSet keeps serving. It is verbose. It is correct. Write it out.</p>
+<p class="step-p"><strong>Fail at sync time.</strong> The <code class="inline">ExternalSecret</code> from Module 7 lists each key with an explicit <code class="inline">remoteRef</code>. If a key is absent in Secrets Manager, the <code class="inline">ExternalSecret</code> goes <code class="inline">SecretSyncError</code>, the target Secret is never created, and (once Module 15 lands) ArgoCD blocks the app rollout entirely because secrets are an earlier sync wave. You see it in the UI before a single pod is touched.</p>
+<p class="step-p"><strong>Fail in the process, all at once.</strong> Module 0 added a <code class="inline">config.py</code> next to each service:</p>
+<pre><code>_MISSING: list[str] = []
+
+
+def require(name: str) -&gt; str:
+    value = os.environ.get(name)
+    if not value:
+        _MISSING.append(name)
+        return ""
+    return value
+
+
+def seal() -&gt; None:
+    if _MISSING:
+        raise SystemExit("missing required config: " + ", ".join(sorted(_MISSING)))</code></pre>
+<p class="step-p">Every module-level <code class="inline">os.environ["X"]</code> becomes <code class="inline">require("X")</code>, and <code class="inline">seal()</code> runs once after the last one. The difference is concrete: instead of</p>
+<pre class="out"><code>KeyError: 'POSTGRES_DSN'</code></pre>
+<p class="step-p">and a redeploy, then</p>
+<pre class="out"><code>KeyError: 'S3_BUCKET'</code></pre>
+<p class="step-p">and another redeploy, you get one line:</p>
+<pre class="out"><code>missing required config: POSTGRES_DSN, S3_BUCKET</code></pre>
+<p class="step-p">Three deploys saved per incident, for nine lines of code.</p>
+<p class="step-p"><strong>The split itself.</strong> Non-secret, environment-shaped values go in <code class="inline">base/config.env</code> and are overridden per-overlay. Exactly one value is secret: <code class="inline">POSTGRES_DSN</code>, which carries the RDS password. There are <strong>no S3 credentials anywhere</strong> &#8212; Module 7 attached IAM roles to the <code class="inline">upload-api</code> and <code class="inline">transcode-worker</code> ServiceAccounts via EKS Pod Identity, and Module 0 made <code class="inline">S3_ENDPOINT</code>/<code class="inline">S3_ACCESS_KEY</code>/<code class="inline">S3_SECRET_KEY</code> optional so boto3 falls through to the credential chain when they're unset. Setting a static key on EKS would <em>win</em> over that chain and silently disable the role you configured.</p>
+<h4 id="m11-mediamtx">MediaMTX</h4>
+<p class="step-p"><code class="inline">mediamtx/mediamtx.yml</code> is a bind mount under Docker Compose. In Kubernetes it becomes a ConfigMap, generated from <code class="inline">k8s/apps/mediamtx/base/mediamtx.yml</code> and mounted with <code class="inline">subPath: mediamtx.yml</code>. Note the path: MediaMTX is not under <code class="inline">base/</code>. It is its own kustomize root, for the reason above, and the generator that builds this ConfigMap lives in <code class="inline">k8s/apps/mediamtx/base/kustomization.yaml</code> &#8212; the hashed name is what restarts the pod, so it has to be produced by the Application that is allowed to restart it.</p>
+<p class="step-p">Four things about that file.</p>
+<p class="step-p"><strong><code class="inline">writeQueueSize: 65536</code> is do-not-touch.</strong> It looks like an arbitrary large number somebody pasted in. It is the fix for a reproduced production stall: at the default of 512 outgoing packets, MediaMTX logged <code class="inline">reader is too slow, discarding N frames</code> and then <code class="inline">closed: i/o timeout</code> against <code class="inline">transcode-worker</code>'s ffmpeg client, on a box with CPU and network to spare (ffmpeg at ~230% of twelve available cores during the stall). A brief scheduling or IO hiccup on the reader side overflows a 512-packet queue. SPEC.md documents the whole investigation. On EKS this matters <em>more</em> than it did on the single box, because ffmpeg and MediaMTX now sit on different nodes with a real network between them. The manifest carries a comment saying so; leave it there.</p>
+<p class="step-p"><strong>The hook URLs already work &#8212; write the FQDN anyway.</strong> The Compose file points at <code class="inline">http://ingest-webhook:8000/hooks/auth</code>. That short name happens to also be valid Kubernetes DNS: a same-namespace Service resolves through the pod's <code class="inline">search streaming.svc.cluster.local svc.cluster.local cluster.local</code> list. So the file would work unchanged, provided the Service is named exactly <code class="inline">ingest-webhook</code> and exposes port <code class="inline">8000</code>. Write <code class="inline">http://ingest-webhook.streaming.svc.cluster.local:8000/hooks/auth</code> regardless, for two reasons: the short name working is a coincidence rather than a design and breaks the moment anyone moves MediaMTX to another namespace, and with the default <code class="inline">ndots:5</code> every short name costs four failed DNS lookups against CoreDNS before the right suffix is tried.</p>
+<p class="step-p"><strong>Enable the API.</strong> Add <code class="inline">api: yes</code> and <code class="inline">apiAddress: :9997</code>. This gives you a health check target that returns 200 only when MediaMTX is fully up, which Module 12's NLB needs &#8212; a bare TCP connect on 1935 passes the instant the socket is listening, before MediaMTX has read its config, and keeps passing when MediaMTX is wedged. It also gives you <code class="inline">kubectl exec deploy/mediamtx -- wget -qO- localhost:9997/v3/paths/list</code>, which is the fastest way to answer "is this stream actually arriving" in Module 13.</p>
+<p class="step-p"><strong>Never <code class="inline">kubectl edit</code> the generated ConfigMap.</strong> MediaMTX watches its own config file and reloads on change. The kubelet updates a projected ConfigMap within about a minute. Put those together and an in-place edit restarts the RTMP listener and drops every live stream &#8212; with no rollout, no <code class="inline">kubectl rollout status</code> to watch, and no event to explain it. Change the file in git, let the generator's name hash roll the pod, and do it in a quiet window.</p>
+<h4 id="m11-why-a-mediamtx-rolling-update-drops-every-viewer">Why a MediaMTX rolling update drops every viewer</h4>
+<p class="step-p"><code class="inline">replicas: 1</code> on the MediaMTX Deployment is a <strong>correctness constraint, not a cost decision</strong>, and "scale it up for HA" is the obvious wrong instinct.</p>
+<p class="step-p">MediaMTX has no clustering. A stream published to pod A exists only in pod A's memory. <code class="inline">transcode-worker</code> dials the <code class="inline">mediamtx</code> ClusterIP Service, which round-robins across endpoints &#8212; with two replicas, roughly half of all transcodes connect to the replica that has never heard of that path and get an empty stream or an immediate exit. Meanwhile the NLB is independently round-robining OBS clients across both. The failure presents as "ffmpeg exited immediately", not as a load balancing bug.</p>
+<p class="step-p">Now the rollout question. RTMP is one long-lived TCP connection per publisher, opened when OBS hits Start Streaming and held for the whole broadcast. There is no reconnect protocol in MediaMTX's RTMP server. When the pod goes away, OBS's own auto-reconnect kicks in, drops several seconds of video, and restarts the path &#8212; which fires <code class="inline">runOnNotReady</code>, then <code class="inline">runOnReady</code>. Follow that through your own code:</p>
+<ol>
+<li><code class="inline">runOnNotReady</code> &#8594; <code class="inline">ingest-webhook</code> closes the <code class="inline">streams</code> row and emits <code class="inline">ended</code>.</li>
+<li><code class="inline">transcode-worker</code> sees <code class="inline">ended</code>, stops the ffmpeg for that stream.</li>
+<li><code class="inline">runOnReady</code> &#8594; a <strong>new</strong> <code class="inline">streams</code> row with a <strong>new</strong> <code class="inline">stream_id</code>, and a fresh <code class="inline">started</code> event.</li>
+<li>A new transcode starts, writing to <code class="inline">hls/live/&lt;new-stream-id&gt;/</code>.</li>
+<li>Every viewer's player is still polling <code class="inline">hls/live/&lt;old-stream-id&gt;/master.m3u8</code>, which stops updating and then 404s as the lifecycle rule cleans it up.</li>
+</ol>
+<p class="step-p">One pod restart cascades into "everyone watching gets a dead player, and a duplicate stream appears in the list."</p>
+<p class="step-p">The grace period does not save you: MediaMTX exits promptly on SIGTERM, it does not drain. <code class="inline">terminationGracePeriodSeconds: 1800</code> is there to stop the kubelet SIGKILLing during the flush and to make an accidental <code class="inline">kubectl rollout restart</code> obviously slow rather than quietly destructive. The real mitigations are structural, and they're in the manifests:</p>
+<ol>
+<li><strong><code class="inline">strategy: Recreate</code>.</strong> Not because it's better &#8212; it guarantees downtime &#8212; but because <code class="inline">RollingUpdate</code> on a single replica pretends there's a safe path and there isn't. It also closes the window where two pods are briefly alive and <code class="inline">transcode-worker</code> can dial the wrong one.</li>
+<li><strong>A PodDisruptionBudget with <code class="inline">minAvailable: 1</code>.</strong> With one replica this blocks <em>every</em> voluntary eviction: <code class="inline">kubectl drain</code> waits, Karpenter refuses to consolidate, the node upgrade stalls. That is the intent &#8212; no automated process gets to end a live broadcast without a human deciding to. Write the cost on a sticky note for whoever does the next EKS upgrade: <code class="inline">kubectl drain</code> will print <code class="inline">Cannot evict pod as it would violate the pod's disruption budget</code> forever until someone passes <code class="inline">--disable-eviction</code> or scales MediaMTX to zero deliberately.</li>
+<li><strong><code class="inline">karpenter.sh/do-not-disrupt: "true"</code> plus <code class="inline">nodeSelector: {workload: system}</code>.</strong> Karpenter nodes are disposable by design; the one pod on the platform that must not move belongs on the stable managed node group from <a href="part-1-foundations.html#m03">Module 3</a>. Without this, consolidation evicts MediaMTX to save four cents an hour.</li>
+<li><strong>In Module 15, a separate ArgoCD <code class="inline">Application</code> with manual sync.</strong> A MediaMTX config change shows as <code class="inline">OutOfSync</code> until a human presses Sync during a quiet window. Everything else auto-syncs.</li>
+</ol>
+<h4 id="m11-resources-security-context-replicas-spread">Resources, security context, replicas, spread</h4>
+<p class="step-p"><strong>Resource requests and limits.</strong> Requests are what the scheduler reserves; limits are what the kubelet enforces. Every container here sets a memory limit and a memory request. Only <code class="inline">transcode-worker</code> deliberately omits a <strong>CPU limit</strong>, because CFS throttling a real-time encoder makes it fall behind the source, which is indistinguishable from "the stream froze" &#8212; you want it to burst.</p>
+<p class="step-p"><code class="inline">upload-api</code> also requests <code class="inline">ephemeral-storage</code>, and that is not optional. Starlette's <code class="inline">UploadFile</code> is a <code class="inline">SpooledTemporaryFile</code> that rolls over to disk past about 1 MB, so a 2 GiB upload writes 2 GiB into the pod's filesystem before boto3 streams it out. Without an <code class="inline">ephemeral-storage</code> request the scheduler cannot reason about it, the node's disk fills, and the kubelet evicts <strong>arbitrary pods on that node</strong> under <code class="inline">DiskPressure</code> &#8212; a failure that looks nothing like "an upload was too big". <code class="inline">TMPDIR=/tmp</code> plus an <code class="inline">emptyDir</code> with a <code class="inline">sizeLimit</code> makes the whole thing accounted for.</p>
+<p class="step-p"><strong>Security context.</strong> The namespace is labelled <code class="inline">pod-security.kubernetes.io/enforce: restricted</code>, so every pod must be non-root, drop all capabilities, disallow privilege escalation, and set a <code class="inline">RuntimeDefault</code> seccomp profile. <code class="inline">readOnlyRootFilesystem: true</code> is on everywhere, which means uvicorn and Jinja2 need a writable <code class="inline">/tmp</code> mounted as an <code class="inline">emptyDir</code>.</p>
+<p class="step-p"><code class="inline">runAsNonRoot: true</code> alone is not enough for these images. The <code class="inline">python:3.12-slim</code> Dockerfiles have no <code class="inline">USER</code> line, so the kubelet rejects the pod with <code class="inline">container has runAsNonRoot and image will run as root</code>. Module 0 added <code class="inline">USER 10001</code> to each Dockerfile; the manifests set <code class="inline">runAsUser: 10001</code> to match. Same story for <code class="inline">bluenviron/mediamtx</code>, which also ships no <code class="inline">USER</code> &#8212; both of its listeners are above 1024, so non-root is fine, it just has to be stated.</p>
+<p class="step-p"><strong>Replicas and spread.</strong> <code class="inline">web</code>, <code class="inline">upload-api</code> and <code class="inline">ingest-webhook</code> run two replicas with <code class="inline">topologySpreadConstraints</code> on both <code class="inline">topology.kubernetes.io/zone</code> and <code class="inline">kubernetes.io/hostname</code>, so a single node or a single AZ going away leaves you serving. <code class="inline">whenUnsatisfiable: ScheduleAnyway</code> rather than <code class="inline">DoNotSchedule</code> &#8212; a soft preference. <code class="inline">DoNotSchedule</code> on a two-node cluster means the second replica sits <code class="inline">Pending</code> forever the moment one node is cordoned, which trades an availability improvement for an availability <em>problem</em>.</p>
+<p class="step-p"><code class="inline">analytics-worker</code> runs one replica with <code class="inline">strategy: Recreate</code> &#8212; it's a Kafka consumer group of one and there is nothing to gain from a rebalance mid-rollout. <code class="inline">mediamtx</code> runs one for the reasons above. <code class="inline">transcode-worker</code> runs one because its live-stream dedup guard (<code class="inline">active_streams</code>) is in-process memory; a second replica would happily start a second ffmpeg for the same stream.</p>
+<blockquote><p class="step-p"><strong>Note for later:</strong> through Modules 11&#8211;13, <code class="inline">transcode-worker</code> is a long-running Deployment &#8212; exactly what it is under Docker Compose, one process with a <code class="inline">while True</code> Kafka consumer loop handling every stream and every upload for the container's lifetime. <a href="part-5-elastic.html#m14">Module 14</a> deletes this Deployment and replaces it with two KEDA <code class="inline">ScaledJob</code>s that create one Job per stream and per upload. Everything you read about <code class="inline">transcode-worker</code> in these three modules is true until then and false afterwards. The manifest carries the same warning at the top of the file.</p></blockquote>
+</div>
+<h3 id="m11-do-it">Do it</h3>
+<h4 id="m11-1-confirm-the-platform-is-ready">1. Confirm the platform is ready</h4>
+<pre><code>kubectl get externalsecret -n streaming
+kubectl get kafkatopic -n kafka</code></pre>
+<pre class="out"><code>NAME           STORETYPE            STORE                REFRESH INTERVAL   STATUS         READY
+streaming-db   ClusterSecretStore   aws-secretsmanager   1h                 SecretSynced   True
+
+NAME                    CLUSTER     PARTITIONS   REPLICATION FACTOR   READY
+stream.lifecycle        streaming   8            1                    True
+upload.events           streaming   8            1                    True
+stream.start.requests   streaming   8            1                    True
+transcode.status        streaming   3            1                    True
+viewer.analytics        streaming   3            1                    True</code></pre>
+<p class="step-p">Those are the five from <a href="part-3-data-layer.html#m10">Module 10</a> &#8212; note <code class="inline">stream.start.requests</code> rather than the <code class="inline">transcode.jobs</code> that <code class="inline">kafka/init-topics.sh</code> used to create. Nothing produces to <code class="inline">stream.start.requests</code> until <a href="part-5-elastic.html#m14">Module 14</a>; it exists now because KEDA's trigger needs a topic carrying <code class="inline">started</code> events and nothing else.</p>
+<p class="step-p">If <code class="inline">streaming-db</code> is not <code class="inline">SecretSynced</code>, stop and fix Module 7. Every Deployment below references <code class="inline">POSTGRES_DSN</code> out of it, and they will all sit in <code class="inline">CreateContainerConfigError</code>.</p>
+<h4 id="m11-2-read-the-manifests">2. Read the manifests</h4>
+<p class="step-p">They're in the repo. Read them before you apply them &#8212; the comments are half the module:</p>
+<pre><code>ls -R k8s/apps/base</code></pre>
+<p class="step-p">Start with <code class="inline">k8s/apps/base/kustomization.yaml</code>, then <code class="inline">upload-api/deployment.yaml</code> (probes, ephemeral storage), then <code class="inline">mediamtx/deployment.yaml</code> (the replica-count comment).</p>
+<h4 id="m11-3-fill-in-the-two-placeholders">3. Fill in the two placeholders</h4>
+<p class="step-p"><code class="inline">k8s/apps/overlays/prod/config.env</code> has one:</p>
+<pre><code>ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+sed -i.bak "s/<span class="ph">&lt;accountid&gt;</span>/${ACCOUNT_ID}/" k8s/apps/overlays/prod/config.env
+rm k8s/apps/overlays/prod/config.env.bak</code></pre>
+<p class="step-p"><code class="inline">k8s/apps/overlays/prod/ingress-alb.yaml</code> has the other (<code class="inline">&lt;acm-cert-arn&gt;</code>), but that file belongs to Module 12.</p>
+<h4 id="m11-4-take-the-module-12-resources-out-for-now">4. Take the Module 12 resources out, for now</h4>
+<p class="step-p"><code class="inline">k8s/apps/overlays/prod/kustomization.yaml</code> in the repo is the finished article and lists one resource Module 12 explains:</p>
+<pre><code>resources:
+  - ../../base
+  - ingress-alb.yaml         <span class="c"># &lt;- comment out for this module</span></code></pre>
+<p class="step-p">Comment it out. Uncommenting it is the first step of the next module. Applying it now provisions a public ALB before you've decided what it should do, and it bills by the hour.</p>
+<p class="step-p">The public RTMP NLB is the same story but it lives elsewhere &#8212; <code class="inline">k8s/apps/mediamtx/overlays/aws/service-rtmp-nlb.yaml</code>, with the Deployment it targets. Comment that entry out of <code class="inline">k8s/apps/mediamtx/overlays/aws/kustomization.yaml</code> for now, for the same reason.</p>
+<h4 id="m11-5-render-both-roots-and-read-the-output">5. Render both roots and read the output</h4>
+<pre><code>kubectl kustomize k8s/apps/overlays/prod | less
+kubectl kustomize k8s/apps/mediamtx/overlays/aws | less</code></pre>
+<p class="step-p">Two commands, because there are two kustomize roots. This is the literal YAML the API server will receive. Check three things in the first: the namespace is <code class="inline">streaming</code> everywhere, the ConfigMap name has a hash suffix (<code class="inline">streaming-config-&lt;hash&gt;</code>), and every <code class="inline">configMapKeyRef</code> points at that same hashed name. In the second, check that <code class="inline">mediamtx-config-&lt;hash&gt;</code> is what the Deployment's volume references.</p>
+<p class="step-p">Check one thing across both: <strong>no object appears in both outputs.</strong> That is the invariant the split exists to hold, and Module 15 turns it into a scripted check.</p>
+<h4 id="m11-6-apply">6. Apply</h4>
+<pre><code>kubectl apply -k k8s/apps/overlays/prod</code></pre>
+<pre class="out"><code>namespace/streaming configured
+serviceaccount/transcode-worker created
+serviceaccount/upload-api created
+configmap/streaming-config-g96ttgh296 created
+service/ingest-webhook created
+service/upload-api created
+service/web created
+deployment.apps/analytics-worker created
+deployment.apps/ingest-webhook created
+deployment.apps/transcode-worker created
+deployment.apps/upload-api created
+deployment.apps/web created
+networkpolicy.networking.k8s.io/ingest-webhook-from-mediamtx created</code></pre>
+<p class="step-p">Then MediaMTX, separately &#8212; and get used to that, because from Module 15 onward it is a separate ArgoCD Application you sync by hand:</p>
+<pre><code>kubectl apply -k k8s/apps/mediamtx/overlays/aws</code></pre>
+<pre class="out"><code>configmap/mediamtx-config-bb424mt4ct created
+service/mediamtx created
+deployment.apps/mediamtx created
+poddisruptionbudget.policy/mediamtx created</code></pre>
+<h4 id="m11-7-restart-anything-that-predates-its-pod-identity-association">7. Restart anything that predates its Pod Identity association</h4>
+<p class="step-p">A Pod Identity association only takes effect on pod start. If you created the associations in Module 7 and the pods came up before that, they're running with the node role:</p>
+<pre><code>kubectl rollout restart -n streaming deploy/upload-api deploy/transcode-worker</code></pre>
+<div class="confirm section">
+<h3 id="m11-verify">Verify</h3>
+<pre><code>kubectl get pods -n streaming</code></pre>
+<p class="step-p">Every pod <code class="inline">Running</code>, every container ready, zero restarts:</p>
+<pre class="out"><code>NAME                                READY   STATUS    RESTARTS   AGE
+analytics-worker-6c9b7d4f88-2xk4t   1/1     Running   0          92s
+ingest-webhook-7d4c8b95f6-h9wqr     1/1     Running   0          92s
+ingest-webhook-7d4c8b95f6-vk2ml     1/1     Running   0          92s
+mediamtx-5f9b6c7d84-t4nzp           1/1     Running   0          92s
+transcode-worker-84b7f9d6c5-jr8xw   1/1     Running   0          92s
+upload-api-6b8f7c9d54-4kp2n         1/1     Running   0          92s
+upload-api-6b8f7c9d54-9wtqz         1/1     Running   0          92s
+web-7c5d9f8b64-mn6vx                1/1     Running   0          92s
+web-7c5d9f8b64-x2rlk                1/1     Running   0          92s</code></pre>
+<p class="step-p">Confirm the two-replica services actually spread across both AZs:</p>
+<pre><code>kubectl get pods -n streaming -l app=web \
+  -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName
+kubectl get nodes -L topology.kubernetes.io/zone</code></pre>
+<p class="step-p">The two <code class="inline">web</code> pods should be on different nodes, and those nodes in different zones.</p>
+<p class="step-p">Confirm readiness is telling the truth rather than defaulting to yes:</p>
+<pre><code>kubectl exec -n streaming deploy/upload-api -- \
+  python -c "import urllib.request;print(urllib.request.urlopen('http://localhost:8000/readyz').read())"</code></pre>
+<pre class="out"><code>b'{"postgres":"ok","s3":"ok"}'</code></pre>
+<p class="step-p">Confirm MediaMTX loaded the config you think it did:</p>
+<pre><code>kubectl exec -n streaming deploy/mediamtx -- wget -qO- http://localhost:9997/v3/config/global/get \
+  | python3 -m json.tool | grep -i writequeue</code></pre>
+<pre class="out"><code>    "writeQueueSize": 65536,</code></pre>
+<p class="step-p"><strong>The checkpoint.</strong> Port-forward to <code class="inline">web</code> and open the homepage:</p>
+<pre><code>kubectl port-forward -n streaming svc/web 8080:8000</code></pre>
+<pre class="out"><code>Forwarding from 127.0.0.1:8080 -&gt; 8000
+Forwarding from [::1]:8080 -&gt; 8000</code></pre>
+<p class="step-p">Open &lt;http://localhost:8080&gt;. You should get the homepage &#8212; the heading, an empty live-streams section, an empty videos section, and working links to "Get a stream key" and "Upload". Empty lists are the correct answer; nothing has streamed yet. A rendered page proves <code class="inline">web</code> started, reached <code class="inline">upload-api</code> over ClusterIP DNS, and <code class="inline">upload-api</code> reached RDS. That is three of the five services and both of the new dependencies, in one HTTP request.</p>
+<p class="step-p">Do not move on until that page renders.</p>
+</div>
+<div class="gotcha section">
+<h3 id="m11-what-breaks">What breaks</h3>
+<p class="step-p">Ordered by how often it actually happens.</p>
+<p class="step-p"><strong><code class="inline">CreateContainerConfigError</code>.</strong> Read the message; it names the key:</p>
+<pre><code>kubectl describe pod -n streaming <span class="ph">&lt;pod&gt;</span> | tail -20</code></pre>
+<pre class="out"><code>  Warning  Failed  12s (x4 over 45s)  kubelet
+    Error: couldn't find key HLS_PUBLIC_BASE_URL in ConfigMap streaming/streaming-config-g96ttgh296</code></pre>
+<p class="step-p">Either the key is missing from <code class="inline">overlays/prod/config.env</code>, or you edited <code class="inline">config.env</code> and applied a Deployment that still references the <em>old</em> hash. <code class="inline">kubectl apply -k</code> regenerates both together; a hand-edited <code class="inline">kubectl apply -f</code> on one file does not.</p>
+<p class="step-p"><strong><code class="inline">CrashLoopBackOff</code> with a <code class="inline">KeyError</code> or <code class="inline">SystemExit</code>.</strong> The config reached the container but the app rejected it.</p>
+<pre><code>kubectl logs -n streaming <span class="ph">&lt;pod&gt;</span> --previous</code></pre>
+<pre class="out"><code>missing required config: S3_BUCKET</code></pre>
+<p class="step-p">That single line listing everything missing is <code class="inline">config.py</code> doing its job. If you instead see a raw <code class="inline">KeyError</code>, the Module 0 change didn't land in the image you're running &#8212; check the image tag.</p>
+<p class="step-p"><strong>Pod rejected before it starts, with a security context message.</strong></p>
+<pre class="out"><code>Error: container has runAsNonRoot and image will run as root</code></pre>
+<p class="step-p">The image has no <code class="inline">USER</code> and the manifest didn't set <code class="inline">runAsUser</code>. Or:</p>
+<pre class="out"><code>Error creating: pods "web-..." is forbidden: violates PodSecurity "restricted:latest":
+  allowPrivilegeEscalation != false, unrestricted capabilities, seccompProfile</code></pre>
+<p class="step-p">You dropped part of the <code class="inline">securityContext</code> block. The namespace label enforces the whole profile, not parts of it.</p>
+<p class="step-p"><strong><code class="inline">upload-api</code> Ready flaps.</strong> <code class="inline">/readyz</code> is doing its job and something underneath is genuinely unhealthy:</p>
+<pre><code>kubectl exec -n streaming deploy/upload-api -- \
+  python -c "import urllib.request;print(urllib.request.urlopen('http://localhost:8000/readyz').read())"</code></pre>
+<p class="step-p"><code class="inline">postgres: error: connection timeout</code> &#8594; the RDS security group doesn't allow 5432 from the node security group, or <code class="inline">sslmode</code> is missing and the parameter group sets <code class="inline">rds.force_ssl</code>. <code class="inline">s3: error: An error occurred (403)</code> &#8594; the Pod Identity role is missing <code class="inline">s3:ListBucket</code> on the <strong>bucket</strong> ARN, which is what <code class="inline">head_bucket</code> needs. That's a classic: every real operation works and only the health check fails.</p>
+<p class="step-p"><strong><code class="inline">ImagePullBackOff</code>.</strong></p>
+<pre><code>kubectl describe pod -n streaming <span class="ph">&lt;pod&gt;</span> | grep -A3 Events</code></pre>
+<p class="step-p">The ghcr.io package is still private (Module 15 covers the pull secret), or the tag doesn't exist because the CI build for that commit didn't finish.</p>
+<p class="step-p"><strong>MediaMTX <code class="inline">CrashLoopBackOff</code> immediately after start.</strong></p>
+<pre><code>kubectl logs -n streaming deploy/mediamtx</code></pre>
+<p class="step-p">A YAML parse error names the line. Remember the mount is <code class="inline">subPath: mediamtx.yml</code> &#8212; if you got the <code class="inline">subPath</code> wrong, MediaMTX starts with its <em>built-in defaults</em> rather than failing, which is worse: it comes up healthy, <code class="inline">writeQueueSize</code> is 512, and you find out during your first live stream. The <code class="inline">writeQueueSize</code> check in the Verify section above is there specifically to catch this.</p>
+<p class="step-p"><strong>Pods <code class="inline">Pending</code>.</strong></p>
+<pre><code>kubectl describe pod -n streaming <span class="ph">&lt;pod&gt;</span> | tail -15</code></pre>
+<p class="step-p"><code class="inline">0/2 nodes are available: 2 Insufficient cpu</code> &#8212; the two <code class="inline">t3.medium</code> nodes are full. <code class="inline">transcode-worker</code> requests a whole core and <code class="inline">mediamtx</code> requests half of one. Either scale the managed node group, or let <a href="part-2-platform.html#m06">Module 6</a>'s Karpenter provision capacity. <code class="inline">1 node(s) didn't match Pod's node affinity/selector</code> on <code class="inline">mediamtx</code> means the <code class="inline">workload: system</code> label isn't on your managed node group nodes.</p>
+<p class="step-p"><strong><code class="inline">web</code> renders but every list is a 500.</strong> <code class="inline">kubectl logs -n streaming deploy/web</code> will show an httpx connection error to <code class="inline">upload-api</code>. Check the Service exists and has endpoints:</p>
+<pre><code>kubectl get endpointslice -n streaming -l kubernetes.io/service-name=upload-api</code></pre>
+<p class="step-p">No endpoints means no <code class="inline">upload-api</code> pod is <em>Ready</em> &#8212; which sends you back to <code class="inline">/readyz</code>, which is exactly where the answer is.</p>
+<p class="step-p">Next: <a href="part-4-application.html#m12">Module 12 &#8212; Exposing it to the world</a>.</p>
+</div>
+</section>
+
+<section class="step" id="m12">
+  <div class="step-head">
+    <span class="step-num">12</span>
+    <h2>Exposing it to the world</h2>
+  </div>
+<p class="modnav">Prerequisites: <a href="part-2-platform.html#m05">Module 5</a> (Route 53 zone, ACM certificate, AWS Load Balancer Controller, ExternalDNS), <a href="part-4-application.html#m11">Module 11</a> (all pods Running). ---</p>
+<h3 id="m12-what-youre-building">What you're building</h3>
+<p class="step-p">Two public entry points, built with two different mechanisms:</p>
+<ul>
+<li><code class="inline">https://stream.k8s.linkifysolutions.com</code> &#8212; the web UI, on an Application Load Balancer, TLS terminated with the ACM certificate from Module 5, HTTP redirected to HTTPS, DNS created automatically by ExternalDNS.</li>
+<li><code class="inline">rtmp://rtmp.k8s.linkifysolutions.com:1935</code> &#8212; RTMP ingest, on a Network Load Balancer doing raw TCP passthrough to MediaMTX.</li>
+</ul>
+<p class="step-p">Nothing else becomes public. <code class="inline">upload-api</code>, <code class="inline">ingest-webhook</code> and <code class="inline">analytics-worker</code> stay on ClusterIP, deliberately.</p>
+<div class="why section">
+<h3 id="m12-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m12-two-traffic-shapes-two-mechanisms">Two traffic shapes, two mechanisms</h4>
+<p class="step-p">An Ingress is an HTTP object. Its whole vocabulary &#8212; hosts, paths, TLS SNI, header-based routing &#8212; is L7. That's what makes it powerful: because the load balancer parses every request, many hostnames and many paths can share <strong>one</strong> load balancer, and you pay for one. <code class="inline">stream.k8s...</code> and any future <code class="inline">admin.k8s...</code> land on the same ALB with different rules.</p>
+<p class="step-p">RTMP is not HTTP. It's a raw TCP stream carrying a binary handshake and then an endless flow of FLV-tagged media, opened once when OBS hits Start Streaming and held for the entire broadcast. There is no request boundary to route on, no <code class="inline">Host</code> header, no path. An Ingress controller has nothing to work with, and there is no annotation that makes it work &#8212; this is a shape mismatch, not a missing feature.</p>
+<p class="step-p">So RTMP gets a <code class="inline">type: LoadBalancer</code> Service, which is the L4 primitive: the load balancer forwards bytes on a port and does not look inside. On AWS the Load Balancer Controller renders that as a Network Load Balancer.</p>
+<p class="step-p">That's two load balancers and roughly $33/month. It is not avoidable at reasonable cost or risk &#8212; see the ingress-nginx discussion below for the one alternative and why it's rejected.</p>
+<p class="step-p">The per-stream transcode workload needs no inbound load balancing at all. It pulls from MediaMTX and pushes to S3; nothing ever connects <em>to</em> it. (That stays true in <a href="part-5-elastic.html#m14">Module 14</a> when it becomes one Job per stream.)</p>
+<h4 id="m12-alb-not-ingress-nginx">ALB, not ingress-nginx</h4>
+<p class="step-p">This one is settled by an external fact before you even get to the technical comparison: <strong>upstream Ingress NGINX was retired in March 2026.</strong> No further releases, no bug fixes, no security patches. The EKS 1.35 release notes call it out and tell customers to migrate off. Standing up a retired, unpatched, internet-facing proxy on a brand-new cluster is not defensible, whatever its merits used to be.</p>
+<p class="step-p">Even setting that aside, the ALB wins on this specific application:</p>
+<ul>
+<li><strong>ACM integration is one annotation.</strong> TLS terminates at the ALB. There is no certificate in the cluster, no cert-manager, no renewal, no reload.</li>
+<li><strong>There are no controller pods in the data path.</strong> The AWS Load Balancer Controller is a control-plane component: it watches Kubernetes objects and reconciles AWS resources. The data plane is AWS-managed and scales without you. On a 4 GiB node, not running two nginx replicas is real memory.</li>
+<li><strong>The ALB has no request body size limit.</strong> ingress-nginx defaults <code class="inline">proxy-body-size</code> to <strong>1m</strong> and would reject a video upload with a 413 that looks exactly like the application's own <code class="inline">MAX_UPLOAD_BYTES</code> check &#8212; a genuinely nasty half-hour of debugging.</li>
+</ul>
+<p class="step-p">The honest cost of choosing the ALB: about $16.43/month base, and you give up the option of collapsing HTTP and RTMP onto one load balancer. ingress-nginx can proxy raw TCP on 1935 through its <code class="inline">tcp-services</code> ConfigMap, which would save the NLB's ~$16/month. Reject that saving: it puts a retired proxy in the RTMP path and couples MediaMTX's availability to nginx rollouts, so every nginx restart drops every live stream.</p>
+<h4 id="m12-groupname-set-it-now-or-pay-later"><code class="inline">group.name</code> &#8212; set it now or pay later</h4>
+<pre><code>alb.ingress.kubernetes.io/group.name: streaming</code></pre>
+<p class="step-p">Without this annotation, <strong>every</strong> Ingress object provisions its own ALB, at ~$16/month each. With it, all Ingresses sharing the group name land on one. It costs nothing today with a single Ingress, and it is not retrofittable without a DNS change, because adding it later moves the rules to a different ALB with a different hostname.</p>
+<h4 id="m12-ingest-webhook-must-never-be-in-the-ingress"><code class="inline">ingest-webhook</code> must never be in the Ingress</h4>
+<p class="step-p">Read what those handlers actually do (<code class="inline">services/ingest-webhook/main.py</code>). <code class="inline">/hooks/publish</code> and <code class="inline">/hooks/unpublish</code> take a single <code class="inline">path</code> form field and perform <strong>zero authentication</strong>. That is deliberate and the code says so: by the time they run, <code class="inline">/hooks/auth</code> has already accepted the stream key, so there's nothing to re-validate. The assumption baked into that comment is that only MediaMTX can reach them.</p>
+<p class="step-p">Break that assumption and: anyone who can POST to <code class="inline">/hooks/publish</code> can forge stream-start events, create phantom <code class="inline">streams</code> rows, and trigger transcode work &#8212; that is, spend your money and fill your bucket. And <code class="inline">/hooks/auth</code> is worse in a quieter way: it's an oracle. POST a candidate <code class="inline">path</code> with <code class="inline">action: "publish"</code> and the status code tells you whether that stream key exists. 401 means no, 200 means yes. Exposed publicly, that turns a 32-hex-character secret into something enumerable by anyone patient enough.</p>
+<p class="step-p">Three layers, use all of them:</p>
+<ol>
+<li><strong>No Ingress rule.</strong> ClusterIP only. The Ingress in this module has exactly one backend and it is <code class="inline">web</code>.</li>
+<li><strong>A NetworkPolicy</strong> restricting ingress on port 8000 to pods labelled <code class="inline">app: mediamtx</code>. It's already in <code class="inline">k8s/apps/base/ingest-webhook/networkpolicy.yaml</code>. <strong>The gotcha:</strong> the AWS VPC CNI does not enforce NetworkPolicy unless you enabled it (<code class="inline">enableNetworkPolicy: "true"</code> on the vpc-cni add-on, Module 4). Without that, the manifest applies cleanly, reports no error, and does nothing whatsoever. Verify it with a real request from a pod outside the selector; do not assume.</li>
+<li><strong>Never add a path rule "just for debugging."</strong> With <code class="inline">group.name</code> set, it lands on the same public ALB. Use <code class="inline">kubectl port-forward</code>.</li>
+</ol>
+<p class="step-p">The same reasoning applies to <code class="inline">upload-api</code>, which mints stream keys via <code class="inline">POST /streamers</code> with no authentication at all. <code class="inline">web</code> proxies to it server-side over ClusterIP. Keep it that way.</p>
+<h4 id="m12-the-5-gib-upload-path-has-three-real-collisions">The 5 GiB upload path has three real collisions</h4>
+<p class="step-p"><code class="inline">MAX_UPLOAD_BYTES</code> defaults to 5 GiB in the code. Putting the current upload path behind an ALB collides with that in three separate places, and only one of them is fixed by the load balancer annotation people reach for first.</p>
+<p class="step-p"><strong>Collision 1 &#8212; the ALB's default idle timeout is 60 seconds.</strong> Exceed it and the ALB closes the connection mid-upload; the browser shows a connection reset. Fixed with:</p>
+<pre><code>alb.ingress.kubernetes.io/load-balancer-attributes: &gt;-
+  idle_timeout.timeout_seconds=1800</code></pre>
+<p class="step-p">Understand what that timeout actually measures, though: <strong>idle</strong> time, meaning a period with no bytes in either direction. A steadily progressing upload never goes idle, so a healthy 5 GiB upload over a fast link may not have tripped this at all. Raise it anyway &#8212; a stalled client on hotel wifi will trip it &#8212; but do not stop here, because it is not the binding constraint.</p>
+<p class="step-p"><strong>Collision 2 &#8212; <code class="inline">web</code>'s httpx timeout is a total timeout, not an idle one.</strong> This is the one that actually bites:</p>
+<pre><code>with httpx.Client(base_url=UPLOAD_API_URL, timeout=60) as client:</code></pre>
+<p class="step-p"><code class="inline">timeout=60</code> in httpx sets connect, read, write and pool timeouts to 60 seconds each. The write timeout is per-chunk rather than total, but the read timeout applies to waiting for <code class="inline">upload-api</code>'s response &#8212; and <code class="inline">upload-api</code> doesn't respond until it has finished streaming the whole file into S3. So <code class="inline">web</code> gives up 60 seconds after it finishes sending, regardless of how much progress everything made. <strong>The ALB annotation alone does not fix the upload</strong>, and if you only change the annotation you will conclude the annotation didn't work.</p>
+<p class="step-p">The fix is explicit per-operation timeouts:</p>
+<pre><code>timeout = httpx.Timeout(connect=10.0, read=1800.0, write=1800.0, pool=10.0)
+with httpx.Client(base_url=UPLOAD_API_URL, timeout=timeout) as client:</code></pre>
+<p class="step-p"><strong>Collision 3 &#8212; <code class="inline">web</code> buffers the entire file in memory.</strong></p>
+<pre><code>files={"file": (file.filename, await file.read(), file.content_type)}</code></pre>
+<p class="step-p"><code class="inline">await file.read()</code> materialises the whole body as a single <code class="inline">bytes</code> object in the <code class="inline">web</code> pod. A 5 GiB upload wants 5 GiB of RSS on a <code class="inline">t3.medium</code> with 4 GiB total. The pod is OOMKilled, and it presents to the user as a browser connection reset with no error page and nothing obviously wrong in the logs &#8212; the process is gone. This is not tunable. There is no memory limit you can afford that makes a 5 GiB in-memory buffer safe, and two concurrent uploads double it.</p>
+<p class="step-p">Stream the forward instead of reading it, and pass the file object through:</p>
+<pre><code>files={"file": (file.filename, file.file, file.content_type)}</code></pre>
+<p class="step-p">Then note that <code class="inline">upload-api</code> still spools to disk &#8212; Starlette's <code class="inline">UploadFile</code> rolls over to a temporary file past ~1 MB, so the full upload lands in that pod's <code class="inline">/tmp</code> before boto3 reads it back out. That's why Module 11 gave it <code class="inline">ephemeral-storage</code> requests and an <code class="inline">emptyDir</code> at <code class="inline">/tmp</code> with <code class="inline">TMPDIR</code> set.</p>
+<p class="step-p"><strong>What to actually do in this module:</strong></p>
+<ol>
+<li>Set <code class="inline">idle_timeout.timeout_seconds=1800</code> on the ALB. (In the manifest already.)</li>
+<li>Land the two <code class="inline">web</code> changes from Module 0: real <code class="inline">httpx.Timeout</code>, and stream instead of <code class="inline">await file.read()</code>.</li>
+<li><strong>Lower <code class="inline">MAX_UPLOAD_BYTES</code> to 2 GiB</strong> in <code class="inline">overlays/prod/config.env</code>. 5 GiB was a placeholder chosen on a twelve-core box with 64 GiB of RAM. On a <code class="inline">t3.medium</code> node pool, 2 GiB is what the ephemeral storage requests and the transcode scratch space are sized for. Raise it deliberately later, along with those numbers.</li>
+</ol>
+<p class="step-p"><strong>And the right long-term fix, which is out of scope here:</strong> have the browser upload directly to S3 with a presigned PUT. <code class="inline">upload-api</code> grows a <code class="inline">POST /videos/presign</code> returning a presigned URL and an object key; the browser PUTs straight to S3; a second small call records the row and emits the Kafka event. That removes 5 GiB from <em>both</em> pods, removes the ALB from the data path entirely, removes the ephemeral-storage requirement, and makes every timeout question above disappear. It costs a bucket CORS rule allowing PUT from <code class="inline">stream.k8s.linkifysolutions.com</code> and maybe sixty lines of Python and JavaScript. It is what the architecture wants. It is not in this course because it changes the upload flow rather than deploying it, and this module is about deploying what exists &#8212; but write it on the backlog before you leave.</p>
+<h4 id="m12-rtmp-via-nlb-and-the-long-lived-tcp-failure-class">RTMP via NLB, and the long-lived TCP failure class</h4>
+<p class="step-p">SPEC.md flags this as the piece to be careful with: <em>"watch for the long-lived-TCP-through-managed-LB failure class documented in the research pass before assuming it just works."</em> Here is that class, concretely. Every one of these is a setting whose default was chosen for HTTP, where connections last milliseconds.</p>
+<p class="step-p"><strong><code class="inline">target-type: ip</code>.</strong> Traffic goes NLB &#8594; pod IP directly. The alternative, <code class="inline">instance</code> mode, lands on a NodePort and gets kube-proxy DNAT'd &#8212; possibly to a pod on a <em>different</em> node, adding a cross-AZ hop and its data charge. With the VPC CNI giving pods real VPC addresses, <code class="inline">ip</code> is free and strictly better.</p>
+<p class="step-p"><strong>Cross-zone load balancing: on.</strong> It costs $0.01/GB for traffic crossing an AZ boundary &#8212; at roughly 4 GB/hour per stream that's about four cents an hour. The alternative is worse than it sounds: with one MediaMTX pod in one AZ and cross-zone off, the NLB's nodes in the other AZs have zero healthy targets and get pulled from its DNS. That works until a TTL boundary or a pod reschedule hands OBS an address with no path to a target, producing an intermittent "connection refused" that fixes itself in sixty seconds and cannot be reproduced. Pay the pennies.</p>
+<p class="step-p"><strong>The TCP idle timeout is 350 seconds.</strong> This is the number to memorise. It used to be entirely fixed; AWS shipped <code class="inline">tcp.idle_timeout.seconds</code> as a <strong>listener</strong> attribute (not a target-group attribute) in September 2024, settable from 60 to 6000 seconds for TCP listeners. TLS listeners are still pinned at 350 and cannot be changed; you're using a plain TCP listener, so you can raise it.</p>
+<p class="step-p">The Load Balancer Controller does not expose it as an annotation, so you set it out-of-band after the NLB exists (commands in "Do it" below).</p>
+<p class="step-p">How much does it matter? Less than it first appears, and knowing why is the point. An <em>actively publishing</em> stream is never idle for 350 seconds &#8212; OBS sends video continuously. The exposure is three specific cases: a connected-but-silent scene (still frame, no audio) where MediaMTX's large <code class="inline">writeQueueSize</code> means very low packet rates; a streamer who pauses; and a network partition where neither side sends anything. The failure is what makes it worth fixing: <strong>the NLB silently drops the flow without sending a TCP RST.</strong> OBS keeps a half-open socket, believes it is still streaming, and displays no error at all. One CLI command removes the entire scenario.</p>
+<p class="step-p">Belt and braces, the prod overlay also enables kernel TCP keepalives on the MediaMTX pod (<code class="inline">net.ipv4.tcp_keepalive_time=120</code> and friends), so the kernel sends probes well inside any timeout. Those three sysctls are in the safe set &#8212; no kubelet flag, no node configuration.</p>
+<p class="step-p"><strong>Deregistration delay is what kills live streams during a rollout.</strong> When a MediaMTX pod is deregistered &#8212; a rollout, a node drain, a Karpenter action &#8212; the NLB stops sending <em>new</em> connections and starts a drain timer, 300 seconds by default. Two attributes decide whether existing streams survive it:</p>
+<ul>
+<li><strong><code class="inline">deregistration_delay.connection_termination.enabled=false</code>.</strong> For TCP target groups this is already the default, meaning existing connections survive past the drain timeout. If it were <code class="inline">true</code>, every in-flight RTMP publish would be forcibly RST'd the moment the timer expires. Set it <strong>explicitly</strong> in the annotation so a future controller default change cannot silently break you.</li>
+<li><strong><code class="inline">deregistration_delay.timeout_seconds=900</code>.</strong> With connection termination off, this only bounds how long the target lingers in <code class="inline">draining</code> &#8212; but a longer value means the target group isn't churning while a stream finishes.</li>
+</ul>
+<p class="step-p"><strong><code class="inline">target_health_state.unhealthy.connection_termination.enabled=false</code></strong> is the third one and the sneaky one. By default, when a target goes <strong>unhealthy</strong>, the NLB terminates its existing connections. So a transient health check blip &#8212; MediaMTX's API taking longer than the check timeout because a transcode saturated the node &#8212; would kill every live stream on a pod that is, in fact, fine. Set it to <code class="inline">false</code> so an unhealthy verdict only stops <em>new</em> connections.</p>
+<p class="step-p"><strong>Health check the API, not the port.</strong> Do not use a bare TCP health check on 1935. A TCP-connect check passes the instant the socket is listening &#8212; which for MediaMTX is before it has read its config &#8212; and keeps passing when MediaMTX is wedged. Point the check at the HTTP API you enabled in Module 11:</p>
+<pre class="out"><code>protocol: HTTP, port: 9997, path: /v3/config/global/get, interval: 10
+healthy-threshold: 2, unhealthy-threshold: 3</code></pre>
+<p class="step-p"><code class="inline">interval: 10</code> is the NLB minimum. <code class="inline">unhealthy-threshold: 3</code> (30 seconds) rather than the default 2 avoids flapping under transcode-induced CPU pressure.</p>
+<p class="step-p"><strong>Do not enable PROXY protocol.</strong> Take this as a firm position, not a preference. <strong>MediaMTX does not parse PROXY protocol on its RTMP listener.</strong> Enable it (<code class="inline">service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: "*"</code>) and the NLB prepends a 28-plus-byte binary header to every connection; MediaMTX reads those bytes as the beginning of the RTMP handshake; the handshake fails; <strong>every single publish is rejected</strong> with an opaque error. That is a total outage, not a degradation, and it is easy to reach for because "preserve the client IP" is a reasonable thing to want.</p>
+<p class="step-p">Use <strong><code class="inline">preserve_client_ip.enabled=true</code></strong> instead. It rewrites the source IP at the network layer, so MediaMTX sees the real client with no protocol change. <code class="inline">/hooks/auth</code> already receives an <code class="inline">ip</code> field it currently ignores (<code class="inline">MediaMTXAuthRequest.ip</code>), so nothing depends on this today &#8212; but it's what makes per-IP rate limiting possible later, and it makes the logs useful now.</p>
+<p class="step-p">One consequence comes with it, and it is worth writing on the manifest: <strong>with <code class="inline">preserve_client_ip</code> on IP targets, a pod cannot reach the NLB from inside the VPC.</strong> The hairpin fails because source and destination are both in-VPC and the NLB cannot NAT it. Check whether that affects you: <code class="inline">transcode-worker</code> dials <code class="inline">MEDIAMTX_RTMP_URL</code>, which is the <code class="inline">mediamtx</code> ClusterIP Service. No hairpin. But if anyone ever "simplifies" that variable to point at <code class="inline">rtmp.k8s.linkifysolutions.com</code> &#8212; which looks tidier and reads like the obvious thing &#8212; every transcode fails to connect and nothing in the logs explains why. The comment is in <code class="inline">k8s/apps/base/config.env</code>; leave it there.</p>
+<p class="step-p"><strong>Never let ArgoCD prune this Service.</strong> Deleting and recreating it creates a <strong>brand new NLB with a brand new DNS name</strong>. ExternalDNS updates the Route 53 record, and then you wait out the TTL while every OBS client in the world has the old hostname cached in a config file. The <code class="inline">argocd.argoproj.io/sync-options: Prune=false</code> annotation is already on the manifest.</p>
+</div>
+<h3 id="m12-do-it">Do it</h3>
+<h4 id="m12-1-put-the-two-resources-back">1. Put the two resources back</h4>
+<p class="step-p">Module 11 had you comment these out. They are in two different kustomize roots, so uncomment them in two files.</p>
+<p class="step-p">The ALB Ingress, in the prod overlay:</p>
+<pre><code><span class="c"># k8s/apps/overlays/prod/kustomization.yaml</span>
+resources:
+  - ../../base
+  - ingress-alb.yaml</code></pre>
+<p class="step-p">The RTMP NLB, in the MediaMTX root:</p>
+<pre><code><span class="c"># k8s/apps/mediamtx/overlays/aws/kustomization.yaml</span>
+resources:
+  - deployment.yaml
+  - service.yaml
+  - pdb.yaml
+  - service-rtmp-nlb.yaml</code></pre>
+<p class="step-p"><strong>That is where the NLB Service belongs, and it is not filing.</strong> A <code class="inline">type: LoadBalancer</code> Service's target group is populated from the endpoints of the pods its selector matches &#8212; so the Service and the Deployment it selects have to be owned by the same thing. <a href="part-5-elastic.html#m15">Module 15</a> gives MediaMTX its own manually-synced ArgoCD Application precisely so a routine deploy cannot restart it mid-broadcast; if the NLB Service sat in the auto-synced prod overlay instead, the fastest Application would still be free to delete and recreate the load balancer under a live stream, and you would get a new NLB hostname out of it.</p>
+<h4 id="m12-2-fill-in-the-certificate-arn">2. Fill in the certificate ARN</h4>
+<pre><code>CERT_ARN=$(aws acm list-certificates \
+  --query "CertificateSummaryList[?DomainName=='*.k8s.linkifysolutions.com'].CertificateArn" \
+  --output text)
+echo "$CERT_ARN"
+sed -i.bak "s|<span class="ph">&lt;acm-cert-arn&gt;</span>|${CERT_ARN}|" k8s/apps/overlays/prod/ingress-alb.yaml
+rm k8s/apps/overlays/prod/ingress-alb.yaml.bak</code></pre>
+<p class="step-p">If <code class="inline">$CERT_ARN</code> is empty, the Module 5 certificate isn't <code class="inline">ISSUED</code> yet &#8212; <code class="inline">aws acm describe-certificate --certificate-arn &lt;arn&gt;</code> and check the DNS validation record landed in the zone.</p>
+<h4 id="m12-3-confirm-the-controller-is-running">3. Confirm the controller is running</h4>
+<pre><code>kubectl get deploy -n kube-system aws-load-balancer-controller</code></pre>
+<pre class="out"><code>NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+aws-load-balancer-controller   2/2     2            2           3d</code></pre>
+<p class="step-p">Nothing below produces an AWS resource without it. If a load balancer never appears, this controller's logs are where the answer is, essentially always.</p>
+<h4 id="m12-4-apply">4. Apply</h4>
+<p class="step-p">Two roots, two applies:</p>
+<pre><code>kubectl apply -k k8s/apps/overlays/prod
+kubectl apply -k k8s/apps/mediamtx/overlays/aws</code></pre>
+<pre class="out"><code>ingress.networking.k8s.io/streaming created
+...
+service/mediamtx-rtmp created
+...</code></pre>
+<h4 id="m12-5-watch-the-load-balancers-appear">5. Watch the load balancers appear</h4>
+<pre><code>kubectl get ingress,svc -n streaming -w</code></pre>
+<p class="step-p">Give it 2&#8211;4 minutes. The ALB takes longer than the NLB to become active:</p>
+<pre class="out"><code>NAME                                CLASS   HOSTS                             ADDRESS                                                    PORTS     AGE
+ingress.networking.k8s.io/streaming alb     stream.k8s.linkifysolutions.com   k8s-streaming-1a2b3c4d5e-123456789.us-east-1.elb.amazonaws.com   80, 443   3m
+
+NAME                    TYPE           CLUSTER-IP      EXTERNAL-IP                                                              PORT(S)
+service/mediamtx-rtmp   LoadBalancer   172.20.84.191   k8s-streaming-mediamtx-abcdef0123-9876543210abcdef.elb.us-east-1.amazonaws.com   1935:31842/TCP</code></pre>
+<p class="step-p"><code class="inline">EXTERNAL-IP</code> stuck on <code class="inline">&lt;pending&gt;</code> for more than five minutes means the controller could not create it &#8212; go read its logs (<code class="inline">kubectl logs -n kube-system deploy/aws-load-balancer-controller</code>), and check the subnet tags from Module 2. Public subnets need <code class="inline">kubernetes.io/role/elb=1</code>.</p>
+<h4 id="m12-6-raise-the-nlb-listeners-idle-timeout">6. Raise the NLB listener's idle timeout</h4>
+<p class="step-p">This is the out-of-band step the controller can't do for you:</p>
+<pre><code>LB_ARN=$(aws elbv2 describe-load-balancers \
+  --query "LoadBalancers[?contains(DNSName,'streaming-mediamtx')].LoadBalancerArn" \
+  --output text)
+
+LISTENER_ARN=$(aws elbv2 describe-listeners --load-balancer-arn "$LB_ARN" \
+  --query 'Listeners[?Port==`1935`].ListenerArn' --output text)
+
+aws elbv2 modify-listener-attributes --listener-arn "$LISTENER_ARN" \
+  --attributes Key=tcp.idle_timeout.seconds,Value=6000</code></pre>
+<pre class="out"><code>{
+    "Attributes": [
+        {
+            "Key": "tcp.idle_timeout.seconds",
+            "Value": "6000"
+        }
+    ]
+}</code></pre>
+<p class="step-p">Write this in the runbook. It does not live in git, it does not survive the NLB being recreated, and nothing will tell you it's missing until a stream silently half-opens.</p>
+<h4 id="m12-7-confirm-externaldns-wrote-the-records">7. Confirm ExternalDNS wrote the records</h4>
+<pre><code>ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+  --dns-name k8s.linkifysolutions.com --query 'HostedZones[0].Id' --output text)
+
+aws route53 list-resource-record-sets --hosted-zone-id "$ZONE_ID" \
+  --query "ResourceRecordSets[?Type=='A'].[Name,AliasTarget.DNSName]" --output table</code></pre>
+<pre class="out"><code>------------------------------------------------------------------------------------------------
+|  stream.k8s.linkifysolutions.com.  |  k8s-streaming-1a2b3c4d5e-123456789.us-east-1.elb.amazonaws.com.  |
+|  rtmp.k8s.linkifysolutions.com.    |  k8s-streaming-mediamtx-abcdef0123-...elb.us-east-1.amazonaws.com. |
+------------------------------------------------------------------------------------------------</code></pre>
+<p class="step-p">Missing records: <code class="inline">kubectl logs -n kube-system deploy/external-dns</code>. The usual cause is the IAM policy scoping <code class="inline">route53:ChangeResourceRecordSets</code> to the wrong hosted zone id.</p>
+<div class="confirm section">
+<h3 id="m12-verify">Verify</h3>
+<h4 id="m12-https-with-a-valid-certificate">HTTPS, with a valid certificate</h4>
+<pre><code>curl -I https://stream.k8s.linkifysolutions.com</code></pre>
+<pre class="out"><code>HTTP/2 200
+content-type: text/html; charset=utf-8
+cache-control: no-store
+server: awselb/2.0</code></pre>
+<p class="step-p"><code class="inline">curl</code> validating the chain without <code class="inline">-k</code> <em>is</em> the certificate check &#8212; it fails loudly otherwise. To see it explicitly:</p>
+<pre><code>curl -sv https://stream.k8s.linkifysolutions.com -o /dev/null 2&gt;&amp;1 | grep -E 'subject:|issuer:|expire'</code></pre>
+<pre class="out"><code>*  subject: CN=*.k8s.linkifysolutions.com
+*  start date: Jul 12 00:00:00 2026 GMT
+*  expire date: Aug 10 23:59:59 2027 GMT
+*  issuer: C=US; O=Amazon; CN=Amazon RSA 2048 M02</code></pre>
+<p class="step-p">And the redirect:</p>
+<pre><code>curl -sI http://stream.k8s.linkifysolutions.com | head -3</code></pre>
+<pre class="out"><code>HTTP/1.1 301 Moved Permanently
+Location: https://stream.k8s.linkifysolutions.com:443/</code></pre>
+<h4 id="m12-rtmp-port-reachable">RTMP port reachable</h4>
+<pre><code>nc -vz rtmp.k8s.linkifysolutions.com 1935</code></pre>
+<pre class="out"><code>Connection to rtmp.k8s.linkifysolutions.com port 1935 [tcp/macromedia-fcs] succeeded!</code></pre>
+<p class="step-p">That proves DNS resolves, the NLB has at least one healthy target, and the security groups allow 1935. It does <strong>not</strong> prove RTMP works &#8212; a TCP connect says nothing about the handshake. That's Module 13's job.</p>
+<p class="step-p">Check the target group agrees:</p>
+<pre><code>TG_ARN=$(aws elbv2 describe-target-groups --load-balancer-arn "$LB_ARN" \
+  --query 'TargetGroups[0].TargetGroupArn' --output text)
+aws elbv2 describe-target-health --target-group-arn "$TG_ARN" \
+  --query 'TargetHealthDescriptions[].[Target.Id,Target.Port,TargetHealth.State]' --output table</code></pre>
+<pre class="out"><code>--------------------------------
+|  10.0.13.204  |  1935  |  healthy  |
+--------------------------------</code></pre>
+<p class="step-p">One target, healthy. One, because MediaMTX runs one replica by design.</p>
+<h4 id="m12-the-negative-check-the-private-services-are-private">The negative check &#8212; the private services are private</h4>
+<p class="step-p">This matters as much as the positive ones:</p>
+<pre><code>curl -s -o /dev/null -w '%{http_code}\n' \
+  https://stream.k8s.linkifysolutions.com/hooks/auth -X POST
+curl -s -o /dev/null -w '%{http_code}\n' \
+  https://stream.k8s.linkifysolutions.com/streamers -X POST</code></pre>
+<pre class="out"><code>404
+404</code></pre>
+<p class="step-p">404 from <code class="inline">web</code>, which has no such routes. If either returns something else, an Ingress rule is routing to a service that should not be public.</p>
+<p class="step-p">If you enabled VPC CNI network policy support, prove the NetworkPolicy too:</p>
+<pre><code><span class="c"># Run it in `default`, not `streaming`: the streaming namespace enforces the</span>
+<span class="c"># `restricted` Pod Security profile, and a bare `kubectl run` does not set</span>
+<span class="c"># the securityContext fields that profile demands.</span>
+kubectl run probe -n default --rm -it --restart=Never \
+  --image=curlimages/curl:8.11.1 --command -- \
+  curl -s -m 5 -o /dev/null -w '%{http_code}\n' \
+  http://ingest-webhook.streaming.svc.cluster.local:8000/livez</code></pre>
+<pre class="out"><code>command terminated with exit code 28</code></pre>
+<p class="step-p">A timeout is the pass. A <code class="inline">200</code> means the policy is not being enforced &#8212; go back to the vpc-cni add-on configuration, because right now that manifest is decoration.</p>
+</div>
+<div class="gotcha section">
+<h3 id="m12-what-breaks">What breaks</h3>
+<p class="step-p"><strong><code class="inline">EXTERNAL-IP: &lt;pending&gt;</code> forever, or no ALB address.</strong></p>
+<pre><code>kubectl logs -n kube-system deploy/aws-load-balancer-controller --tail=50</code></pre>
+<p class="step-p">Nine times in ten it's subnet tags or IAM. Public subnets need <code class="inline">kubernetes.io/role/elb=1</code>; every subnet needs <code class="inline">kubernetes.io/cluster/streaming</code> (<code class="inline">shared</code> or <code class="inline">owned</code>). <code class="inline">AccessDenied</code> in the log means the controller's IAM policy is missing an action &#8212; reapply the policy document from Module 5 rather than adding permissions one at a time.</p>
+<p class="step-p"><strong><code class="inline">curl</code> returns 503 from the ALB.</strong></p>
+<pre class="out"><code>HTTP/2 503
+server: awselb/2.0</code></pre>
+<p class="step-p">The ALB is up and the target group is empty or unhealthy. <code class="inline">aws elbv2 describe-target-health</code> will say <code class="inline">unhealthy</code> with a reason. The health check path is <code class="inline">/livez</code>, so this usually means Module 0's <code class="inline">/livez</code> alias didn't land in the running <code class="inline">web</code> image and the ALB is getting a 404. <code class="inline">kubectl exec deploy/web -- python -c "import urllib.request;print(urllib.request.urlopen('http://localhost:8000/livez').read())"</code> settles it in one command.</p>
+<p class="step-p"><strong>Certificate error in the browser, <code class="inline">curl</code> says <code class="inline">SSL: no alternative certificate subject name matches</code>.</strong> The ACM certificate covers <code class="inline">*.k8s.linkifysolutions.com</code> but the ALB is serving its default certificate &#8212; the <code class="inline">certificate-arn</code> annotation is missing, still contains the literal <code class="inline">&lt;acm-cert-arn&gt;</code>, or points at a certificate in a different region. ACM certificates for an ALB must be in the ALB's region (<code class="inline">us-east-1</code> here); the CloudFront one from Module 9 also happens to be in <code class="inline">us-east-1</code>, which is why one certificate serves both.</p>
+<p class="step-p"><strong><code class="inline">nc</code> says <code class="inline">Connection refused</code>.</strong> DNS resolved but nothing accepted. Check <code class="inline">dig +short rtmp.k8s.linkifysolutions.com</code> returns the NLB name, then check target health. <code class="inline">unhealthy</code> with <code class="inline">Health checks failed</code> means the health check can't reach 9997 &#8212; either <code class="inline">api: yes</code> isn't in the running ConfigMap (<code class="inline">kubectl exec deploy/mediamtx -- wget -qO- localhost:9997/v3/paths/list</code> from inside proves it either way) or the node security group doesn't allow 9997 from the NLB.</p>
+<p class="step-p"><strong><code class="inline">nc</code> hangs with no answer at all.</strong> That's a security group dropping the packet rather than rejecting it. The Load Balancer Controller manages the node security group rules for <code class="inline">target-type: ip</code> automatically; if you're also managing security groups in Terraform, you're fighting it and Terraform is winning.</p>
+<p class="step-p"><strong>Uploads fail at exactly 60 seconds.</strong> The <code class="inline">httpx</code> timeout, not the ALB. Confirm by checking whether the ALB annotation actually made it to AWS:</p>
+<pre><code>ALB_ARN=$(aws elbv2 describe-load-balancers \
+  --query "LoadBalancers[?Type=='application'].LoadBalancerArn" --output text)
+aws elbv2 describe-load-balancer-attributes --load-balancer-arn "$ALB_ARN" \
+  --query "Attributes[?Key=='idle_timeout.timeout_seconds']"</code></pre>
+<p class="step-p">If that says 1800 and uploads still die at 60 seconds, it is Collision 2 and the fix is in <code class="inline">web/main.py</code>.</p>
+<p class="step-p"><strong>Uploads kill the <code class="inline">web</code> pod.</strong></p>
+<pre><code>kubectl get pods -n streaming -l app=web
+kubectl describe pod -n streaming <span class="ph">&lt;pod&gt;</span> | grep -i -A2 'last state'</code></pre>
+<pre class="out"><code>    Last State:     Terminated
+      Reason:       OOMKilled
+      Exit Code:    137</code></pre>
+<p class="step-p">That is Collision 3, <code class="inline">await file.read()</code>. Do not raise the memory limit &#8212; there is no limit you can afford.</p>
+<p class="step-p"><strong>A live stream dies every time you deploy.</strong> Check <code class="inline">deregistration_delay.connection_termination.enabled</code> on the target group. And remember that in Modules 11&#8211;13 <code class="inline">transcode-worker</code> is still a single long-running Deployment, so a rollout of <em>it</em> also kills every in-flight transcode regardless of what the NLB does. <a href="part-5-elastic.html#m14">Module 14</a> is what fixes that half.</p>
+<p class="step-p">Next: <a href="part-4-application.html#m13">Module 13 &#8212; Your first stream</a>. This is the milestone.</p>
+</div>
+</section>
+
+<section class="step" id="m13">
+  <div class="step-head">
+    <span class="step-num">13</span>
+    <h2>Your first stream</h2>
+  </div>
+<p class="modnav">Prerequisites: <a href="part-4-application.html#m11">Module 11</a> (all pods Running), <a href="part-4-application.html#m12">Module 12</a> (HTTPS and RTMP both answering). ---</p>
+<h3 id="m13-what-youre-building">What you're building</h3>
+<p class="step-p">Nothing. This module builds no infrastructure at all &#8212; it runs the whole path end to end and checks every hop, in order, so that when something fails you know exactly which one hop it was.</p>
+<p class="step-p">This is the milestone the course exists for. By the end you will have pushed RTMP from your laptop into EKS, watched it become three HLS renditions in S3, and played it back through CloudFront in a browser &#8212; and separately walked a file upload through the VOD path.</p>
+<p class="step-p">It's a lab rather than a normal module: every step is a command, the output you should see, and a <strong>if this failed</strong> block naming the likely cause and the one diagnostic that distinguishes it. Work through it in order. Do not skip a step because the previous one looked fine.</p>
+<blockquote><p class="step-p"><strong>Reminder about <code class="inline">transcode-worker</code>:</strong> in this module it is still a single long-running Deployment consuming <code class="inline">stream.lifecycle</code> and <code class="inline">upload.events</code>, exactly as it does under Docker Compose. You will read its logs with <code class="inline">kubectl logs deploy/transcode-worker</code>. <a href="part-5-elastic.html#m14">Module 14</a> replaces it with KEDA <code class="inline">ScaledJob</code>s &#8212; one Job per stream, one per upload &#8212; at which point the same evidence lives in per-Job pod logs and <code class="inline">kubectl get jobs</code>. Everything below is true until then.</p></blockquote>
+<h3 id="m13-setup-two-shortcuts-youll-use-throughout">Setup: two shortcuts you'll use throughout</h3>
+<p class="step-p"><strong>A psql you can actually run.</strong> RDS is in private subnets, so query it from inside the VPC. Pull the DSN out of the Secret once, then run throwaway pods against it:</p>
+<pre><code>export PGURL=$(kubectl get secret -n streaming streaming-db \
+  -o jsonpath='{.data.POSTGRES_DSN}' | base64 -d)
+
+pg() {
+  kubectl run "pg-$RANDOM" -n default --rm -i --restart=Never --quiet \
+    --image=postgres:16-alpine -- psql "$PGURL" -c "$1"
+}</code></pre>
+<p class="step-p">The pod runs in <code class="inline">default</code>, not <code class="inline">streaming</code>: the <code class="inline">streaming</code> namespace enforces the <code class="inline">restricted</code> Pod Security profile, and a bare <code class="inline">kubectl run</code> doesn't set the fields that profile demands.</p>
+<pre><code>pg "SELECT count(*) FROM streamers"</code></pre>
+<pre class="out"><code> count
+-------
+     0
+(1 row)</code></pre>
+<p class="step-p"><strong>Your bucket name.</strong></p>
+<pre><code>export BUCKET=linkify-streaming-media-$(aws sts get-caller-identity --query Account --output text)
+echo "$BUCKET"</code></pre>
+<h3 id="m13-step-1-create-a-streamer-and-get-a-stream-key">Step 1 &#8212; Create a streamer and get a stream key</h3>
+<p class="step-p">Do it through the web UI, because that also proves <code class="inline">web</code> &#8594; <code class="inline">upload-api</code> &#8594; RDS works from the public internet:</p>
+<pre><code>curl -sS -X POST https://stream.k8s.linkifysolutions.com/streamers/new \
+  -d 'display_name=fatima-test' | grep -o 'rtmp://[^&lt;"]*'</code></pre>
+<pre class="out"><code>rtmp://rtmp.k8s.linkifysolutions.com:1935/8f3a1c9d2e7b4a5f6c0d8e1a3b5c7d9e</code></pre>
+<p class="step-p">That whole URL is what OBS wants. The 32 hex characters at the end are the stream key. Keep it:</p>
+<pre><code>export STREAM_KEY=8f3a1c9d2e7b4a5f6c0d8e1a3b5c7d9e</code></pre>
+<p class="step-p">Confirm it landed in RDS rather than only in the response:</p>
+<pre><code>pg "SELECT display_name, left(stream_key, 8) || '...' AS key, created_at FROM streamers ORDER BY created_at DESC LIMIT 1"</code></pre>
+<pre class="out"><code> display_name  |     key     |          created_at
+---------------+-------------+-------------------------------
+ fatima-test   | 8f3a1c9d... | 2026-07-29 14:02:11.481293+00
+(1 row)</code></pre>
+<p class="step-p"><strong>If this failed:</strong></p>
+<ul>
+<li><strong><code class="inline">grep</code> found nothing, and the body is an HTML error page.</strong> <code class="inline">kubectl logs -n streaming deploy/web --tail=30</code>. An httpx <code class="inline">ConnectError</code> to <code class="inline">upload-api</code> means <code class="inline">upload-api</code> has no Ready endpoints &#8212; check <code class="inline">kubectl get endpointslice -n streaming -l kubernetes.io/service-name=upload-api</code>, then <code class="inline">/readyz</code> on the pod.</li>
+<li><strong>500, and <code class="inline">upload-api</code> logs <code class="inline">UndefinedTable: relation "streamers" does not exist</code>.</strong> The Module 8 schema job never ran against this database. <code class="inline">kubectl get job -n streaming db-migrate</code> and read its logs.</li>
+<li><strong>500, and the log shows a connection timeout to RDS.</strong> The RDS security group must allow 5432 from the <em>node</em> security group. This is the single most common Module 8 leftover.</li>
+<li><strong><code class="inline">curl</code> itself fails on TLS or DNS.</strong> You're back in Module 12; don't debug it here.</li>
+</ul>
+<h3 id="m13-step-2-push-rtmp">Step 2 &#8212; Push RTMP</h3>
+<p class="step-p">Copy-pasteable, generates a test pattern with a 440 Hz tone, no camera or capture card required:</p>
+<pre><code>ffmpeg -re \
+  -f lavfi -i testsrc2=size=1920x1080:rate=30 \
+  -f lavfi -i sine=frequency=440 \
+  -c:v libx264 -preset veryfast -b:v 4000k -pix_fmt yuv420p -g 60 \
+  -c:a aac -b:a 128k \
+  -f flv "rtmp://rtmp.k8s.linkifysolutions.com:1935/${STREAM_KEY}"</code></pre>
+<p class="step-p"><strong><code class="inline">-re</code> is not optional.</strong> Without it, ffmpeg pushes the synthetic source as fast as it can encode rather than at real-time speed, which is not what a live publisher does. SPEC.md documents an afternoon lost to exactly this: the output appeared to "cut off early", and the cause was the test harness, not the pipeline.</p>
+<p class="step-p">Leave it running. You should see a steadily advancing counter:</p>
+<pre class="out"><code>Output #0, flv, to 'rtmp://rtmp.k8s.linkifysolutions.com:1935/8f3a1c9d...':
+  Stream #0:0: Video: h264 ([7][0][0][0] / 0x0007), yuv420p(tv, progressive), 1920x1080, q=2-31, 4000 kb/s, 30 fps
+  Stream #0:1: Audio: aac (LC) ([10][0][0][0] / 0x000A), 44100 Hz, mono, fltp, 128 kb/s
+frame=  312 fps= 30 q=27.0 size=    1792KiB time=00:00:10.36 bitrate=1416.4kbits/s speed=   1x</code></pre>
+<p class="step-p"><code class="inline">speed=1x</code> is the number that matters &#8212; that's <code class="inline">-re</code> doing its job.</p>
+<h4 id="m13-the-obs-equivalent-and-the-footgun">The OBS equivalent, and the footgun</h4>
+<p class="step-p">In OBS: <strong>Settings &#8594; Stream &#8594; Service: Custom</strong>.</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><strong>Server</strong></td>
+<td><code class="inline">rtmp://rtmp.k8s.linkifysolutions.com:1935/8f3a1c9d2e7b4a5f6c0d8e1a3b5c7d9e</code></td>
+</tr>
+<tr>
+<td><strong>Stream Key</strong></td>
+<td><em>(leave completely blank)</em></td>
+</tr>
+</tbody></table></div>
+<p class="step-p"><strong>This is a known footgun and it is worth reading twice.</strong> <code class="inline">web</code>'s <code class="inline">/streamers/new</code> handler builds the publish URL as <code class="inline">{RTMP_PUBLIC_URL}/{stream_key}</code> &#8212; the key is part of the URL path, not a separate credential. OBS presents Server and Stream Key as two fields, which invites pasting the key into both. Do that and OBS publishes to <code class="inline">rtmp://host/&lt;key&gt;/&lt;key&gt;</code>. MediaMTX passes <code class="inline">&lt;key&gt;/&lt;key&gt;</code> to <code class="inline">/hooks/auth</code> as the path, it matches no row in <code class="inline">streamers</code>, and the publish is rejected with an unhelpful "Failed to connect to server". SPEC.md flags this too. Server field gets everything; Stream Key stays empty.</p>
+<p class="step-p"><strong>If this failed:</strong></p>
+<ul>
+<li><strong><code class="inline">Connection refused</code> or <code class="inline">Connection timed out</code> immediately.</strong> You never reached MediaMTX. <code class="inline">dig +short rtmp.k8s.linkifysolutions.com</code>, then <code class="inline">aws elbv2 describe-target-health --target-group-arn &lt;arn&gt;</code>. An empty or unhealthy target group is a Module 12 problem.</li>
+<li><strong>Connects, then disconnects within a second.</strong> <code class="inline">/hooks/auth</code> rejected you. This is the interesting failure &#8212; go straight to Step 3's logs, which distinguish the causes.</li>
+<li><strong><code class="inline">Broken pipe</code> after a few seconds of apparently working.</strong> MediaMTX accepted the publish and then something killed the flow. Check <code class="inline">kubectl get pods -n streaming -l app=mediamtx</code> for a restart, and remember the NLB's 350-second idle timeout if the gap was around that long.</li>
+<li><strong>Connects and hangs with no output counter at all.</strong> ffmpeg is waiting on the RTMP handshake. If you enabled PROXY protocol on the NLB, this is exactly what it looks like &#8212; see Module 12, and turn it off.</li>
+</ul>
+<h3 id="m13-step-3-confirm-ingest-webhook-authorised-it-and-wrote-the-row">Step 3 &#8212; Confirm <code class="inline">ingest-webhook</code> authorised it and wrote the row</h3>
+<p class="step-p">In a second terminal, with ffmpeg still running:</p>
+<pre><code>kubectl logs -n streaming -l app=ingest-webhook --tail=20 --prefix</code></pre>
+<pre class="out"><code>[pod/ingest-webhook-7d4c8b95f6-h9wqr/ingest-webhook] INFO:     10.0.13.204:51224 - "POST /hooks/auth HTTP/1.1" 200 OK
+[pod/ingest-webhook-7d4c8b95f6-h9wqr/ingest-webhook] INFO:ingest-webhook:stream started: path=8f3a1c9d2e7b4a5f6c0d8e1a3b5c7d9e stream_id=3f6b2c8a-1d4e-4a7b-9c0f-2e5d8a1b3c6f
+[pod/ingest-webhook-7d4c8b95f6-h9wqr/ingest-webhook] INFO:     10.0.13.204:51226 - "POST /hooks/publish HTTP/1.1" 200 OK</code></pre>
+<p class="step-p">Two separate hooks, in that order, and they mean different things. <code class="inline">/hooks/auth</code> is the <strong>gate</strong> &#8212; MediaMTX calls it before accepting the publish, and a non-2xx rejects the stream. <code class="inline">/hooks/publish</code> is <code class="inline">runOnReady</code>, which fires <em>after</em> the stream is already accepted and cannot reject anything; it's what creates the <code class="inline">streams</code> row and emits the <code class="inline">started</code> event.</p>
+<p class="step-p">Note the source IP: <code class="inline">10.0.13.204</code> is the MediaMTX pod, not your laptop. Every call to <code class="inline">ingest-webhook</code> comes from inside the cluster. That's the invariant the NetworkPolicy encodes.</p>
+<p class="step-p">Now the row:</p>
+<pre><code>pg "SELECT id, left(path,8)||'...' AS path, status, started_at FROM streams ORDER BY started_at DESC LIMIT 1"</code></pre>
+<pre class="out"><code>                  id                  |    path     | status |          started_at
+--------------------------------------+-------------+--------+-------------------------------
+ 3f6b2c8a-1d4e-4a7b-9c0f-2e5d8a1b3c6f | 8f3a1c9d... | live   | 2026-07-29 14:06:44.203881+00
+(1 row)</code></pre>
+<p class="step-p">Save the id &#8212; every remaining step uses it, and it's the only identifier that's safe to put in a URL:</p>
+<pre><code>export STREAM_ID=3f6b2c8a-1d4e-4a7b-9c0f-2e5d8a1b3c6f</code></pre>
+<p class="step-p">(<code class="inline">path</code> is the same value as the secret stream key. It never leaves the server side. HLS output is keyed by <code class="inline">stream_id</code> precisely so that the key never appears in anything a browser sees.)</p>
+<p class="step-p">And confirm MediaMTX agrees it has a live path:</p>
+<pre><code>kubectl exec -n streaming deploy/mediamtx -- \
+  wget -qO- http://localhost:9997/v3/paths/list | python3 -m json.tool</code></pre>
+<pre class="out"><code>{
+    "pageCount": 1,
+    "itemCount": 1,
+    "items": [
+        {
+            "name": "8f3a1c9d2e7b4a5f6c0d8e1a3b5c7d9e",
+            "confName": "all_others",
+            "source": { "type": "rtmpConn", "id": "..." },
+            "ready": true,
+            "tracks": ["H264", "MPEG-4 Audio"],
+            "bytesReceived": 18443127,
+            "readers": [ { "type": "rtmpConn", "id": "..." } ]
+        }
+    ]
+}</code></pre>
+<p class="step-p"><code class="inline">"ready": true</code>, two tracks, <code class="inline">bytesReceived</code> climbing, and exactly one reader &#8212; that reader is <code class="inline">transcode-worker</code>'s ffmpeg. If <code class="inline">readers</code> is empty, Step 4 is where the problem is.</p>
+<p class="step-p"><strong>If this failed:</strong></p>
+<ul>
+<li><strong><code class="inline">"POST /hooks/auth HTTP/1.1" 401</code> and <code class="inline">rejected publish: unknown stream key '...'</code>.</strong> Look at the path in that log line. If it contains the key twice, you filled in the OBS Stream Key field. If it's a key you don't recognise, you're using a stale one. If it looks right, confirm the row exists: <code class="inline">pg "SELECT count(*) FROM streamers WHERE stream_key = '$STREAM_KEY'"</code>.</li>
+<li><strong>No <code class="inline">/hooks/auth</code> line at all, but ffmpeg connected.</strong> MediaMTX could not reach <code class="inline">ingest-webhook</code> and defaulted to rejecting. Check DNS and reachability from inside the MediaMTX pod: <code class="inline">kubectl exec -n streaming deploy/mediamtx -- wget -qO- http://ingest-webhook.streaming.svc.cluster.local:8000/livez</code>. A hang here means the NetworkPolicy is selecting the wrong pods; a DNS failure means CoreDNS or a typo in the ConfigMap.</li>
+<li><strong><code class="inline">/hooks/auth</code> 200 but no <code class="inline">stream started</code> line.</strong> <code class="inline">runOnReady</code> didn't fire or didn't land. <code class="inline">kubectl logs -n streaming deploy/mediamtx</code> &#8212; this hook is a <code class="inline">wget</code> in a shell, so it only works on the <code class="inline">-ffmpeg</code> image variant (Alpine, has <code class="inline">wget</code>). If someone changed the image to plain <code class="inline">bluenviron/mediamtx</code>, auth works and the publish hook silently does nothing.</li>
+<li><strong><code class="inline">duplicate publish hook for path=..., stream_id=... already live</code>.</strong> MediaMTX retried <code class="inline">runOnReady</code>. The guard did its job; nothing is wrong. But if you see it on a <em>first</em> attempt, there's a stale <code class="inline">live</code> row from an earlier test: <code class="inline">pg "UPDATE streams SET status='ended', ended_at=now() WHERE status='live'"</code>.</li>
+<li><strong><code class="inline">ingest-webhook</code> returns 500 with a psycopg error.</strong> RDS. Same causes as Step 1.</li>
+</ul>
+<h3 id="m13-step-4-confirm-the-transcode-workload-picked-it-up">Step 4 &#8212; Confirm the transcode workload picked it up</h3>
+<pre><code>kubectl logs -n streaming deploy/transcode-worker --tail=5</code></pre>
+<pre class="out"><code>INFO:transcode-worker:live transcode starting (attempt 1): path=8f3a1c9d2e7b4a5f6c0d8e1a3b5c7d9e stream_id=3f6b2c8a-1d4e-4a7b-9c0f-2e5d8a1b3c6f cmd=ffmpeg -y -i rtmp://mediamtx.streaming.svc.cluster.local:1935/8f3a1c9d2e7b4a5f6c0d8e1a3b5c7d9e -filter_complex [0:v]split=3[v0][v1][v2];[v0]scale=w=1920:h=1080[v0out];[v1]scale=w=1280:h=720[v1out];[v2]scale=w=854:h=480[v2out] -map [v0out] -c:v:0 libx264 -preset:v:0 veryfast -b:v:0 5000k ... -f hls -hls_time 4 -hls_flags independent_segments+delete_segments -hls_list_size 30 -master_pl_name master.m3u8 -var_stream_map v:0,a:0,name:1080p v:1,a:1,name:720p v:2,a:2,name:480p ...</code></pre>
+<p class="step-p">Read that command, because it encodes several decisions:</p>
+<ul>
+<li><strong>One ffmpeg process, one decode, <code class="inline">split=3</code></strong> &#8212; not three processes. Three independent encoders would place keyframes independently, and HLS ABR switching requires the renditions to be keyframe-aligned. <code class="inline">-g 60 -keyint_min 60 -sc_threshold 0</code> forces that alignment (2-second GOP at 30fps, so exactly two keyframes per 4-second segment).</li>
+<li><strong><code class="inline">-preset veryfast</code></strong> for live. The encoder must keep up with real time; quality is the thing that gives.</li>
+<li><strong><code class="inline">-hls_flags +delete_segments</code> and <code class="inline">-hls_list_size 30</code></strong> &#8212; a sliding 30-segment window, about two minutes of DVR range.</li>
+<li><strong>The input is <code class="inline">rtmp://mediamtx.streaming.svc.cluster.local:1935/...</code></strong> &#8212; the ClusterIP Service, not the public NLB hostname. That is deliberate; see Module 12 on the <code class="inline">preserve_client_ip</code> hairpin.</li>
+</ul>
+<p class="step-p">Also confirm the reverse direction &#8212; that the pipeline is producing status events:</p>
+<pre><code>kubectl logs -n streaming deploy/analytics-worker --tail=5</code></pre>
+<pre class="out"><code>INFO:analytics-worker:[transcode.status] {'event': 'live_transcode_started', 'ts': 1785405000.12, 'path': '8f3a1c9d2e7b4a5f6c0d8e1a3b5c7d9e', 'stream_id': '3f6b2c8a-1d4e-4a7b-9c0f-2e5d8a1b3c6f'}</code></pre>
+<p class="step-p"><code class="inline">analytics-worker</code> consumes <code class="inline">transcode.status</code> and logs it without aggregating, which makes it a convenient window onto Kafka without running a console consumer.</p>
+<p class="step-p"><strong>If this failed:</strong></p>
+<ul>
+<li><p class="step-p"><strong>No log line at all.</strong> <code class="inline">transcode-worker</code> isn't consuming. Check the pod is Running and check the consumer group's lag:</p>
+<pre><code>kubectl -n kafka run kt --rm -it --restart=Never --quiet \
+  --image=quay.io/strimzi/kafka:0.49.0-kafka-3.9.0 -- \
+  bin/kafka-consumer-groups.sh \
+    --bootstrap-server streaming-kafka-bootstrap.kafka.svc.cluster.local:9092 \
+    --describe --group transcode-worker</code></pre>
+<p class="step-p">Non-zero <code class="inline">LAG</code> means it's connected but stuck. <code class="inline">Consumer group has no active members</code> means it never connected &#8212; usually a wrong <code class="inline">KAFKA_BOOTSTRAP_SERVERS</code>.</p></li>
+<li><strong><code class="inline">no stream_id for path=..., refusing to start</code>.</strong> The <code class="inline">started</code> event arrived without a <code class="inline">stream_id</code>. That means <code class="inline">ingest-webhook</code> emitted it from the duplicate-guard branch, or an older image is running.</li>
+<li><strong><code class="inline">ffmpeg exited 1 for path=...</code> with <code class="inline">Connection refused</code> in the stderr tail.</strong> The transcode pod can't reach MediaMTX. <code class="inline">kubectl exec -n streaming deploy/transcode-worker -- python -c "import socket;socket.create_connection(('mediamtx.streaming.svc.cluster.local',1935),5)"</code> &#8212; silence is success. If it connects but ffmpeg still fails, check MediaMTX's replica count: with more than one replica the ClusterIP round-robins and half of all connections land on a pod that has never heard of that path. That is why <code class="inline">replicas: 1</code> is a correctness constraint.</li>
+<li><p class="step-p"><strong><code class="inline">ffmpeg wedged (no new segment for 20s) for path=..., restarting</code>.</strong> The stall watchdog fired. Confirm the running config actually has the large write queue:</p>
+<pre><code>kubectl exec -n streaming deploy/mediamtx -- \
+  wget -qO- http://localhost:9997/v3/config/global/get | grep -o '"writeQueueSize":[0-9]*'</code></pre>
+<pre class="out"><code>"writeQueueSize":65536</code></pre>
+<p class="step-p">If it says 512, the ConfigMap didn't mount where you think it did and MediaMTX fell back to its defaults.</p></li>
+<li><strong>Pod <code class="inline">OOMKilled</code>.</strong> The 1 GiB request was measured against a 1080p source. A higher-resolution input needs more; raise request and limit together.</li>
+<li><strong>Pod evicted with <code class="inline">The node was low on resource: ephemeral-storage</code>.</strong> The <code class="inline">emptyDir</code> <code class="inline">sizeLimit</code>, or the node's root volume. Karpenter nodes need a root volume comfortably above the scratch requirement.</li>
+</ul>
+<h3 id="m13-step-5-confirm-hls-lands-in-s3">Step 5 &#8212; Confirm HLS lands in S3</h3>
+<p class="step-p">Give it about thirty seconds after the transcode starts, then:</p>
+<pre><code>aws s3 ls "s3://${BUCKET}/hls/live/${STREAM_ID}/" --recursive | head -20</code></pre>
+<pre class="out"><code>2026-07-29 14:07:12       1043 hls/live/3f6b2c8a-.../1080p/playlist.m3u8
+2026-07-29 14:07:08    2094336 hls/live/3f6b2c8a-.../1080p/segment_000.ts
+2026-07-29 14:07:12    2081792 hls/live/3f6b2c8a-.../1080p/segment_001.ts
+2026-07-29 14:07:12        997 hls/live/3f6b2c8a-.../480p/playlist.m3u8
+2026-07-29 14:07:08     612352 hls/live/3f6b2c8a-.../480p/segment_000.ts
+2026-07-29 14:07:12        998 hls/live/3f6b2c8a-.../720p/playlist.m3u8
+2026-07-29 14:07:08    1180672 hls/live/3f6b2c8a-.../720p/segment_000.ts
+2026-07-29 14:07:12        512 hls/live/3f6b2c8a-.../master.m3u8</code></pre>
+<p class="step-p">Three rendition directories, each with a <code class="inline">playlist.m3u8</code> and segments, plus one <code class="inline">master.m3u8</code> at the top. Run it again twenty seconds later &#8212; <strong>the segment numbers must be increasing.</strong> A static listing means ffmpeg wrote a few segments and stopped.</p>
+<p class="step-p">Now the headers, which are the part people skip and then spend a day on:</p>
+<pre><code>aws s3api head-object --bucket "$BUCKET" \
+  --key "hls/live/${STREAM_ID}/master.m3u8"</code></pre>
+<pre class="out"><code>{
+    "LastModified": "2026-07-29T14:07:12+00:00",
+    "ContentLength": 512,
+    "ETag": "\"a1b2c3d4e5f60718293a4b5c6d7e8f90\"",
+    "CacheControl": "no-cache, must-revalidate",
+    "ContentType": "application/vnd.apple.mpegurl",
+    "Metadata": {}
+}</code></pre>
+<pre><code>aws s3api head-object --bucket "$BUCKET" \
+  --key "hls/live/${STREAM_ID}/1080p/segment_001.ts" \
+  --query '[ContentType,CacheControl]'</code></pre>
+<pre class="out"><code>[
+    "video/mp2t",
+    "public, max-age=31536000, immutable"
+]</code></pre>
+<p class="step-p"><strong>Why those two headers matter, precisely.</strong></p>
+<p class="step-p"><code class="inline">ContentType: application/vnd.apple.mpegurl</code> is what makes a playlist a playlist. Neither S3 nor boto3 guesses MIME types for <code class="inline">.m3u8</code> or <code class="inline">.ts</code>; without an explicit <code class="inline">ContentType</code> they'd be served as <code class="inline">binary/octet-stream</code>. Safari's native HLS player refuses to touch that, and hls.js's behaviour depends on the browser. <code class="inline">transcode-worker</code>'s <code class="inline">_s3_extra_args</code> sets it on every upload.</p>
+<p class="step-p"><code class="inline">CacheControl: no-cache, must-revalidate</code> on a <strong>live</strong> manifest is load-bearing in a way the segment header is not. A live <code class="inline">playlist.m3u8</code> is rewritten every few seconds: new segments are appended and old ones drop out of the sliding window, and <code class="inline">+delete_segments</code> removes the corresponding files. A cached copy therefore references segments that no longer exist. The player fetches the stale manifest, requests a segment that has been deleted, gets a 404, and freezes &#8212; while the stream is perfectly healthy. This exact bug already happened once in the browser's own HTTP cache ("works in a fresh tab, breaks on refresh"), which is why the header exists at all. Behind CloudFront it comes back as a CDN-cache version of the same bug, which is why Module 9's cache behaviour for <code class="inline">*.m3u8</code> has a near-zero TTL and honours the origin's <code class="inline">Cache-Control</code> rather than overriding it.</p>
+<p class="step-p">Segments get the opposite treatment &#8212; <code class="inline">max-age=31536000, immutable</code> &#8212; because a segment file, once written under a given key, is never rewritten. A VOD manifest gets the long treatment too: it's written once, finalised with <code class="inline">EXT-X-ENDLIST</code>, and never touched again.</p>
+<p class="step-p"><strong>If this failed:</strong></p>
+<ul>
+<li><p class="step-p"><strong>Nothing in the bucket, and the transcode log looks fine.</strong> Credentials. <code class="inline">_upload_pass</code> logs and swallows exceptions rather than crashing, so this fails <em>quietly</em>: <code class="inline">kubectl logs -n streaming deploy/transcode-worker | grep -i "failed to upload"</code>. Then check the identity the pod actually has:</p>
+<pre><code>kubectl exec -n streaming deploy/transcode-worker -- \
+  python -c "import boto3;print(boto3.client('sts').get_caller_identity()['Arn'])"</code></pre>
+<pre class="out"><code>arn:aws:sts::123456789012:assumed-role/streaming-transcode-worker/eks-streaming-...</code></pre>
+<p class="step-p">If that shows the <em>node</em> role instead, the Pod Identity association is missing, the ServiceAccount name doesn't match, or the pod started before the association existed &#8212; <code class="inline">kubectl rollout restart deploy/transcode-worker</code>.</p></li>
+<li><strong><code class="inline">InvalidAccessKeyId</code> or <code class="inline">SignatureDoesNotMatch</code>.</strong> <code class="inline">S3_ACCESS_KEY</code>/<code class="inline">S3_SECRET_KEY</code> are still set in the environment, and explicit credentials win over the credential chain. <code class="inline">kubectl exec -n streaming deploy/transcode-worker -- env | grep -c S3_ACCESS_KEY</code> must print <code class="inline">0</code>.</li>
+<li><strong><code class="inline">Could not connect to the endpoint URL</code>.</strong> <code class="inline">S3_ENDPOINT</code> is still pointing at something MinIO-shaped. It must be <em>unset</em> on AWS.</li>
+<li><strong><code class="inline">AccessDenied</code> on <code class="inline">PutObject</code>.</strong> The IAM role from Module 7 grants <code class="inline">s3:PutObject</code> on <code class="inline">hls/*</code> only. Check the key prefix in the error message &#8212; writing outside <code class="inline">hls/</code> means the code is using a different prefix than you think.</li>
+<li><strong><code class="inline">ContentType</code> is <code class="inline">binary/octet-stream</code>.</strong> An older image without <code class="inline">_s3_extra_args</code>. Check the tag.</li>
+<li><strong>Segments stop advancing.</strong> Back to Step 4's watchdog block.</li>
+</ul>
+<h3 id="m13-step-6-confirm-playback-through-cloudfront">Step 6 &#8212; Confirm playback through CloudFront</h3>
+<pre><code>curl -sSI "https://cdn.k8s.linkifysolutions.com/hls/live/${STREAM_ID}/master.m3u8"</code></pre>
+<pre class="out"><code>HTTP/2 200
+content-type: application/vnd.apple.mpegurl
+content-length: 512
+cache-control: no-cache, must-revalidate
+x-cache: Miss from cloudfront
+via: 1.1 8f2c1a9d3e4b5f6a.cloudfront.net (CloudFront)</code></pre>
+<p class="step-p">Note <code class="inline">cache-control</code> survived the trip &#8212; CloudFront is passing the origin's header through, not substituting its own. That's the Module 9 cache policy working.</p>
+<p class="step-p">Now the content:</p>
+<pre><code>curl -sS "https://cdn.k8s.linkifysolutions.com/hls/live/${STREAM_ID}/master.m3u8"</code></pre>
+<pre class="out"><code>#EXTM3U
+#EXT-X-VERSION:3
+#EXT-X-STREAM-INF:BANDWIDTH=5128000,RESOLUTION=1920x1080,CODECS="avc1.64002a,mp4a.40.2"
+1080p/playlist.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=2928000,RESOLUTION=1280x720,CODECS="avc1.64001f,mp4a.40.2"
+720p/playlist.m3u8
+#EXT-X-STREAM-INF:BANDWIDTH=1528000,RESOLUTION=854x480,CODECS="avc1.64001e,mp4a.40.2"
+480p/playlist.m3u8</code></pre>
+<p class="step-p">Count them:</p>
+<pre><code>curl -sS "https://cdn.k8s.linkifysolutions.com/hls/live/${STREAM_ID}/master.m3u8" \
+  | grep -c EXT-X-STREAM-INF</code></pre>
+<pre class="out"><code>3</code></pre>
+<p class="step-p">Three variants is the ABR ladder. Fewer means a rendition directory is missing from S3.</p>
+<p class="step-p"><strong>The CORS preflight.</strong> The watch page is served from <code class="inline">stream.k8s...</code> and hls.js fetches manifests from <code class="inline">cdn.k8s...</code> &#8212; a cross-origin request. This is the check that catches the single most confusing failure in the whole migration:</p>
+<pre><code>curl -sS -o /dev/null -D - -X OPTIONS \
+  -H 'Origin: https://stream.k8s.linkifysolutions.com' \
+  -H 'Access-Control-Request-Method: GET' \
+  "https://cdn.k8s.linkifysolutions.com/hls/live/${STREAM_ID}/master.m3u8" \
+  | grep -i 'access-control'</code></pre>
+<pre class="out"><code>access-control-allow-origin: https://stream.k8s.linkifysolutions.com
+access-control-allow-methods: GET, HEAD, OPTIONS
+access-control-expose-headers: Content-Length, Content-Range, ETag
+access-control-max-age: 3000</code></pre>
+<p class="step-p">Why this deserves its own step: MinIO reflected the <code class="inline">Origin</code> header for free, so nothing in the Compose setup ever configured CORS. S3 does not. Without these headers the browser blocks the fetch while the network tab shows a perfectly good <strong>200 OK</strong> &#8212; the object is there, the URL is right, the response is fine, and the player says "Playback error". Worse, Safari uses native HLS (<code class="inline">video.src = ...</code>), which is not subject to CORS for media elements, so <strong>it works on your Mac in Safari and fails in Chrome.</strong> Do not let that mislead you.</p>
+<p class="step-p">Sanity-check the actual media before involving a browser:</p>
+<pre><code>ffplay "https://cdn.k8s.linkifysolutions.com/hls/live/${STREAM_ID}/master.m3u8"</code></pre>
+<p class="step-p">A window with the test pattern and a 440 Hz tone. <code class="inline">ffplay</code> doesn't do CORS, which is exactly why it is a <em>separate</em> check from the one above and not a substitute for it.</p>
+<p class="step-p"><strong>Now the real thing.</strong> Open in a browser:</p>
+<pre class="out"><code>https://stream.k8s.linkifysolutions.com/watch/stream/3f6b2c8a-1d4e-4a7b-9c0f-2e5d8a1b3c6f</code></pre>
+<p class="step-p">You should see the test pattern playing, with the streamer's display name as the heading. The homepage at <code class="inline">https://stream.k8s.linkifysolutions.com</code> should now list the stream as live with a view count.</p>
+<p class="step-p">Open the browser devtools network tab and watch it for twenty seconds: <code class="inline">master.m3u8</code> fetched once, then <code class="inline">playlist.m3u8</code> re-fetched every few seconds (each a 200, not a 304 &#8212; that's <code class="inline">no-cache, must-revalidate</code>), and <code class="inline">segment_NNN.ts</code> files arriving in sequence.</p>
+<p class="step-p"><strong>If this failed:</strong></p>
+<ul>
+<li><strong>403 from CloudFront.</strong> Origin Access Control. The bucket is fully private now &#8212; no anonymous public-read prefix, unlike the MinIO setup &#8212; so every read must come through the distribution. The bucket policy needs <code class="inline">s3:GetObject</code> granted to <code class="inline">cloudfront.amazonaws.com</code> with an <code class="inline">AWS:SourceArn</code> condition naming the distribution.</li>
+<li><strong>404, and the path contains <code class="inline">/media/</code>.</strong> The Module 0 change to <code class="inline">web/main.py</code> didn't land. <code class="inline">/media</code> was MinIO's <em>bucket name</em> in a path-style URL; behind CloudFront the origin is one bucket and there is no bucket segment in the path. <code class="inline">kubectl exec -n streaming deploy/web -- env | grep HLS_PUBLIC_BASE_URL</code> &#8212; it must have no <code class="inline">/media</code> suffix.</li>
+<li><strong>Player loads, then freezes after about 20 seconds.</strong> This is the likeliest CloudFront problem and it is the stale-manifest bug from Step 5, moved to the CDN. Confirm with <code class="inline">curl -sSI</code> twice, twenty seconds apart, and compare <code class="inline">x-cache</code> and <code class="inline">last-modified</code>. A <code class="inline">Hit from cloudfront</code> on a live <code class="inline">.m3u8</code> is the smoking gun. Fix in Module 9's cache behaviours: near-zero TTL for <code class="inline">*.m3u8</code>, <code class="inline">CachingOptimized</code> for <code class="inline">*.ts</code>.</li>
+<li><strong>Browser console shows a CORS error, but <code class="inline">ffplay</code> works.</strong> The preflight check above already told you this. Note the sneaky variant: if CORS is configured only on the S3 bucket and not as a CloudFront response headers policy, the first request to reach a given edge &#8212; possibly your own <code class="inline">curl</code> with no <code class="inline">Origin</code> header &#8212; populates the cache with a header-less response, and every browser after that gets the cached copy. That produces intermittent, edge-dependent CORS failures that appear to fix themselves. The response headers policy makes CloudFront synthesise the header on every response regardless of what's cached.</li>
+<li><strong>Plays, but only one quality.</strong> <code class="inline">master.m3u8</code> is there and the variant playlists 404. Check the <code class="inline">%v</code> subdirectories exist in S3; <code class="inline">_make_rendition_dirs</code> creates them because ffmpeg's HLS muxer does not.</li>
+<li><strong>View count stays 0.</strong> <code class="inline">kubectl logs -n streaming deploy/analytics-worker</code> &#8212; the <code class="inline">viewer.analytics</code> event goes <code class="inline">web</code> &#8594; <code class="inline">upload-api</code> &#8594; Kafka &#8594; <code class="inline">analytics-worker</code> &#8594; Postgres, so a missing count means one of those four hops, and the log tells you which.</li>
+</ul>
+<h3 id="m13-step-7-stop-the-stream-and-confirm-teardown">Step 7 &#8212; Stop the stream and confirm teardown</h3>
+<p class="step-p">Ctrl-C the ffmpeg (or Stop Streaming in OBS).</p>
+<pre><code>kubectl logs -n streaming -l app=ingest-webhook --tail=10 --prefix</code></pre>
+<pre class="out"><code>[pod/ingest-webhook-7d4c8b95f6-h9wqr/ingest-webhook] INFO:ingest-webhook:stream ended: path=8f3a1c9d2e7b4a5f6c0d8e1a3b5c7d9e stream_id=3f6b2c8a-1d4e-4a7b-9c0f-2e5d8a1b3c6f
+[pod/ingest-webhook-7d4c8b95f6-h9wqr/ingest-webhook] INFO:     10.0.13.204:51402 - "POST /hooks/unpublish HTTP/1.1" 200 OK</code></pre>
+<p class="step-p">The DB row closes:</p>
+<pre><code>pg "SELECT status, started_at, ended_at, ended_at - started_at AS duration FROM streams WHERE id = '$STREAM_ID'"</code></pre>
+<pre class="out"><code> status |          started_at           |           ended_at            |    duration
+--------+-------------------------------+-------------------------------+-----------------
+ ended  | 2026-07-29 14:06:44.203881+00 | 2026-07-29 14:11:57.882014+00 | 00:05:13.678133
+(1 row)</code></pre>
+<p class="step-p">The transcode winds down. There is no "stopping" log line today &#8212; the signal is the <code class="inline">live_transcode_stopped</code> event, which <code class="inline">analytics-worker</code> prints:</p>
+<pre><code>kubectl logs -n streaming deploy/analytics-worker --tail=5</code></pre>
+<pre class="out"><code>INFO:analytics-worker:[transcode.status] {'event': 'live_transcode_stopped', 'ts': 1785405117.44, 'path': '8f3a1c9d2e7b4a5f6c0d8e1a3b5c7d9e', 'stream_id': '3f6b2c8a-1d4e-4a7b-9c0f-2e5d8a1b3c6f'}</code></pre>
+<p class="step-p">Confirm the ffmpeg process is actually gone rather than orphaned:</p>
+<pre><code>kubectl exec -n streaming deploy/transcode-worker -- python -c \
+  "import glob;print(sum('ffmpeg' in open(f,'rb').read().decode(errors='ignore') for f in glob.glob('/proc/*/cmdline')))"</code></pre>
+<pre class="out"><code>0</code></pre>
+<p class="step-p">(<code class="inline">ps</code> is not in the <code class="inline">python:3.12-slim</code> base image, hence reading <code class="inline">/proc</code> directly.)</p>
+<p class="step-p">And MediaMTX has no live path:</p>
+<pre><code>kubectl exec -n streaming deploy/mediamtx -- \
+  wget -qO- http://localhost:9997/v3/paths/list | grep -o '"itemCount":[0-9]*'</code></pre>
+<pre class="out"><code>"itemCount":0</code></pre>
+<p class="step-p">The HLS objects stay in S3 &#8212; nothing deletes them at teardown, by design. Module 9's lifecycle rule on <code class="inline">hls/live/</code> is what reclaims them, and it is the only thing that does. If you skipped that rule, this is where the bill starts growing quietly.</p>
+<p class="step-p"><strong>If this failed:</strong></p>
+<ul>
+<li><p class="step-p"><strong><code class="inline">stream ended</code> logged but ffmpeg still running.</strong> The <code class="inline">ended</code> event didn't reach <code class="inline">transcode-worker</code>, or it reached a different <code class="inline">path</code> than the one it claimed. Check the topic directly:</p>
+<pre><code>kubectl -n kafka run kt --rm -it --restart=Never --quiet \
+  --image=quay.io/strimzi/kafka:0.49.0-kafka-3.9.0 -- \
+  bin/kafka-console-consumer.sh \
+    --bootstrap-server streaming-kafka-bootstrap.kafka.svc.cluster.local:9092 \
+    --topic stream.lifecycle --from-beginning --max-messages 10</code></pre>
+<p class="step-p">You want a <code class="inline">{"event": "ended", "path": "...", "stream_id": "..."}</code> matching the <code class="inline">started</code> you saw earlier.</p></li>
+<li><strong><code class="inline">no active live transcode for path=... (already stopped, or never started)</code>.</strong> <code class="inline">transcode-worker</code> restarted at some point between <code class="inline">started</code> and <code class="inline">ended</code>. <code class="inline">active_streams</code> is in-process memory, so a restart loses the mapping &#8212; and the ffmpeg child dies with the container, so nothing is orphaned. Harmless here; it is one of the reasons Module 14 moves this state out of memory.</li>
+<li><strong><code class="inline">streams</code> row still <code class="inline">live</code>.</strong> <code class="inline">/hooks/unpublish</code> never fired. Same MediaMTX-side causes as <code class="inline">runOnReady</code> in Step 3. A stale <code class="inline">live</code> row matters more than it looks: once the Module 14 admission check lands, stale rows count toward the concurrency ceiling and will eventually block all new streams. Reset with <code class="inline">pg "UPDATE streams SET status='ended', ended_at=now() WHERE status='live'"</code>.</li>
+</ul>
+<h3 id="m13-step-8-the-vod-path">Step 8 &#8212; The VOD path</h3>
+<p class="step-p">Different entry point, same back half. Make a short test file:</p>
+<pre><code>ffmpeg -f lavfi -i testsrc2=size=1920x1080:rate=30:duration=30 \
+       -f lavfi -i sine=frequency=440:duration=30 \
+       -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac /tmp/test.mp4</code></pre>
+<p class="step-p">Upload it through the public UI:</p>
+<pre><code>curl -sS -X POST https://stream.k8s.linkifysolutions.com/upload \
+  -F "stream_key=${STREAM_KEY}" \
+  -F "title=verify-vod" \
+  -F "file=@/tmp/test.mp4" | grep -o '"id":"[^"]*"'</code></pre>
+<pre class="out"><code>"id":"7c1e9d4b-3a8f-4d2c-b6e0-5f9a1c3d7e2b"</code></pre>
+<pre><code>export VIDEO_ID=7c1e9d4b-3a8f-4d2c-b6e0-5f9a1c3d7e2b</code></pre>
+<p class="step-p">Watch the status walk through its three values. Run this a few times over the next minute or two:</p>
+<pre><code>pg "SELECT title, status, raw_object_key FROM videos WHERE id = '$VIDEO_ID'"</code></pre>
+<pre class="out"><code>   title    |   status    |               raw_object_key
+------------+-------------+---------------------------------------------
+ verify-vod | uploaded    | raw/7c1e9d4b-3a8f-4d2c-b6e0-5f9a1c3d7e2b.mp4</code></pre>
+<p class="step-p">then</p>
+<pre class="out"><code> verify-vod | transcoding | raw/7c1e9d4b-...mp4</code></pre>
+<p class="step-p">then</p>
+<pre class="out"><code> verify-vod | ready       | raw/7c1e9d4b-...mp4</code></pre>
+<p class="step-p"><code class="inline">uploaded</code> is written by <code class="inline">upload-api</code> after the raw file lands in S3. <code class="inline">transcoding</code> is <code class="inline">transcode-worker</code> claiming the job with an atomic <code class="inline">UPDATE videos SET status='transcoding' WHERE id=%s AND status='uploaded'</code> &#8212; that <code class="inline">WHERE</code> clause is the whole dedup mechanism, and unlike the live path's in-memory guard it survives a restart. <code class="inline">ready</code> is written after the last rendition is uploaded.</p>
+<p class="step-p">The raw object and the output:</p>
+<pre><code>aws s3 ls "s3://${BUCKET}/raw/${VIDEO_ID}.mp4"
+aws s3 ls "s3://${BUCKET}/hls/vod/${VIDEO_ID}/" --recursive | wc -l</code></pre>
+<pre class="out"><code>2026-07-29 14:15:03   14238721 raw/7c1e9d4b-3a8f-4d2c-b6e0-5f9a1c3d7e2b.mp4
+      13</code></pre>
+<p class="step-p">A VOD manifest is finalised, unlike a live one:</p>
+<pre><code>curl -sS "https://cdn.k8s.linkifysolutions.com/hls/vod/${VIDEO_ID}/1080p/playlist.m3u8" | tail -3</code></pre>
+<pre class="out"><code>#EXTINF:2.000000,
+segment_007.ts
+#EXT-X-ENDLIST</code></pre>
+<p class="step-p"><code class="inline">#EXT-X-ENDLIST</code> is what <code class="inline">-hls_playlist_type vod</code> produces, and it's what tells the player this is a finite thing it can seek around in. Its <code class="inline">Cache-Control</code> differs accordingly:</p>
+<pre><code>aws s3api head-object --bucket "$BUCKET" \
+  --key "hls/vod/${VIDEO_ID}/master.m3u8" --query 'CacheControl'</code></pre>
+<pre class="out"><code>"public, max-age=31536000, immutable"</code></pre>
+<p class="step-p">Then play it:</p>
+<pre class="out"><code>https://stream.k8s.linkifysolutions.com/watch/video/7c1e9d4b-3a8f-4d2c-b6e0-5f9a1c3d7e2b</code></pre>
+<p class="step-p"><strong>If this failed:</strong></p>
+<ul>
+<li><strong>413.</strong> <code class="inline">MAX_UPLOAD_BYTES</code>. Module 12 lowered it to 2 GiB in <code class="inline">overlays/prod/config.env</code>.</li>
+<li><strong>429.</strong> The per-streamer rate limit &#8212; ten uploads per hour, counted from the <code class="inline">videos</code> table. You hit it while testing. Create a fresh streamer.</li>
+<li><strong>The connection resets and <code class="inline">web</code> restarts.</strong> <code class="inline">kubectl describe pod -n streaming &lt;web-pod&gt; | grep -i -A2 'last state'</code> showing <code class="inline">OOMKilled</code> is the <code class="inline">await file.read()</code> bug from Module 12. It presents as a browser reset, not an error page.</li>
+<li><strong>Stuck at <code class="inline">uploaded</code> forever.</strong> The <code class="inline">upload.events</code> message was produced but nothing consumed it. Check <code class="inline">transcode-worker</code>'s lag on the <code class="inline">transcode-worker</code> group.</li>
+<li><strong>Stuck at <code class="inline">transcoding</code> forever.</strong> The worker claimed the job and then died. Because the claim lives in Postgres, a redelivered event will <em>not</em> retry it &#8212; that's the deliberate trade-off documented in the code. Read the logs for the ffmpeg failure, then reset by hand: <code class="inline">pg "UPDATE videos SET status='uploaded' WHERE id='$VIDEO_ID'"</code> and re-produce the event. Module 14 adds a sweeper for this.</li>
+<li><strong><code class="inline">failed</code>.</strong> ffmpeg rejected the input. <code class="inline">kubectl logs -n streaming deploy/transcode-worker | grep "ffmpeg failed"</code> prints the last 2000 characters of its stderr.</li>
+</ul>
+<h3 id="m13-what-you-just-proved">What you just proved</h3>
+<p class="step-p">Each step closed the loop on a module you built earlier. If everything above passed, all of this is now demonstrated rather than assumed:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Step</th>
+<th>What it proved</th>
+<th>Built in</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>1</td>
+<td>Public HTTPS reaches <code class="inline">web</code>; <code class="inline">web</code> reaches <code class="inline">upload-api</code>; <code class="inline">upload-api</code> writes to RDS</td>
+<td><a href="part-2-platform.html#m05">5</a>, <a href="part-3-data-layer.html#m08">8</a>, <a href="part-4-application.html#m12">12</a></td>
+</tr>
+<tr>
+<td>2</td>
+<td>The NLB passes raw TCP to MediaMTX with the handshake intact, from the public internet</td>
+<td><a href="part-4-application.html#m12">12</a></td>
+</tr>
+<tr>
+<td>3</td>
+<td>MediaMTX resolves in-cluster DNS, the auth gate rejects and accepts correctly, and the lifecycle event reaches Kafka</td>
+<td><a href="part-3-data-layer.html#m10">10</a>, <a href="part-4-application.html#m11">11</a></td>
+</tr>
+<tr>
+<td>4</td>
+<td>A consumer picked the event off Kafka and started the right ffmpeg against the right in-cluster source</td>
+<td><a href="part-3-data-layer.html#m10">10</a>, <a href="part-4-application.html#m11">11</a></td>
+</tr>
+<tr>
+<td>5</td>
+<td>The pod's IAM identity is its own role, not the node's, and it can write only where it should</td>
+<td><a href="part-2-platform.html#m07">7</a>, <a href="part-3-data-layer.html#m09">9</a></td>
+</tr>
+<tr>
+<td>6</td>
+<td>CloudFront serves a private bucket through OAC, with cache behaviours and CORS that a real player accepts</td>
+<td><a href="part-3-data-layer.html#m09">9</a></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Teardown is event-driven end to end &#8212; no polling, no orphaned processes, no stuck rows</td>
+<td><a href="part-3-data-layer.html#m10">10</a>, <a href="part-4-application.html#m11">11</a></td>
+</tr>
+<tr>
+<td>8</td>
+<td>The second entry point shares the same back half, with idempotency that survives a restart</td>
+<td><a href="part-3-data-layer.html#m08">8</a>, <a href="part-3-data-layer.html#m09">9</a>, <a href="part-4-application.html#m11">11</a></td>
+</tr>
+</tbody></table></div>
+<p class="step-p">What you have <strong>not</strong> proved, and shouldn't claim: that any of it scales. One stream ran on a <code class="inline">transcode-worker</code> Deployment that handles every stream in one process, on nodes you provisioned by hand. Start a second stream now and you'll see the ceiling &#8212; which is precisely what <a href="part-5-elastic.html#m14">Module 14</a> is for.</p>
+<p class="step-p">Before you move on, stop paying for an idle cluster if you're taking a break: <a href="part-5-elastic.html#m16">Module 16</a>'s cost section has the scale-to-zero commands.</p>
+<p class="step-p">Next: <a href="part-5-elastic.html#m14">Module 14 &#8212; Transcoding that scales</a>.</p>
+</section>
+
+<footer class="finish">
+  <span class="eyebrow">End of Part IV</span>
+  <p>Module 13 is the milestone: a stream pushed from OBS, transcoded in the cluster, and watched in a browser over HTTPS. Everything after it is making the setup good.</p>
+</footer>
+<div class="pager"><a href="part-3-data-layer.html">&larr; Part III &mdash; Data layer</a><a href="part-5-elastic.html">Part V &mdash; Elastic and automated &rarr;</a></div>
+</main>
+</div>

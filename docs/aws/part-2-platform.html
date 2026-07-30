@@ -1,0 +1,1964 @@
+<title>AWS/EKS &mdash; Part II: Platform</title>
+<style>
+  :root {
+    --paper: #eef1f4;
+    --surface: #ffffff;
+    --surface-dim: #e4e8ec;
+    --ink: #1b232c;
+    --ink-dim: #57626d;
+    --line: #ccd3d9;
+    --amber: #a35f22;
+    --amber-ink: #7c4718;
+    --teal: #2d5f74;
+    --teal-bg: #dfe9ec;
+    --ok: #2f6b3e;
+    --ok-bg: #dfeee2;
+    --warn: #9a3d3d;
+    --warn-bg: #f2e0e0;
+    --code-bg: #1b232c;
+    --code-ink: #e7ebee;
+    --code-dim: #93a1ac;
+    --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+      --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+      --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+      --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+      --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+    --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+    --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+    --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+    --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1f4; --surface: #ffffff; --surface-dim: #e4e8ec;
+    --ink: #1b232c; --ink-dim: #57626d; --line: #ccd3d9;
+    --amber: #a35f22; --amber-ink: #7c4718; --teal: #2d5f74; --teal-bg: #dfe9ec;
+    --ok: #2f6b3e; --ok-bg: #dfeee2; --warn: #9a3d3d; --warn-bg: #f2e0e0;
+    --code-bg: #1b232c; --code-ink: #e7ebee; --code-dim: #93a1ac; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6; font-size: 16px;
+  }
+  ::selection { background: var(--amber); color: #fff; }
+  a { color: var(--amber-ink); }
+  code, pre, kbd {
+    font-family: "Cascadia Code", "Cascadia Mono", ui-monospace, "SF Mono", Consolas,
+      "Liberation Mono", monospace;
+  }
+
+  .topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .topbar-inner { max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 1.75rem; }
+  .eyebrow {
+    display: inline-block; font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--amber-ink); background: color-mix(in srgb, var(--amber) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    padding: 0.2rem 0.55rem; border-radius: 3px;
+  }
+  h1 {
+    margin: 0.65rem 0 0.35rem; font-size: 1.95rem; font-weight: 700;
+    letter-spacing: -0.015em; text-wrap: balance;
+  }
+  .subtitle {
+    margin: 0 0 1rem; color: var(--ink-dim); font-size: 1.02rem;
+    max-width: 64ch; text-wrap: pretty;
+  }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem;
+    font-size: 0.85rem; color: var(--ink-dim);
+  }
+  .meta-row strong { color: var(--ink); font-weight: 600; }
+
+  .layout {
+    max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 5rem;
+    display: grid; grid-template-columns: 210px minmax(0, 1fr);
+    gap: 2.5rem; align-items: start;
+  }
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+    .rail { display: none; }
+  }
+
+  .rail {
+    position: sticky; top: 1.5rem; display: flex; flex-direction: column;
+    gap: 0.1rem; max-height: calc(100vh - 3rem); overflow-y: auto;
+    padding-right: 0.4rem;
+  }
+  .rail-label {
+    font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 0.45rem;
+  }
+  .rail-label + .rail-label, .rail a + .rail-label { margin-top: 1.1rem; }
+  .rail a {
+    display: flex; gap: 0.5rem; align-items: baseline;
+    padding: 0.3rem 0 0.3rem 0.7rem; font-size: 0.85rem;
+    color: var(--ink-dim); text-decoration: none;
+    border-left: 2px solid var(--line); margin-left: -1px;
+  }
+  .rail a:hover { color: var(--ink); border-left-color: var(--amber); }
+  .rail a .n {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber-ink); font-size: 0.78rem; flex-shrink: 0;
+  }
+
+  main { min-width: 0; }
+
+  .intro { color: var(--ink-dim); max-width: 68ch; margin: 0 0 2rem; }
+  .intro strong { color: var(--ink); }
+  .intro p { margin: 0 0 0.9rem; text-wrap: pretty; }
+
+  .step {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.5rem 1.6rem 1.7rem;
+    margin-bottom: 1.5rem; box-shadow: var(--shadow); scroll-margin-top: 1.5rem;
+  }
+  .step-head {
+    display: flex; align-items: baseline; gap: 0.85rem;
+    margin-bottom: 0.9rem; flex-wrap: wrap;
+  }
+  .step-num {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber); font-size: 1.05rem; font-weight: 600;
+  }
+  .step h2 { margin: 0; font-size: 1.2rem; font-weight: 650; letter-spacing: -0.008em; }
+  .step h3 {
+    margin: 1.6rem 0 0.6rem; font-size: 0.99rem; font-weight: 650;
+    letter-spacing: -0.005em;
+  }
+  .step h3:first-child { margin-top: 0; }
+  .step h4 {
+    margin: 1.1rem 0 0.4rem; font-size: 0.9rem; font-weight: 650;
+    color: var(--ink-dim); letter-spacing: 0.01em;
+  }
+  .context-chip {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--teal); background: var(--teal-bg);
+    border-radius: 999px; padding: 0.18rem 0.65rem; white-space: nowrap;
+  }
+
+  .why, .confirm, .gotcha {
+    display: flex; gap: 0.7rem; border-radius: 0 6px 6px 0;
+    padding: 0.8rem 0.95rem; margin: 0 0 1rem;
+    font-size: 0.92rem; text-wrap: pretty;
+  }
+  .why { background: var(--teal-bg); border-left: 3px solid var(--teal); }
+  .why b { color: var(--teal); font-weight: 700; }
+  .confirm { background: var(--ok-bg); border-left: 3px solid var(--ok); }
+  .confirm b { color: var(--ok); font-weight: 700; }
+  .gotcha { background: var(--warn-bg); border-left: 3px solid var(--warn); }
+  .gotcha b { color: var(--warn); font-weight: 700; }
+
+  p.step-p { margin: 0 0 1rem; text-wrap: pretty; }
+  p.step-p:last-child { margin-bottom: 0; }
+  .step ul, .step ol { margin: 0 0 1rem; padding-left: 1.35rem; }
+  .step li { margin-bottom: 0.45rem; text-wrap: pretty; }
+  .step li:last-child { margin-bottom: 0; }
+  .step ul ul, .step ol ol, .step ul ol { margin: 0.4rem 0 0; }
+
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+    padding: 0.85rem 1rem; margin: 0 0 1rem; overflow-x: auto;
+    font-size: 0.85rem; line-height: 1.6;
+  }
+  pre code { color: inherit; }
+  pre .c { color: var(--code-dim); }
+  pre .ph { color: var(--code-key); }
+  pre.out {
+    background: var(--surface-dim); color: var(--ink); border: 1px solid var(--line);
+  }
+  pre.out .c { color: var(--ink-dim); }
+  code.inline {
+    background: var(--surface-dim); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.87em; word-break: break-word;
+  }
+
+  .tbl-wrap { overflow-x: auto; margin: 0 0 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 460px; }
+  th, td {
+    text-align: left; padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  th {
+    font-size: 0.73rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-dim); font-weight: 600;
+  }
+  td code { font-size: 0.85em; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .diagram {
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.1rem; margin: 0 0 1.2rem;
+  }
+  .dlayer {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 0.75rem 0.85rem; margin-bottom: 0.55rem;
+  }
+  .dlayer:last-child { margin-bottom: 0; }
+  .dlayer-title {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--amber-ink); margin-bottom: 0.5rem;
+  }
+  .dboxes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .dbox {
+    border: 1px solid var(--line); border-radius: 5px;
+    padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--paper);
+  }
+  .dbox b { display: block; font-weight: 650; font-size: 0.82rem; }
+  .dbox span {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; color: var(--ink-dim);
+  }
+  .dbox.accent {
+    border-color: var(--amber);
+    background: color-mix(in srgb, var(--amber) 8%, var(--paper));
+  }
+  .dbox.teal { border-color: var(--teal); background: var(--teal-bg); }
+  .darrow {
+    text-align: center; color: var(--ink-dim); font-size: 0.88rem;
+    margin: 0.15rem 0; font-family: "Cascadia Code", ui-monospace, monospace;
+  }
+
+  /* numbered end-to-end trace */
+  .trace { margin: 0 0 1.2rem; counter-reset: tr; }
+  .trace-item {
+    display: grid; grid-template-columns: 1.7rem minmax(0, 1fr);
+    gap: 0.85rem; padding-bottom: 1rem; position: relative;
+  }
+  .trace-item::before {
+    counter-increment: tr; content: counter(tr);
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.75rem; font-weight: 600; color: var(--amber-ink);
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 50%; width: 1.7rem; height: 1.7rem;
+    display: grid; place-items: center;
+  }
+  .trace-item:not(:last-child)::after {
+    content: ""; position: absolute; left: 0.85rem; top: 1.85rem; bottom: 0.1rem;
+    width: 1px; background: var(--line);
+  }
+  .trace-item > div { padding-top: 0.1rem; font-size: 0.92rem; }
+  .trace-item b { font-weight: 650; }
+  .trace-item .who {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.74rem; color: var(--teal); display: block; margin-bottom: 0.1rem;
+  }
+
+  .glossary { font-size: 0.9rem; }
+  .glossary dt {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-weight: 600; color: var(--amber-ink); margin-top: 0.8rem; font-size: 0.85rem;
+  }
+  .glossary dt:first-child { margin-top: 0; }
+  .glossary dd { margin: 0.15rem 0 0; color: var(--ink); text-wrap: pretty; }
+
+  footer.finish {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--amber); border-radius: 0 10px 10px 0;
+    padding: 1.3rem 1.5rem; box-shadow: var(--shadow); font-size: 0.97rem;
+  }
+  footer.finish .eyebrow { margin-bottom: 0.6rem; }
+  footer.finish p { margin: 0 0 0.8rem; text-wrap: pretty; }
+  footer.finish p:last-child { margin-bottom: 0; }
+
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  /* ---- additions for the AWS course ---------------------------------- */
+
+  /* Section-level variants of the three callouts: they hold whole sections
+     (headings, tables, code) rather than a single sentence. */
+  .why.section, .confirm.section, .gotcha.section {
+    display: block; border-radius: 0 8px 8px 0;
+    padding: 1.15rem 1.3rem 1.25rem; margin: 0 0 1.4rem; font-size: 1rem;
+  }
+  .why.section { background: color-mix(in srgb, var(--teal-bg) 60%, var(--surface)); }
+  .confirm.section { background: color-mix(in srgb, var(--ok-bg) 55%, var(--surface)); }
+  .gotcha.section { background: color-mix(in srgb, var(--warn-bg) 55%, var(--surface)); }
+  .section > h3:first-child { margin-top: 0; }
+  .why.section > h3:first-child { color: var(--teal); }
+  .confirm.section > h3:first-child { color: var(--ok); }
+  .gotcha.section > h3:first-child { color: var(--warn); }
+  .section > *:last-child { margin-bottom: 0; }
+  .section pre.out { background: var(--surface); }
+
+  .step h4 { color: var(--ink); font-size: 0.95rem; }
+
+  .modnav {
+    font-size: 0.85rem; color: var(--ink-dim); margin: 0 0 1.2rem;
+    padding-bottom: 0.8rem; border-bottom: 1px solid var(--line);
+  }
+
+  blockquote {
+    margin: 0 0 1rem; padding: 0.1rem 0 0.1rem 1rem;
+    border-left: 3px solid var(--line); color: var(--ink-dim);
+  }
+  blockquote p.step-p:last-child { margin-bottom: 0; }
+
+  .step li > pre, .step li > .tbl-wrap { margin-top: 0.5rem; }
+
+  .pager {
+    display: flex; flex-wrap: wrap; gap: 0.75rem 1rem;
+    justify-content: space-between; margin-top: 1.5rem;
+    font-size: 0.9rem;
+  }
+  .pager a { text-decoration: none; }
+  .pager a:hover { text-decoration: underline; }
+
+  .rail a.home { border-left-color: var(--amber); color: var(--ink); }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="eyebrow">AWS &middot; EKS course &middot; Part II</span>
+    <h1>Platform</h1>
+    <p class="subtitle">Add-ons and the storage blocker, DNS and certificates, Karpenter for nodes on demand, and secrets that never touch git.</p>
+    <div class="meta-row">
+      <span><strong>Modules:</strong> 4&ndash;7</span>
+      <span><strong>Region:</strong> us-east-1</span>
+      <span><strong>Cluster:</strong> streaming</span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+<nav class="rail">
+  <div class="rail-label">Part II &mdash; Platform</div>
+  <a href="#m04"><span class="n">04</span> Add-ons and the storage blocker</a>
+  <a href="#m05"><span class="n">05</span> DNS, certificates, load balancer controller</a>
+  <a href="#m06"><span class="n">06</span> Karpenter</a>
+  <a href="#m07"><span class="n">07</span> Secrets</a>
+  <div class="rail-label">Course</div>
+  <a href="index.html" class="home"><span class="n">&#8617;</span> Course index</a>
+  <a href="part-1-foundations.html"><span class="n">I</span> Foundations</a>
+  <a href="part-3-data-layer.html"><span class="n">III</span> Data layer</a>
+  <a href="part-4-application.html"><span class="n">IV</span> The application</a>
+  <a href="part-5-elastic.html"><span class="n">V</span> Elastic and automated</a>
+</nav>
+
+<main>
+<section class="step" id="m04">
+  <div class="step-head">
+    <span class="step-num">04</span>
+    <h2>Add-ons and the storage blocker</h2>
+  </div>
+<p class="modnav"><em>Part II &#8212; Platform. Previous: <a href="part-1-foundations.html#m03">Module 3</a>. Next: <a href="part-2-platform.html#m05">Module 5</a>.</em> ---</p>
+<h3 id="m04-what-youre-building">What you're building</h3>
+<p class="step-p">A cluster that can actually run things. Right now you have nodes and an API server. By the end of this module the four core add-ons are confirmed healthy, the EBS CSI driver has an IAM role that lets it create disks, <code class="inline">metrics-server</code> is answering <code class="inline">kubectl top</code>, and &#8212; the part that will otherwise stop you dead in <a href="part-3-data-layer.html#m10">Module 10</a> &#8212; a <strong>gp3 StorageClass marked default, with gp2's default flag removed</strong>.</p>
+<p class="step-p">Nothing in this module is visible from the outside. It is entirely plumbing. Do it properly now and the next twelve modules work; skip it and you will debug a <code class="inline">Pending</code> Kafka pod for an afternoon.</p>
+<div class="why section">
+<h3 id="m04-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m04-the-add-ons-are-a-dependency-chain-not-a-checklist">The add-ons are a dependency chain, not a checklist</h4>
+<p class="step-p">EKS gives you a control plane. It does not give you a working pod network, in-cluster DNS, Service routing, or the ability to attach a disk. Those are <em>add-ons</em>, and they layer strictly:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Order</th>
+<th>Add-on</th>
+<th>What it does</th>
+<th>Depends on</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>VPC CNI</strong> (<code class="inline">vpc-cni</code>)</td>
+<td>Gives every pod a real IP address from your VPC subnets</td>
+<td>Nothing. Nothing else works without it.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><strong>CoreDNS</strong> (<code class="inline">coredns</code>)</td>
+<td>Resolves <code class="inline">upload-api.streaming.svc.cluster.local</code></td>
+<td>Runs as pods, so it needs the CNI first</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>kube-proxy</strong> (<code class="inline">kube-proxy</code>)</td>
+<td>Programs iptables/nftables so Service ClusterIPs route</td>
+<td>CNI</td>
+</tr>
+<tr>
+<td>4</td>
+<td><strong>Pod Identity Agent</strong> (<code class="inline">eks-pod-identity-agent</code>)</td>
+<td>Hands AWS credentials to pods that ask</td>
+<td>CNI</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>EBS CSI driver</strong> (<code class="inline">aws-ebs-csi-driver</code>)</td>
+<td>Creates and attaches EBS volumes for PVCs</td>
+<td>Pod Identity (or IRSA) for its IAM permissions</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">That order is why a broken CNI presents as "CoreDNS is CrashLooping" and a broken CoreDNS presents as "every service in the cluster can't reach the database". When something is wrong, check the chain from the top.</p>
+<p class="step-p"><strong>The VPC CNI is the one that shapes your network design.</strong> Unlike Calico on the kubeadm box in <code class="inline">k8s/cluster/</code>, which gave pods addresses from an overlay network invisible to the rest of the LAN, the VPC CNI assigns each pod a <strong>secondary IP on the node's ENI</strong>, taken from the same subnet the node sits in. Pods are first-class VPC citizens: a security group rule can target one, an ALB can send traffic straight to one, and a <code class="inline">t3.medium</code> can hold at most 17 pods because that is how many secondary IPs three ENIs give you. This is also why <a href="part-1-foundations.html#m02">Module 2</a> made the private subnets <code class="inline">/19</code> instead of something tidy &#8212; every pod eats a real VPC address.</p>
+<p class="step-p"><code class="inline">eksctl create cluster</code> in <a href="part-1-foundations.html#m03">Module 3</a> installed all five. Your job here is to confirm that, not to install them, and then to fix the one thing EKS does not do for you.</p>
+<h4 id="m04-pod-identity-vs-irsa-you-will-use-both-deliberately">Pod Identity vs IRSA &#8212; you will use both, deliberately</h4>
+<p class="step-p">Two mechanisms exist for giving a pod AWS credentials.</p>
+<p class="step-p"><strong>IRSA</strong> (IAM Roles for Service Accounts) is the older one: the cluster gets an OIDC identity provider, each IAM role's <em>trust policy</em> names that provider plus a specific <code class="inline">namespace:serviceaccount</code>, and the pod exchanges a projected token for credentials. It works everywhere but the trust policy is per-cluster, so roles are not reusable and the JSON is fiddly.</p>
+<p class="step-p"><strong>EKS Pod Identity</strong> is the current answer: no OIDC provider, no trust-policy editing. The role trusts the service principal <code class="inline">pods.eks.amazonaws.com</code>, and you bind role-to-service-account with a plain AWS API call (<code class="inline">aws eks create-pod-identity-association</code>). A DaemonSet on each node serves the credentials.</p>
+<p class="step-p">Use Pod Identity everywhere you can. Two things force IRSA anyway:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Component</th>
+<th>Mechanism</th>
+<th>Reason</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>EBS CSI driver</td>
+<td><strong>Pod Identity</strong></td>
+<td>Natively supported by the managed add-on</td>
+</tr>
+<tr>
+<td>External Secrets Operator (<a href="part-2-platform.html#m07">Module 7</a>)</td>
+<td><strong>Pod Identity</strong></td>
+<td>Supported, and it lets you delete the <code class="inline">auth:</code> block entirely</td>
+</tr>
+<tr>
+<td>ExternalDNS (<a href="part-2-platform.html#m05">Module 5</a>)</td>
+<td><strong>Pod Identity</strong></td>
+<td>Supported</td>
+</tr>
+<tr>
+<td>AWS Load Balancer Controller (<a href="part-2-platform.html#m05">Module 5</a>)</td>
+<td><strong>IRSA</strong></td>
+<td>Does not support Pod Identity</td>
+</tr>
+<tr>
+<td>Karpenter (<a href="part-2-platform.html#m06">Module 6</a>)</td>
+<td><strong>IRSA</strong></td>
+<td>The official CloudFormation getting-started path wires IRSA</td>
+</tr>
+<tr>
+<td><code class="inline">upload-api</code>, <code class="inline">transcode-worker</code> (<a href="part-4-application.html#m11">Module 11</a>)</td>
+<td><strong>Pod Identity</strong></td>
+<td>Your own workloads. Simplest thing that works.</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">That mixture is a compatibility fact, not a preference, and it is why <code class="inline">iam.withOIDC: true</code> is in the cluster config even though Pod Identity is the modern default. If you find yourself wondering "which one does this thing use", this table is the answer.</p>
+<h4 id="m04-the-storage-blocker">The storage blocker</h4>
+<p class="step-p"><strong>A fresh EKS cluster's default StorageClass is gp2. Nothing in <code class="inline">k8s/cluster/</code> provisions storage at all.</strong> Compose used named Docker volumes &#8212; <code class="inline">postgres-data</code>, <code class="inline">minio-data</code>, <code class="inline">kafka-data</code> &#8212; which are just directories on the host, created implicitly, never sized, never thought about. The kubeadm cluster never got as far as needing a PVC. So this is the first time anyone on this project has had to answer the question "where does a stateful pod's disk come from".</p>
+<p class="step-p">Two things go wrong if you leave the default alone.</p>
+<p class="step-p"><strong>First, gp2 is the wrong volume type.</strong> It costs $0.10/GiB-month against gp3's $0.08 &#8212; 25% more &#8212; and its IOPS are a function of size: 3 IOPS per GiB, so the 20 GiB volume Kafka gets in <a href="part-3-data-layer.html#m10">Module 10</a> is capped at <strong>100 IOPS</strong>. gp3 gives you 3000 IOPS and 125 MB/s at <em>any</em> size, included in the price. Kafka does small synchronous writes to its log segments; 100 IOPS is a number you will feel, as producer latency spikes that look like a network problem.</p>
+<p class="step-p"><strong>Second, and worse, <code class="inline">volumeBindingMode</code>.</strong> The gp2 class EKS ships uses <code class="inline">Immediate</code>, which means the EBS volume is created the moment the PVC is created &#8212; before the scheduler has picked a node. <strong>EBS volumes live in exactly one Availability Zone and cannot be attached across AZs.</strong> Your cluster spans three. So the sequence is:</p>
+<ol>
+<li>Strimzi creates a PVC for the Kafka broker.</li>
+<li>The provisioner immediately creates a 20 GiB volume in, say, <code class="inline">us-east-1c</code>.</li>
+<li>The scheduler looks for a node for the Kafka pod and finds a good one in <code class="inline">us-east-1a</code>.</li>
+<li>The volume cannot follow. The pod is unschedulable <strong>forever</strong>, with <code class="inline">node(s) had volume node affinity conflict</code>.</li>
+</ol>
+<p class="step-p"><code class="inline">WaitForFirstConsumer</code> inverts the order: the PVC stays <code class="inline">Pending</code> until a pod that uses it is scheduled, <em>then</em> the volume is created in the AZ the scheduler chose. One line, and the entire failure mode disappears. This is the single most common EKS storage failure and it is fully preventable.</p>
+<h4 id="m04-what-a-pending-pvc-actually-looks-like">What a <code class="inline">Pending</code> PVC actually looks like</h4>
+<p class="step-p">You will see this at least once, so learn to read it now rather than at 11pm in Module 10.</p>
+<pre class="out"><code>$ kubectl get pvc -n kafka
+NAME                          STATUS    VOLUME   CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+data-0-streaming-dual-0       Pending                                                     4m</code></pre>
+<p class="step-p">An empty <code class="inline">STORAGECLASS</code> column is the tell: no class was requested and there is no default, so nothing is even trying to provision it. The pod above it says <code class="inline">pod has unbound immediate PersistentVolumeClaims</code> and Strimzi gives you no useful signal at all &#8212; the operator is happy, the Kafka CR looks fine, and one pod sits there.</p>
+<p class="step-p"><code class="inline">kubectl describe</code> is where the truth lives. The <strong>Events</strong> block at the bottom is the part you read:</p>
+<pre class="out"><code>$ kubectl describe pvc data-0-streaming-dual-0 -n kafka
+...
+Events:
+  Type     Reason              Age   From                         Message
+  ----     ------              ----  ----                         -------
+  Warning  ProvisioningFailed  30s   persistentvolume-controller  storageclass.storage.k8s.io "" not found</code></pre>
+<p class="step-p">Three messages, three different problems:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Event message</th>
+<th>Means</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">storageclass.storage.k8s.io "" not found</code></td>
+<td>No default StorageClass. This module fixes it.</td>
+</tr>
+<tr>
+<td><code class="inline">waiting for first consumer to be created before binding</code></td>
+<td><strong>Normal.</strong> <code class="inline">WaitForFirstConsumer</code> doing its job. Look at the <em>pod</em>, not the PVC.</td>
+</tr>
+<tr>
+<td><code class="inline">could not create volume in EC2: UnauthorizedOperation</code></td>
+<td>EBS CSI driver has no IAM permissions. See the Pod Identity step below.</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">The second one catches people constantly. A <code class="inline">Pending</code> PVC with that message is not broken &#8212; it is waiting for you to fix whatever is stopping the pod from being scheduled, which is usually something else entirely.</p>
+</div>
+<h3 id="m04-do-it">Do it</h3>
+<p class="step-p">Everything below assumes <code class="inline">AWS_PROFILE=linkify-streaming</code> and <code class="inline">AWS_REGION=us-east-1</code> are exported, and <code class="inline">kubectl</code> points at the <code class="inline">streaming</code> cluster.</p>
+<h4 id="m04-41-confirm-the-core-add-ons">4.1 &#8212; Confirm the core add-ons</h4>
+<pre><code>aws eks list-addons --cluster-name streaming</code></pre>
+<pre class="out"><code>{
+    "addons": [
+        "aws-ebs-csi-driver",
+        "coredns",
+        "eks-pod-identity-agent",
+        "kube-proxy",
+        "vpc-cni"
+    ]
+}</code></pre>
+<p class="step-p">If any of those five is missing, <code class="inline">eksctl create cluster</code> did not do what Module 3 said it would &#8212; go back and re-read the <code class="inline">addons:</code> block in <code class="inline">cluster.yaml</code> before continuing.</p>
+<p class="step-p">Now check they are actually <em>running</em>, not just registered:</p>
+<pre><code>kubectl get pods -n kube-system</code></pre>
+<p class="step-p">Every pod <code class="inline">Running</code>, every <code class="inline">READY</code> column showing all containers up. <code class="inline">aws-node</code> (the CNI) and <code class="inline">kube-proxy</code> and <code class="inline">eks-pod-identity-agent</code> are DaemonSets, so you get one of each per node; <code class="inline">coredns</code> is a 2-replica Deployment; <code class="inline">ebs-csi-node</code> is a DaemonSet and <code class="inline">ebs-csi-controller</code> a Deployment.</p>
+<p class="step-p">Add-ons have versions, and the right version depends on your Kubernetes version. Rather than pasting a version here that will be stale by the time you read it, ask:</p>
+<pre><code>aws eks describe-addon-versions \
+  --addon-name aws-ebs-csi-driver \
+  --kubernetes-version 1.35 \
+  --query 'addons[0].addonVersions[?compatibilities[0].defaultVersion==`true`].addonVersion' \
+  --output text</code></pre>
+<p class="step-p">Compare against what you have (<code class="inline">aws eks describe-addon --cluster-name streaming --addon-name aws-ebs-csi-driver --query 'addon.addonVersion'</code>). If yours is older, that is fine for now &#8212; the default version is chosen by AWS as a safe one, not the newest. Do not chase versions in the middle of a build.</p>
+<h4 id="m04-42-give-the-ebs-csi-driver-an-iam-role">4.2 &#8212; Give the EBS CSI driver an IAM role</h4>
+<p class="step-p">The driver's controller pod calls <code class="inline">ec2:CreateVolume</code>, <code class="inline">ec2:AttachVolume</code>, <code class="inline">ec2:DescribeVolumes</code> and friends. Out of the box it has no credentials at all. Everything below silently works right up until the first PVC, at which point you get <code class="inline">UnauthorizedOperation</code>.</p>
+<p class="step-p">Create the role with a <strong>Pod Identity</strong> trust policy &#8212; note the principal is <code class="inline">pods.eks.amazonaws.com</code>, not an OIDC provider:</p>
+<pre><code>ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+cat &gt; /tmp/pod-identity-trust.json &lt;&lt;'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "Service": "pods.eks.amazonaws.com" },
+      "Action": ["sts:AssumeRole", "sts:TagSession"]
+    }
+  ]
+}
+EOF
+
+aws iam create-role \
+  --role-name streaming-ebs-csi-driver \
+  --assume-role-policy-document file:///tmp/pod-identity-trust.json
+
+aws iam attach-role-policy \
+  --role-name streaming-ebs-csi-driver \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy</code></pre>
+<p class="step-p"><code class="inline">sts:TagSession</code> in the trust policy is required &#8212; Pod Identity tags the session with the cluster and namespace. Leave it out and the association is created successfully but credential vending fails with an unhelpful <code class="inline">AccessDenied</code>.</p>
+<p class="step-p">Keep that trust policy file. Modules <a href="part-2-platform.html#m05">5</a> and <a href="part-2-platform.html#m07">7</a> reuse it verbatim.</p>
+<p class="step-p">Bind the role to the driver's ServiceAccount:</p>
+<pre><code>aws eks create-pod-identity-association \
+  --cluster-name streaming \
+  --namespace kube-system \
+  --service-account ebs-csi-controller-sa \
+  --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/streaming-ebs-csi-driver"</code></pre>
+<p class="step-p">The service account name is <code class="inline">ebs-csi-controller-sa</code>. It is created by the add-on; you do not make it. Getting the name wrong produces no error &#8212; the association is created, it just never matches a pod.</p>
+<p class="step-p">Existing pods do not pick up a new association. Restart the controller:</p>
+<pre><code>kubectl -n kube-system rollout restart deploy/ebs-csi-controller
+kubectl -n kube-system rollout status deploy/ebs-csi-controller</code></pre>
+<p class="step-p">Confirm the association exists and points where you think:</p>
+<pre><code>aws eks list-pod-identity-associations --cluster-name streaming \
+  --query 'associations[].[namespace,serviceAccount,roleArn]' --output table</code></pre>
+<h4 id="m04-43-gp3-as-default-gp2-demoted">4.3 &#8212; gp3 as default, gp2 demoted</h4>
+<p class="step-p">The manifest is in the repo at <code class="inline">k8s/infra/storageclass-gp3.yaml</code>:</p>
+<pre><code>apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+<span class="c"># Do not create the EBS volume until a pod that wants it has been scheduled.</span>
+<span class="c"># EBS volumes are single-AZ; binding early pins the pod to whichever AZ the</span>
+<span class="c"># volume happened to land in.</span>
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+parameters:
+  type: gp3
+  iops: "3000"          <span class="c"># free gp3 baseline</span>
+  throughput: "125"     <span class="c"># free gp3 baseline, MB/s</span>
+  encrypted: "true"
+  fsType: ext4</code></pre>
+<p class="step-p">Line by line, the choices that matter:</p>
+<ul>
+<li><strong><code class="inline">volumeBindingMode: WaitForFirstConsumer</code></strong> &#8212; the AZ fix described above. Not optional.</li>
+<li><strong><code class="inline">iops: 3000</code> / <code class="inline">throughput: 125</code></strong> &#8212; the <em>free</em> gp3 baseline. You pay $0.08/GiB-month for capacity and nothing for these. Raising either bills separately, so do not raise them without a measured reason.</li>
+<li><strong><code class="inline">allowVolumeExpansion: true</code></strong> &#8212; lets you grow a PVC later by editing it. Costs nothing to enable, impossible to add retroactively to a bound volume's class without recreating the class.</li>
+<li><strong><code class="inline">reclaimPolicy: Delete</code></strong> &#8212; deleting the PVC deletes the EBS volume. Correct for a learning cluster; it is also how you avoid paying for orphaned volumes forever. Note that Strimzi's <code class="inline">deleteClaim: false</code> keeps the <em>PVC</em> around when the Kafka cluster is deleted, so this policy does not silently eat your Kafka data.</li>
+<li><strong><code class="inline">encrypted: "true"</code></strong> &#8212; EBS encryption with the account's default KMS key. Free, and there is no reason to say no.</li>
+</ul>
+<p class="step-p">Apply it, and take gp2's crown away:</p>
+<pre><code>kubectl patch storageclass gp2 \
+  -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+
+kubectl apply -f k8s/infra/storageclass-gp3.yaml</code></pre>
+<p class="step-p">Order matters slightly: patch gp2 first. If both classes claim the default at once, Kubernetes picks one arbitrarily and a PVC created in that window can land on gp2.</p>
+<h4 id="m04-44-metrics-server">4.4 &#8212; metrics-server</h4>
+<p class="step-p"><code class="inline">kubectl top</code> needs it, and so does any future HorizontalPodAutoscaler. It is a single small Deployment.</p>
+<pre><code>kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+kubectl -n kube-system rollout status deploy/metrics-server</code></pre>
+<p class="step-p">If you would rather pin a version than track <code class="inline">latest</code> &#8212; reasonable, since this is the one URL in this module that moves under you &#8212; check what the current release is and substitute it:</p>
+<pre><code>curl -fsSL https://api.github.com/repos/kubernetes-sigs/metrics-server/releases/latest \
+  | grep '"tag_name"'</code></pre>
+<p class="step-p">On EKS this works with no arguments. You will find a great deal of internet advice telling you to add <code class="inline">--kubelet-insecure-tls</code>; that is for kubeadm clusters like the one in <code class="inline">k8s/cluster/</code>, whose kubelets have self-signed serving certificates. The EKS-optimized AMI's kubelet has a properly signed cert. <strong>If you find yourself adding <code class="inline">--kubelet-insecure-tls</code> on EKS, you are papering over a different problem</strong> &#8212; almost always a security group that is blocking port 10250 from the control plane to the nodes.</p>
+<p class="step-p">Metrics take about 30 seconds to populate after the pod is Ready.</p>
+<div class="confirm section">
+<h3 id="m04-verify">Verify</h3>
+<p class="step-p">Four checks. All four must pass before <a href="part-2-platform.html#m05">Module 5</a>.</p>
+<p class="step-p"><strong>1. Exactly one default StorageClass, and it is gp3.</strong></p>
+<pre><code>kubectl get storageclass</code></pre>
+<pre class="out"><code>NAME            PROVISIONER             RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
+gp2             kubernetes.io/aws-ebs   Delete          WaitForFirstConsumer   false                  41m
+gp3 (default)   ebs.csi.aws.com         Delete          WaitForFirstConsumer   true                   30s</code></pre>
+<p class="step-p"><code class="inline">(default)</code> appears on gp3 and <strong>nowhere else</strong>. If it appears twice, or not at all, stop here &#8212; everything downstream that needs a disk will fail in a way that does not mention StorageClasses.</p>
+<p class="step-p"><strong>2. A PVC actually provisions.</strong> The StorageClass existing does not prove the driver works. Prove it:</p>
+<pre><code>kubectl apply -f - &lt;&lt;'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-smoke-test
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: storage-smoke-test
+spec:
+  containers:
+    - name: writer
+      image: public.ecr.aws/docker/library/busybox:1.36
+      command: ["sh", "-c", "echo ok &gt; /data/proof &amp;&amp; sleep 3600"]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: storage-smoke-test
+EOF
+
+kubectl wait --for=condition=Ready pod/storage-smoke-test --timeout=180s
+kubectl get pvc storage-smoke-test</code></pre>
+<pre class="out"><code>NAME                 STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+storage-smoke-test   Bound    pvc-3f1c9a02-6d7e-4f8a-9b21-0c5d4e7a1b33   1Gi        RWO            gp3            48s</code></pre>
+<p class="step-p"><code class="inline">Bound</code>, capacity <code class="inline">1Gi</code>, class <code class="inline">gp3</code>. Note that it stayed <code class="inline">Pending</code> until the pod appeared &#8212; that is <code class="inline">WaitForFirstConsumer</code> working, not a fault.</p>
+<p class="step-p">Clean up, or you pay $0.08/month forever for a 1 GiB volume you forgot:</p>
+<pre><code>kubectl delete pod storage-smoke-test
+kubectl delete pvc storage-smoke-test</code></pre>
+<p class="step-p"><strong>3. <code class="inline">kubectl top</code> returns numbers.</strong></p>
+<pre><code>kubectl top nodes</code></pre>
+<pre class="out"><code>NAME                          CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
+ip-10-0-33-14.ec2.internal    58m          2%     742Mi           19%
+ip-10-0-66-201.ec2.internal   71m          3%     801Mi           21%</code></pre>
+<p class="step-p"><strong>4. Pod Identity association is bound.</strong></p>
+<pre><code>aws eks list-pod-identity-associations --cluster-name streaming \
+  --query 'associations[?serviceAccount==`ebs-csi-controller-sa`]' --output table</code></pre>
+<p class="step-p">One row. If check 2 passed, this is already proven &#8212; the driver could not have created a volume without it.</p>
+</div>
+<div class="gotcha section">
+<h3 id="m04-what-breaks">What breaks</h3>
+<p class="step-p">Ordered by how often each actually happens.</p>
+<h4 id="m04-1-pvc-stuck-pending-storageclass-column-empty">1. PVC stuck <code class="inline">Pending</code>, <code class="inline">STORAGECLASS</code> column empty</h4>
+<p class="step-p">No default class, or two of them. By far the most common.</p>
+<pre><code>kubectl get storageclass
+kubectl describe pvc <span class="ph">&lt;name&gt;</span> -n <span class="ph">&lt;namespace&gt;</span> | tail -20</code></pre>
+<p class="step-p">If <code class="inline">(default)</code> is on neither class, re-apply <code class="inline">k8s/infra/storageclass-gp3.yaml</code>. If it is on both, patch gp2 again &#8212; an EKS add-on update can restore it. Note that an already-created PVC does <strong>not</strong> retroactively pick up a newly created default class; delete and recreate the PVC (and for Strimzi, delete the pod so the operator recreates its claim).</p>
+<h4 id="m04-2-nodes-had-volume-node-affinity-conflict">2. <code class="inline">node(s) had volume node affinity conflict</code></h4>
+<p class="step-p">The AZ mismatch. It means a volume was bound before its pod was scheduled, which means something used a class with <code class="inline">volumeBindingMode: Immediate</code>.</p>
+<pre><code>kubectl describe pod <span class="ph">&lt;name&gt;</span> -n <span class="ph">&lt;namespace&gt;</span> | grep -A5 Events
+kubectl get pv <span class="ph">&lt;pv-name&gt;</span> -o jsonpath='{.spec.nodeAffinity}' | jq</code></pre>
+<p class="step-p">The <code class="inline">nodeAffinity</code> block names one AZ. Compare with <code class="inline">kubectl get nodes -L topology.kubernetes.io/zone</code>. There is no fix for the existing volume &#8212; delete the PVC and the pod, confirm the class the workload requests is <code class="inline">gp3</code>, and let it re-provision. If a chart hardcodes <code class="inline">gp2</code>, override it; do not "fix" gp2 by editing its binding mode, because a StorageClass's <code class="inline">volumeBindingMode</code> is immutable and the patch will be rejected.</p>
+<h4 id="m04-3-could-not-create-volume-in-ec2-unauthorizedoperation">3. <code class="inline">could not create volume in EC2: UnauthorizedOperation</code></h4>
+<p class="step-p">The EBS CSI driver has no IAM permissions, or has them but did not restart to pick them up.</p>
+<pre><code>kubectl -n kube-system logs deploy/ebs-csi-controller -c csi-provisioner --tail=50
+aws eks list-pod-identity-associations --cluster-name streaming</code></pre>
+<p class="step-p">Check the association's <code class="inline">serviceAccount</code> is exactly <code class="inline">ebs-csi-controller-sa</code> and the namespace is <code class="inline">kube-system</code>. Then <code class="inline">kubectl -n kube-system rollout restart deploy/ebs-csi-controller</code> &#8212; an association created after the pod started does nothing until the pod is recreated.</p>
+<h4 id="m04-4-kubectl-top-says-metrics-api-not-available">4. <code class="inline">kubectl top</code> says <code class="inline">Metrics API not available</code></h4>
+<pre><code>kubectl -n kube-system get pods -l k8s-app=metrics-server
+kubectl -n kube-system logs deploy/metrics-server --tail=30
+kubectl get apiservice v1beta1.metrics.k8s.io -o yaml | grep -A5 status</code></pre>
+<p class="step-p">If the log shows TLS or timeout errors reaching port 10250 on the nodes, that is a security group problem between the control plane and the node group, not a metrics-server problem. Wait 60 seconds after the pod becomes Ready before deciding it is broken &#8212; the first scrape has not happened yet.</p>
+<h4 id="m04-5-coredns-pods-pending">5. CoreDNS pods <code class="inline">Pending</code></h4>
+<p class="step-p">CoreDNS has a hard anti-affinity that prevents two replicas on the same node, so a single-node cluster leaves one replica <code class="inline">Pending</code> permanently. That is cosmetic. If <strong>both</strong> are Pending, you have no schedulable nodes at all:</p>
+<pre><code>kubectl get nodes
+kubectl -n kube-system describe pod -l k8s-app=kube-dns | grep -A10 Events</code></pre>
+<h4 id="m04-6-pods-stuck-containercreating-events-mention-failed-to-assign-an-ip-address">6. Pods stuck <code class="inline">ContainerCreating</code>, events mention <code class="inline">failed to assign an IP address</code></h4>
+<p class="step-p">VPC CNI IP exhaustion: the private subnet has run out of addresses, or the instance type's ENI limit is reached.</p>
+<pre><code>kubectl describe pod <span class="ph">&lt;name&gt;</span> -n <span class="ph">&lt;namespace&gt;</span> | grep -A10 Events
+kubectl -n kube-system logs -l k8s-app=aws-node --tail=50
+aws ec2 describe-subnets --filters "Name=tag:kubernetes.io/role/internal-elb,Values=1" \
+  --query 'Subnets[].[SubnetId,AvailableIpAddressCount]' --output table</code></pre>
+<p class="step-p">If <code class="inline">AvailableIpAddressCount</code> is healthy in the hundreds, it is the per-instance ENI limit instead &#8212; a <code class="inline">t3.medium</code> tops out around 17 pods including DaemonSets. That is a node-size problem, and <a href="part-2-platform.html#m06">Module 6</a> is where you get more nodes.</p>
+<p class="step-p"><strong>Next:</strong> <a href="part-2-platform.html#m05">Module 5 &#8212; DNS, certificates, load balancer controller</a>.</p>
+</div>
+</section>
+
+<section class="step" id="m05">
+  <div class="step-head">
+    <span class="step-num">05</span>
+    <h2>DNS, certificates, load balancer controller</h2>
+  </div>
+<p class="modnav"><em>Part II &#8212; Platform. Previous: <a href="part-2-platform.html#m04">Module 4</a>. Next: <a href="part-2-platform.html#m06">Module 6</a>.</em> ---</p>
+<h3 id="m05-what-youre-building">What you're building</h3>
+<p class="step-p">A real hostname with a real certificate, and the two controllers that will use them. Concretely: a Route 53 hosted zone for <code class="inline">k8s.linkifysolutions.com</code> delegated from the parent domain, one ACM wildcard certificate for <code class="inline">*.k8s.linkifysolutions.com</code> in <code class="inline">us-east-1</code>, the AWS Load Balancer Controller (so a Kubernetes <code class="inline">Ingress</code> turns into an ALB), and ExternalDNS (so that ALB gets a DNS record without anyone opening the console).</p>
+<p class="step-p">At the end of this module nothing is served yet &#8212; there is no Ingress until <a href="part-4-application.html#m12">Module 12</a>. What you have is the machinery that makes Module 12 a five-line YAML file instead of an afternoon of clicking.</p>
+<p class="step-p">One step here needs a human who is not you: adding the NS records at the parent zone. Read the "Do it" section, find out who that is, and ask them early.</p>
+<div class="why section">
+<h3 id="m05-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m05-delegate-a-subdomain-do-not-migrate-the-zone">Delegate a subdomain; do not migrate the zone</h4>
+<p class="step-p">Linkify owns <code class="inline">linkifysolutions.com</code>, and its DNS lives with the existing provider, serving production records for things that have nothing to do with this project. You need AWS-side DNS so that ExternalDNS and ACM can create records automatically. There are two ways to get it:</p>
+<p class="step-p"><strong>Move the whole zone to Route 53.</strong> Every existing record has to be recreated correctly, and a mistake takes down the company's website. No.</p>
+<p class="step-p"><strong>Delegate one subdomain.</strong> You create a Route 53 hosted zone for <code class="inline">k8s.linkifysolutions.com</code>. Route 53 gives you four nameservers. Someone adds a single <code class="inline">NS</code> record set at the parent zone saying "for anything under <code class="inline">k8s</code>, go ask those four". From then on, Route 53 is authoritative for the subtree and you can do whatever you want inside it without ever touching the parent again.</p>
+<p class="step-p">That is one record, added once, permanently. It is the smallest possible blast radius, and it is why every hostname in this course sits under <code class="inline">.k8s.</code>.</p>
+<p class="step-p"><strong>Delegation is a one-time change that someone with access to <code class="inline">linkifysolutions.com</code>'s DNS must make.</strong> You probably do not have that access. Ask before you need it, not after &#8212; and note that when it does happen, propagation is on the order of <strong>minutes, not hours</strong>. The parent zone's NS record set has a TTL (often 300s&#8211;3600s), and resolvers that have never looked up <code class="inline">k8s.linkifysolutions.com</code> before have nothing stale to cache. If it is not resolving after 15 minutes, something is wrong with the record &#8212; do not sit and wait for a day.</p>
+<h4 id="m05-one-certificate-two-consumers-one-region">One certificate, two consumers, one region</h4>
+<p class="step-p">You need TLS in two places: the ALB in front of <code class="inline">stream.k8s.linkifysolutions.com</code>, and CloudFront in front of <code class="inline">cdn.k8s.linkifysolutions.com</code> (<a href="part-3-data-layer.html#m09">Module 9</a>).</p>
+<p class="step-p">A single wildcard certificate for <code class="inline">*.k8s.linkifysolutions.com</code> covers both names, plus <code class="inline">rtmp.</code> and anything else you add later. Request it <strong>in <code class="inline">us-east-1</code></strong> and you are done.</p>
+<p class="step-p">The region matters, and it is the fact people get wrong. <strong>ACM certificates are regional, and CloudFront can only use certificates from <code class="inline">us-east-1</code>.</strong> CloudFront is a global service whose control plane lives in <code class="inline">us-east-1</code>; a certificate in <code class="inline">eu-west-1</code> is simply not visible to it. An ALB, by contrast, needs a certificate in <em>its own</em> region.</p>
+<p class="step-p">This course puts everything in <code class="inline">us-east-1</code>, which means the two requirements collapse into one: <strong>one <code class="inline">us-east-1</code> wildcard certificate serves both the ALB and CloudFront.</strong> Had the cluster been in, say, <code class="inline">ca-central-1</code>, you would need two certificates &#8212; one in <code class="inline">ca-central-1</code> for the ALB and a second in <code class="inline">us-east-1</code> for CloudFront &#8212; each with its own validation records. That is a genuine reason <code class="inline">us-east-1</code> was chosen back in <a href="part-1-foundations.html#m01">Module 1</a>.</p>
+<p class="step-p"><strong>DNS validation, not email.</strong> ACM gives you a CNAME to publish; once it sees it, the certificate issues. Crucially, it keeps checking, which is how <strong>renewal is automatic and permanent</strong> &#8212; as long as that CNAME stays in the zone, ACM renews the certificate every year with zero human involvement. Email validation requires a human to click a link every time and is a scheduled outage waiting to happen.</p>
+<h4 id="m05-the-explicit-decision-acm-not-cert-manager">The explicit decision: ACM, not cert-manager</h4>
+<p class="step-p">If you have used Kubernetes before, your instinct will be to install cert-manager. Do not. This is a considered decision, not an omission.</p>
+<p class="step-p"><strong>Use ACM because:</strong></p>
+<ul>
+<li>ACM certificates are <strong>free</strong>. Not "free tier" &#8212; free, permanently, for use with AWS services.</li>
+<li>They <strong>renew themselves</strong>. There is no controller to keep alive, no <code class="inline">Certificate</code> resource to go stale, no 3am alert about an expiring secret.</li>
+<li>TLS terminates <strong>at the ALB and at CloudFront</strong>, which is where the traffic already arrives. The pods never see TLS, never mount a certificate, never need reloading when one rotates. <code class="inline">web</code> and <code class="inline">upload-api</code> keep speaking plain HTTP on port 8000 exactly as they do under Compose.</li>
+<li>The integration is a single annotation on the Ingress. That is the whole thing.</li>
+</ul>
+<p class="step-p"><strong>cert-manager would mean running an operator to solve a problem AWS has already solved.</strong> It issues Let's Encrypt certificates <em>into the cluster</em> as Kubernetes Secrets, which is the right answer when TLS terminates at a pod &#8212; an ingress-nginx setup, or mTLS between services. Neither is true here. You would be running three extra pods (controller, webhook, cainjector), a set of CRDs, and an ACME HTTP-01 or DNS-01 solver that needs its own Route 53 permissions, in order to produce a certificate that then has to be handed to the ALB anyway.</p>
+<p class="step-p">There is one thing cert-manager is genuinely required for on some EKS setups: the AWS Load Balancer Controller's own admission webhook needs a certificate. The Helm chart generates a self-signed one itself by default, so that need is already met. If you find a blog post saying "install cert-manager before the LBC", it is describing the chart's <code class="inline">enableCertManager=true</code> path, which you are not using.</p>
+<h4 id="m05-why-the-aws-load-balancer-controller-and-not-ingress-nginx">Why the AWS Load Balancer Controller, and not ingress-nginx</h4>
+<p class="step-p">The controller watches <code class="inline">Ingress</code> and <code class="inline">Service type=LoadBalancer</code> objects and creates real AWS load balancers. An <code class="inline">Ingress</code> becomes an <strong>ALB</strong> (layer 7, HTTPS, ACM certificate attached, path routing); a <code class="inline">Service</code> with the right annotations becomes an <strong>NLB</strong> (layer 4 &#8212; which is what <a href="part-4-application.html#m12">Module 12</a> uses for RTMP on TCP 1935, because RTMP is not HTTP and an ALB cannot carry it).</p>
+<p class="step-p">ingress-nginx would put a pod in the path: NLB &#8594; nginx pods &#8594; your pods. That is one more hop, one more thing to run, one more TLS termination point, and it forfeits the ALB's native ACM and WAF integration. On EKS with the traffic shape this app has, the ALB is the smaller, cheaper answer.</p>
+<p class="step-p"><strong>The controller needs IRSA, not Pod Identity.</strong> It is one of the two components in this whole course that does &#8212; see the table in <a href="part-2-platform.html#m04">Module 4</a>. This is why the cluster has an OIDC provider.</p>
+<h4 id="m05-externaldns-and-why-policysync-is-safe-here">ExternalDNS, and why <code class="inline">policy=sync</code> is safe here</h4>
+<p class="step-p">ExternalDNS watches Ingress and Service objects and writes Route 53 records to match. Without it, every time an ALB is recreated (a different DNS name each time) somebody has to update a record by hand.</p>
+<p class="step-p">Two settings do the real work:</p>
+<ul>
+<li><strong><code class="inline">domainFilters</code></strong> restricts it to <code class="inline">k8s.linkifysolutions.com</code>. Combined with an IAM policy scoped to that one hosted zone, ExternalDNS is <em>incapable</em> of touching the parent domain even if misconfigured. Belt and braces, and worth it when the parent zone is a production domain.</li>
+<li><strong><code class="inline">policy=sync</code> with <code class="inline">txtOwnerId</code></strong>. The default <code class="inline">upsert-only</code> never deletes, so records accumulate as garbage pointing at load balancers that no longer exist. <code class="inline">sync</code> deletes a record when its Ingress goes away &#8212; which is what you want, but on its own it is dangerous, because ExternalDNS would happily delete records it did not create. <code class="inline">txtOwnerId</code> fixes that: alongside every record it creates, it writes a TXT record claiming ownership, and it will not touch anything without its own marker. <strong><code class="inline">policy=sync</code> without <code class="inline">txtOwnerId</code> is how people delete production DNS.</strong></li>
+</ul>
+</div>
+<h3 id="m05-do-it">Do it</h3>
+<p class="step-p"><code class="inline">AWS_PROFILE=linkify-streaming</code> and <code class="inline">AWS_REGION=us-east-1</code> exported, as always.</p>
+<h4 id="m05-51-create-the-hosted-zone">5.1 &#8212; Create the hosted zone</h4>
+<pre><code>aws route53 create-hosted-zone \
+  --name k8s.linkifysolutions.com \
+  --caller-reference "streaming-$(date +%s)"</code></pre>
+<p class="step-p"><code class="inline">--caller-reference</code> is an idempotency token; it just has to be unique per request, hence the timestamp.</p>
+<p class="step-p">Pull out the two things you need &#8212; the zone ID and the four nameservers:</p>
+<pre><code>HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+  --dns-name k8s.linkifysolutions.com \
+  --query 'HostedZones[0].Id' --output text | sed 's|/hostedzone/||')
+echo "$HOSTED_ZONE_ID"
+
+aws route53 get-hosted-zone --id "$HOSTED_ZONE_ID" \
+  --query 'DelegationSet.NameServers' --output text</code></pre>
+<pre class="out"><code>ns-1234.awsdns-26.org  ns-567.awsdns-07.net  ns-890.awsdns-38.com  ns-1512.awsdns-60.co.uk</code></pre>
+<p class="step-p">Save that zone ID somewhere. You need it in this module twice and again in <a href="part-3-data-layer.html#m09">Module 9</a>.</p>
+<h4 id="m05-52-the-one-time-change-at-the-parent-zone">5.2 &#8212; The one-time change at the parent zone</h4>
+<p class="step-p"><strong>This is the step you cannot do alone.</strong> Whoever controls DNS for <code class="inline">linkifysolutions.com</code> must add one record set at the parent:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Field</th>
+<th>Value</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Name</td>
+<td><code class="inline">k8s</code> (i.e. <code class="inline">k8s.linkifysolutions.com</code>)</td>
+</tr>
+<tr>
+<td>Type</td>
+<td><code class="inline">NS</code></td>
+</tr>
+<tr>
+<td>TTL</td>
+<td><code class="inline">300</code></td>
+</tr>
+<tr>
+<td>Value</td>
+<td>the four nameservers from the previous step, one per line</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">That is the entire change. It creates nothing, deletes nothing, and affects no existing record. It says "the <code class="inline">k8s</code> branch is delegated to AWS".</p>
+<p class="step-p">Send them the four nameservers exactly as printed, including the trailing dots if their interface wants them, and note that <code class="inline">.org</code>, <code class="inline">.net</code>, <code class="inline">.com</code> and <code class="inline">.co.uk</code> all appearing in one delegation set is normal &#8212; AWS deliberately spreads nameservers across TLDs.</p>
+<p class="step-p">Then wait, and check:</p>
+<pre><code>dig +short NS k8s.linkifysolutions.com</code></pre>
+<p class="step-p">Nothing for the first few minutes is expected. <strong>Minutes, not hours.</strong> If you get nothing after 15, query the parent's nameservers directly to see whether the record was actually added:</p>
+<pre><code>dig +short NS linkifysolutions.com                        <span class="c"># parent's nameservers</span>
+dig @<span class="ph">&lt;one-of-those&gt;</span> NS k8s.linkifysolutions.com           <span class="c"># ask one directly</span></code></pre>
+<p class="step-p">If the direct query returns the record but <code class="inline">dig +short</code> does not, it is caching and it will resolve. If the direct query returns nothing, the record was not added &#8212; go back to whoever added it.</p>
+<h4 id="m05-53-request-the-acm-certificate">5.3 &#8212; Request the ACM certificate</h4>
+<pre><code>CERT_ARN=$(aws acm request-certificate \
+  --domain-name "*.k8s.linkifysolutions.com" \
+  --subject-alternative-names "k8s.linkifysolutions.com" \
+  --validation-method DNS \
+  --region us-east-1 \
+  --query CertificateArn --output text)
+echo "$CERT_ARN"</code></pre>
+<p class="step-p">The SAN for the bare <code class="inline">k8s.linkifysolutions.com</code> is included because a wildcard covers <code class="inline">stream.k8s...</code> but <strong>not</strong> <code class="inline">k8s...</code> itself. It costs nothing and saves a second certificate later.</p>
+<p class="step-p">Get the validation CNAME. It takes a few seconds to appear after the request &#8212; if the query returns <code class="inline">None</code>, wait and retry:</p>
+<pre><code>aws acm describe-certificate --certificate-arn "$CERT_ARN" --region us-east-1 \
+  --query 'Certificate.DomainValidationOptions[0].ResourceRecord'</code></pre>
+<pre class="out"><code>{
+    "Name": "_a79865eb4cd1a6ab990a45779b53961e.k8s.linkifysolutions.com.",
+    "Type": "CNAME",
+    "Value": "_424c463e9b51d4e5e8a1d1e0d8dbd6f2.acm-validations.aws."
+}</code></pre>
+<p class="step-p">Both entries of the wildcard and the SAN validate through the <strong>same</strong> record, so you only publish one. Write it into the hosted zone:</p>
+<pre><code>VAL_NAME=$(aws acm describe-certificate --certificate-arn "$CERT_ARN" --region us-east-1 \
+  --query 'Certificate.DomainValidationOptions[0].ResourceRecord.Name' --output text)
+VAL_VALUE=$(aws acm describe-certificate --certificate-arn "$CERT_ARN" --region us-east-1 \
+  --query 'Certificate.DomainValidationOptions[0].ResourceRecord.Value' --output text)
+
+cat &gt; /tmp/acm-validation.json &lt;&lt;EOF
+{
+  "Changes": [{
+    "Action": "UPSERT",
+    "ResourceRecordSet": {
+      "Name": "${VAL_NAME}",
+      "Type": "CNAME",
+      "TTL": 300,
+      "ResourceRecords": [{ "Value": "${VAL_VALUE}" }]
+    }
+  }]
+}
+EOF
+
+aws route53 change-resource-record-sets \
+  --hosted-zone-id "$HOSTED_ZONE_ID" \
+  --change-batch file:///tmp/acm-validation.json</code></pre>
+<p class="step-p">Because that record lives inside the delegated zone that you control, ACM will keep finding it forever &#8212; which is what makes renewal automatic. <strong>Never delete it</strong>, not even after the certificate reaches <code class="inline">ISSUED</code>. Removing it breaks the renewal a year later, at which point nobody will remember this step.</p>
+<p class="step-p">Wait for issuance (typically under five minutes once the NS delegation is live):</p>
+<pre><code>aws acm wait certificate-validated --certificate-arn "$CERT_ARN" --region us-east-1
+aws acm describe-certificate --certificate-arn "$CERT_ARN" --region us-east-1 \
+  --query 'Certificate.Status' --output text</code></pre>
+<p class="step-p">Record <code class="inline">$CERT_ARN</code> in your notes. <a href="part-4-application.html#m12">Module 12</a> puts it in an Ingress annotation and <a href="part-3-data-layer.html#m09">Module 9</a> puts it in the CloudFront distribution.</p>
+<h4 id="m05-54-aws-load-balancer-controller-irsa">5.4 &#8212; AWS Load Balancer Controller (IRSA)</h4>
+<p class="step-p">Download the IAM policy that matches the chart version you are installing. Check what that is rather than trusting a number in a document:</p>
+<pre><code>helm repo add eks https://aws.github.io/eks-charts
+helm repo update
+helm search repo eks/aws-load-balancer-controller --versions | head -5</code></pre>
+<p class="step-p">The <code class="inline">APP VERSION</code> column (e.g. <code class="inline">v2.13.0</code>) is the controller version. Use it below:</p>
+<pre><code>export LBC_VERSION="v2.13.0"     <span class="c"># substitute what helm search reported</span>
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+curl -fsSL -o /tmp/lbc-iam-policy.json \
+  "https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/${LBC_VERSION}/docs/install/iam_policy.json"
+
+aws iam create-policy \
+  --policy-name AWSLoadBalancerControllerIAMPolicy \
+  --policy-document file:///tmp/lbc-iam-policy.json</code></pre>
+<p class="step-p">That policy is long and grants a lot of EC2 and ELB permissions. It is the upstream-published one; do not hand-edit it, and do not substitute <code class="inline">AdministratorAccess</code> because it fails to create.</p>
+<p class="step-p">Create the IRSA-backed ServiceAccount. <code class="inline">eksctl</code> writes the trust policy against the cluster's OIDC provider and creates the Kubernetes ServiceAccount in one step:</p>
+<pre><code>eksctl create iamserviceaccount \
+  --cluster=streaming \
+  --region=us-east-1 \
+  --namespace=kube-system \
+  --name=aws-load-balancer-controller \
+  --role-name=AmazonEKSLoadBalancerControllerRole \
+  --attach-policy-arn="arn:aws:iam::${ACCOUNT_ID}:policy/AWSLoadBalancerControllerIAMPolicy" \
+  --approve</code></pre>
+<p class="step-p">Install the chart. You need the VPC ID from <a href="part-1-foundations.html#m02">Module 2</a>:</p>
+<pre><code>VPC_ID=$(aws eks describe-cluster --name streaming \
+  --query 'cluster.resourcesVpcConfig.vpcId' --output text)
+
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=streaming \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --set region=us-east-1 \
+  --set vpcId="$VPC_ID" \
+  --set replicaCount=2
+
+kubectl -n kube-system rollout status deploy/aws-load-balancer-controller</code></pre>
+<p class="step-p">Two of those flags deserve explanation:</p>
+<ul>
+<li><strong><code class="inline">serviceAccount.create=false</code></strong> &#8212; <code class="inline">eksctl</code> already made it, with the IRSA annotation attached. Letting Helm create its own produces a ServiceAccount with no role annotation and a controller that cannot call any AWS API.</li>
+<li><strong><code class="inline">region</code> and <code class="inline">vpcId</code> set explicitly</strong> &#8212; not cosmetic. The controller can auto-discover both from the instance metadata service, but that discovery fails intermittently on nodes with <code class="inline">httpPutResponseHopLimit=1</code> (the secure default). The resulting error, <code class="inline">failed to introspect vpcID</code>, does not mention IMDS, hop limits, or anything you could search for productively. Set them and the problem cannot occur.</li>
+</ul>
+<h4 id="m05-55-externaldns-pod-identity">5.5 &#8212; ExternalDNS (Pod Identity)</h4>
+<p class="step-p">Reuse the Pod Identity trust policy from <a href="part-2-platform.html#m04">Module 4</a>:</p>
+<pre><code>cat &gt; /tmp/pod-identity-trust.json &lt;&lt;'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "Service": "pods.eks.amazonaws.com" },
+      "Action": ["sts:AssumeRole", "sts:TagSession"]
+    }
+  ]
+}
+EOF
+
+aws iam create-role \
+  --role-name streaming-external-dns \
+  --assume-role-policy-document file:///tmp/pod-identity-trust.json</code></pre>
+<p class="step-p">The inline policy is where the scoping happens. <code class="inline">ChangeResourceRecordSets</code> is restricted to <strong>this one hosted zone</strong>; the <code class="inline">List*</code> actions have to be <code class="inline">*</code> because ExternalDNS enumerates zones at startup to find the one matching its <code class="inline">domainFilters</code>, and listing is read-only:</p>
+<pre><code>cat &gt; /tmp/external-dns-policy.json &lt;&lt;EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["route53:ChangeResourceRecordSets"],
+      "Resource": ["arn:aws:route53:::hostedzone/${HOSTED_ZONE_ID}"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "route53:ListHostedZones",
+        "route53:ListHostedZonesByName",
+        "route53:ListResourceRecordSets",
+        "route53:ListTagsForResource"
+      ],
+      "Resource": ["*"]
+    }
+  ]
+}
+EOF
+
+aws iam put-role-policy \
+  --role-name streaming-external-dns \
+  --policy-name route53-delegated-zone \
+  --policy-document file:///tmp/external-dns-policy.json</code></pre>
+<p class="step-p"><strong>That <code class="inline">Resource</code> restriction is the real safety mechanism.</strong> <code class="inline">domainFilters</code> is a controller-side setting that a future <code class="inline">helm upgrade</code> could drop; the IAM policy is enforced by AWS regardless of what the pod believes it is allowed to do. If ExternalDNS is ever pointed at the parent zone by accident, AWS refuses.</p>
+<p class="step-p">Create the namespace, bind the role, install the chart:</p>
+<pre><code>kubectl create namespace external-dns
+
+aws eks create-pod-identity-association \
+  --cluster-name streaming \
+  --namespace external-dns \
+  --service-account external-dns \
+  --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/streaming-external-dns"
+
+helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+helm repo update
+
+helm install external-dns external-dns/external-dns \
+  -n external-dns \
+  --set provider.name=aws \
+  --set "domainFilters[0]=k8s.linkifysolutions.com" \
+  --set policy=sync \
+  --set registry=txt \
+  --set txtOwnerId=streaming-eks \
+  --set "extraArgs[0]=--aws-zone-type=public"
+
+kubectl -n external-dns rollout status deploy/external-dns</code></pre>
+<p class="step-p">The chart creates a ServiceAccount named <code class="inline">external-dns</code> in that namespace, which is what the association above targets. <strong>The association must exist before the pod starts, or the pod must be restarted after</strong> &#8212; Pod Identity credentials are resolved at pod startup. If you created the association after installing, run <code class="inline">kubectl -n external-dns rollout restart deploy/external-dns</code>.</p>
+<div class="confirm section">
+<h3 id="m05-verify">Verify</h3>
+<p class="step-p"><strong>1. The delegation resolves.</strong></p>
+<pre><code>dig +short NS k8s.linkifysolutions.com</code></pre>
+<pre class="out"><code>ns-1234.awsdns-26.org.
+ns-567.awsdns-07.net.
+ns-890.awsdns-38.com.
+ns-1512.awsdns-60.co.uk.</code></pre>
+<p class="step-p">Four nameservers, matching what Route 53 gave you. Empty output means the parent record is missing or has not propagated.</p>
+<p class="step-p"><strong>2. The certificate is <code class="inline">ISSUED</code>.</strong></p>
+<pre><code>aws acm describe-certificate --certificate-arn "$CERT_ARN" --region us-east-1 \
+  --query 'Certificate.{Status:Status,Domain:DomainName,Region:CertificateArn}' --output table</code></pre>
+<pre class="out"><code>------------------------------------------------------------------------------------
+|                               DescribeCertificate                                |
++----------+-----------------------------------+-----------------------------------+
+|  Domain  |  *.k8s.linkifysolutions.com        |                                  |
+|  Status  |  ISSUED                            |                                  |
++----------+-----------------------------------+-----------------------------------+</code></pre>
+<p class="step-p"><code class="inline">PENDING_VALIDATION</code> means ACM cannot see the CNAME yet. Confirm it is actually published:</p>
+<pre><code>dig +short CNAME "$VAL_NAME"</code></pre>
+<p class="step-p"><strong>3. Both controllers are Ready.</strong></p>
+<pre><code>kubectl -n kube-system get deploy aws-load-balancer-controller
+kubectl -n external-dns get deploy external-dns</code></pre>
+<pre class="out"><code>NAME                           READY   UP-TO-DATE   AVAILABLE   AGE
+aws-load-balancer-controller   2/2     2            2           3m
+
+NAME           READY   UP-TO-DATE   AVAILABLE   AGE
+external-dns   1/1     1            1           90s</code></pre>
+<p class="step-p"><strong>4. ExternalDNS can see the zone.</strong> Ready is not the same as working &#8212; the pod starts fine with no permissions at all. Read the logs:</p>
+<pre><code>kubectl -n external-dns logs deploy/external-dns --tail=20</code></pre>
+<pre class="out"><code>time="..." level=info msg="Instantiating new Kubernetes client"
+time="..." level=info msg="Applying provider record filter for domains [k8s.linkifysolutions.com. .k8s.linkifysolutions.com.]"
+time="..." level=info msg="All records are already up to date"</code></pre>
+<p class="step-p"><code class="inline">All records are already up to date</code> with no <code class="inline">AccessDenied</code> above it is the pass condition. There are no Ingresses yet, so having nothing to do is correct.</p>
+</div>
+<div class="gotcha section">
+<h3 id="m05-what-breaks">What breaks</h3>
+<p class="step-p">Ordered by how often each actually happens.</p>
+<h4 id="m05-1-certificate-stuck-in-pendingvalidation">1. Certificate stuck in <code class="inline">PENDING_VALIDATION</code></h4>
+<p class="step-p">Almost always the validation CNAME: either the NS delegation was not live when the record was written, or the record name is wrong.</p>
+<pre><code>aws acm describe-certificate --certificate-arn "$CERT_ARN" --region us-east-1 \
+  --query 'Certificate.DomainValidationOptions'
+dig +short CNAME "$VAL_NAME"
+aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+  --query "ResourceRecordSets[?Type=='CNAME']"</code></pre>
+<p class="step-p">The record name ACM gives you already includes the full domain &#8212; if you pasted it into a console field that appends the zone name, you have created <code class="inline">_abc.k8s.linkifysolutions.com.k8s.linkifysolutions.com</code>. That is the usual cause.</p>
+<h4 id="m05-2-dig-ns-returns-nothing">2. <code class="inline">dig NS</code> returns nothing</h4>
+<p class="step-p">The parent zone record. Query the parent's nameservers directly rather than guessing at cache behaviour:</p>
+<pre><code>dig +short NS linkifysolutions.com
+dig @<span class="ph">&lt;parent-ns&gt;</span> NS k8s.linkifysolutions.com
+dig +trace k8s.linkifysolutions.com | tail -20</code></pre>
+<p class="step-p"><code class="inline">+trace</code> walks the delegation from the root and shows exactly where the chain stops.</p>
+<h4 id="m05-3-lbc-pod-running-but-no-alb-appears-for-an-ingress-module-12">3. LBC pod running, but no ALB appears for an Ingress (Module 12)</h4>
+<p class="step-p">The controller's own log is where the answer always is:</p>
+<pre><code>kubectl -n kube-system logs deploy/aws-load-balancer-controller --tail=100</code></pre>
+<p class="step-p">The three recurring causes:</p>
+<ul>
+<li><code class="inline">failed to introspect vpcID</code> &#8212; the IMDS discovery problem. Confirm <code class="inline">vpcId</code> and <code class="inline">region</code> are set: <code class="inline">helm get values aws-load-balancer-controller -n kube-system</code>.</li>
+<li><code class="inline">AccessDenied</code> on an <code class="inline">elasticloadbalancing:*</code> call &#8212; the ServiceAccount is missing its IRSA annotation. Check <code class="inline">kubectl -n kube-system get sa aws-load-balancer-controller -o yaml</code> for <code class="inline">eks.amazonaws.com/role-arn</code>. If absent, Helm created its own ServiceAccount; delete it and re-run the <code class="inline">eksctl create iamserviceaccount</code> command.</li>
+<li><code class="inline">couldn't auto-discover subnets</code> &#8212; the subnet tags from <a href="part-1-foundations.html#m02">Module 2</a> are missing. Public subnets need <code class="inline">kubernetes.io/role/elb=1</code>, private need <code class="inline">kubernetes.io/role/internal-elb=1</code>, and both need <code class="inline">kubernetes.io/cluster/streaming</code> set to <code class="inline">owned</code> or <code class="inline">shared</code>.</li>
+</ul>
+<h4 id="m05-4-externaldns-logs-accessdenied">4. ExternalDNS logs <code class="inline">AccessDenied</code></h4>
+<pre><code>kubectl -n external-dns logs deploy/external-dns --tail=50 | grep -i denied
+aws eks list-pod-identity-associations --cluster-name streaming \
+  --query 'associations[?namespace==`external-dns`]'</code></pre>
+<p class="step-p">If the association exists and looks right, the pod started before it did &#8212; <code class="inline">kubectl -n external-dns rollout restart deploy/external-dns</code>. If the denial is specifically on <code class="inline">ChangeResourceRecordSets</code>, the hosted zone ID baked into the IAM policy is wrong; compare it with <code class="inline">$HOSTED_ZONE_ID</code>.</p>
+<h4 id="m05-5-externaldns-creates-records-that-immediately-disappear-or-vice-versa">5. ExternalDNS creates records that immediately disappear (or vice versa)</h4>
+<p class="step-p">Two ExternalDNS instances with different <code class="inline">txtOwnerId</code> values fighting, or a record created by hand that ExternalDNS now considers orphaned.</p>
+<pre><code>aws route53 list-resource-record-sets --hosted-zone-id "$HOSTED_ZONE_ID" \
+  --query "ResourceRecordSets[?Type=='TXT']"</code></pre>
+<p class="step-p">Every record ExternalDNS owns has a matching TXT registry record. Records without one it will not touch &#8212; so if a hand-made record is being deleted, it is not ExternalDNS doing it.</p>
+<h4 id="m05-6-certificate-exists-but-the-alb-rejects-it">6. Certificate exists but the ALB rejects it</h4>
+<p class="step-p">You requested it in the wrong region. <code class="inline">aws acm list-certificates</code> with no <code class="inline">--region</code> uses the profile default, so this is easy to miss:</p>
+<pre><code>aws acm list-certificates --region us-east-1 \
+  --query 'CertificateSummaryList[].[DomainName,CertificateArn]' --output table</code></pre>
+<p class="step-p">The ARN must contain <code class="inline">:us-east-1:</code>. If it does not, delete it and request again &#8212; there is no way to move a certificate between regions.</p>
+<p class="step-p"><strong>Next:</strong> <a href="part-2-platform.html#m06">Module 6 &#8212; Karpenter</a>.</p>
+</div>
+</section>
+
+<section class="step" id="m06">
+  <div class="step-head">
+    <span class="step-num">06</span>
+    <h2>Karpenter</h2>
+  </div>
+<p class="modnav"><em>Part II &#8212; Platform. Previous: <a href="part-2-platform.html#m05">Module 5</a>. Next: <a href="part-2-platform.html#m07">Module 7</a>.</em> ---</p>
+<h3 id="m06-what-youre-building">What you're building</h3>
+<p class="step-p">Node autoscaling. By the end of this module, a pod that cannot be scheduled causes a correctly-sized EC2 instance to appear within about a minute, and when that pod goes away the instance is terminated. Two node pools: one on <strong>on-demand</strong> capacity for live transcoding, one on <strong>spot</strong> for VOD.</p>
+<p class="step-p">The last thing you do is a deliberately fake test &#8212; a dummy Deployment that asks for 3 CPUs and does nothing with them. Read the next section to understand why that is the right way to finish this module rather than a cop-out.</p>
+<div class="why section">
+<h3 id="m06-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m06-what-karpenter-actually-does">What Karpenter actually does</h4>
+<p class="step-p">Karpenter is a controller with one job. It watches for <strong>pods that the scheduler could not place</strong> &#8212; pods sitting in <code class="inline">Pending</code> with <code class="inline">Insufficient cpu</code> or <code class="inline">Insufficient memory</code> &#8212; reads what those pods asked for, and launches an EC2 instance shaped to fit them. When the node later has no non-DaemonSet pods left, it terminates it.</p>
+<p class="step-p">That is the whole loop:</p>
+<pre class="out"><code>pod Pending  -&gt;  Karpenter reads its requests, affinities, tolerations
+             -&gt;  picks an instance type from the allowed set
+             -&gt;  launches it, node joins, kubelet reports Ready
+             -&gt;  scheduler places the pod
+             ...
+             -&gt;  pod finishes, node is empty
+             -&gt;  consolidateAfter elapses, node terminated</code></pre>
+<p class="step-p">The important word is <strong>requests</strong>. Karpenter does not measure CPU usage; it reads <code class="inline">resources.requests</code> off the pod spec and does bin-packing arithmetic. A pod that requests <code class="inline">100m</code> and burns four cores gets no help from Karpenter at all. A pod that requests <code class="inline">2500m</code> and sleeps gets a node. <strong>Your resource requests are the input to this system &#8212; if they are wrong, everything downstream is wrong.</strong></p>
+<p class="step-p">If you have met the <strong>Cluster Autoscaler</strong> before, the difference is worth naming. Cluster Autoscaler works on Auto Scaling Groups: you predefine node groups with fixed instance types, and it increments the desired count. If your groups are <code class="inline">m5.large</code> and a pod wants 8 CPUs, it cannot help you. Karpenter has no groups &#8212; it evaluates the actual pending pod against the whole EC2 catalogue (filtered by your constraints) and launches whatever fits best. That is why this module defines <em>shapes</em> (<code class="inline">c</code> or <code class="inline">m</code> family, 4 or 8 vCPU, generation &gt; 5) rather than instance types.</p>
+<h4 id="m06-karpenter-scales-nodes-it-does-not-scale-pods">Karpenter scales nodes. It does not scale pods.</h4>
+<p class="step-p">State this plainly, because it is the thing that confuses everyone at this point in the course:</p>
+<p class="step-p"><strong>Karpenter creates nodes for pods that already exist. Something else has to create the pods.</strong></p>
+<p class="step-p">Today, <code class="inline">transcode-worker</code> is a long-running Deployment with <code class="inline">replicas: 1</code> that consumes Kafka in a <code class="inline">while True</code> loop. One replica, forever, no matter how many streams are running. So after installing Karpenter, the honest description of what happens when three people start streaming is: <strong>nothing</strong>. One pod exists, one pod is scheduled, no new pod becomes <code class="inline">Pending</code>, Karpenter has nothing to react to.</p>
+<p class="step-p">The pod half of the answer is <strong>KEDA</strong>, in <a href="part-5-elastic.html#m14">Module 14</a>. KEDA watches Kafka topic lag and creates one <code class="inline">Job</code> per message &#8212; one pod per stream. Each of those pods is <code class="inline">Pending</code> until Karpenter provisions a node. That is when this module's work starts paying for itself.</p>
+<pre class="out"><code>Kafka message  -&gt;  KEDA creates a Job  -&gt;  pod is Pending
+                                       -&gt;  Karpenter launches a node
+                                       -&gt;  pod runs, stream transcodes
+                                       -&gt;  Job completes, node empties, node dies</code></pre>
+<p class="step-p"><strong>Karpenter is the node half. KEDA is the pod half. Neither does anything useful alone.</strong></p>
+<p class="step-p">Which is why this module ends with a dummy Deployment. There is no real workload that can exercise the node pools yet, and pretending otherwise would mean either skipping verification or waiting eight modules to find out whether the IAM was right. A fake pod with a real resource request exercises exactly the same code path as a real transcode job &#8212; pending pod in, node out &#8212; and tells you now, while the configuration is fresh, whether it works.</p>
+<p class="step-p">If you would like the interim behaviour before KEDA lands: run <code class="inline">transcode-worker</code> as a <code class="inline">Deployment</code> with <code class="inline">replicas: 1</code>, <code class="inline">requests.cpu: 2500m</code>, and the live pool's toleration. Karpenter provisions exactly one node and concurrency is bounded by that node's cores &#8212; the same constraint the dev box had, on rented hardware. That is a workable stopgap, but it is not elasticity.</p>
+<h4 id="m06-instance-selection-for-a-23-core-ffmpeg-job">Instance selection for a ~2.3-core ffmpeg job</h4>
+<p class="step-p">SPEC.md records the measurement: one live transcode &#8212; three renditions, <code class="inline">veryfast</code> preset &#8212; costs <strong>~2.3 cores and ~1 GB of RAM</strong>. Request <code class="inline">2500m</code> CPU and <code class="inline">2Gi</code> memory, leaving headroom for the boto3 upload threads and the watchdog.</p>
+<p class="step-p">Against that number, two node shapes make sense:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Node</th>
+<th>vCPU</th>
+<th>Live jobs at 2500m</th>
+<th>Trade-off</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">c6i.xlarge</code></td>
+<td>4</td>
+<td>1 (&#8776;1.2 vCPU left for kubelet + DaemonSets)</td>
+<td>Perfect isolation, some waste</td>
+</tr>
+<tr>
+<td><code class="inline">c6i.2xlarge</code></td>
+<td>8</td>
+<td>3 (7.5 vCPU requested)</td>
+<td>Much better $/stream, three streams share one node's memory bandwidth and EBS throughput</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">Rather than choosing, constrain the <em>shape</em> and let Karpenter pick per launch:</p>
+<ul>
+<li><strong>Compute-optimized (<code class="inline">c</code>) families.</strong> x264 is CPU-bound with a small working set &#8212; it wants clock speed, not memory. The <code class="inline">c</code> families give the best GHz per dollar. <code class="inline">m</code> families are included as a fallback so a thin <code class="inline">c</code> pool never leaves a job unschedulable.</li>
+<li><strong>Generation &gt; 5.</strong> Excludes <code class="inline">c4</code>/<code class="inline">m4</code> and older, which are slower per core, on worse networking, and frequently no cheaper.</li>
+<li><strong>4 or 8 vCPU</strong> for live (16 also allowed on VOD, where jobs are larger). Anything smaller cannot fit one job; anything larger for live means one interruption takes out three streams instead of one.</li>
+<li><strong><code class="inline">amd64</code> only.</strong> Graviton is genuinely better value for ffmpeg, but CI publishes <code class="inline">linux/amd64</code> images only. Allowing <code class="inline">arm64</code> here would produce nodes your pods cannot run on and an <code class="inline">exec format error</code> that looks like a corrupt image. If you later add a multi-arch build, revisit this line &#8212; not before.</li>
+</ul>
+<h4 id="m06-spot-for-vod-on-demand-for-live">Spot for VOD, on-demand for live</h4>
+<p class="step-p">Spot instances are roughly 65% cheaper and can be reclaimed with <strong>two minutes' notice</strong>. Whether that is acceptable depends entirely on what the pod is doing.</p>
+<p class="step-p"><strong>For live, two minutes is not enough, and the failure is not graceful.</strong> Trace it through:</p>
+<ol>
+<li>Karpenter gets the interruption notice, cordons the node, drains it. The transcode pod receives SIGTERM.</li>
+<li>A replacement node must be provisioned: EC2 launch + AL2023 boot + a ~1.5 GB image pull through the NAT gateway. <strong>90&#8211;150 seconds</strong>, best case.</li>
+<li>Meanwhile ffmpeg has stopped writing segments. The live playlist stops advancing. Every viewer's hls.js exhausts its retries &#8212; roughly 22 seconds of tolerance &#8212; and shows "Lost connection to the stream".</li>
+<li>Worse: <code class="inline">transcode-worker</code> holds <code class="inline">active_streams</code> in memory. The <code class="inline">stream.lifecycle</code> "started" event was consumed and its offset committed long ago. Nothing re-emits it. <strong>The stream stays dead until the streamer stops and restarts OBS.</strong></li>
+</ol>
+<p class="step-p">The cost of avoiding that: a <code class="inline">c6i.xlarge</code> is about $0.17/hr on-demand against roughly $0.06/hr spot. <strong>$0.11/hr, billed only while someone is actually streaming.</strong> At twenty hours of streaming a month, $2.20. Paying $2.20/month to eliminate a class of unrecoverable viewer-visible blackouts is not a close call.</p>
+<p class="step-p"><strong>For VOD, spot is exactly right.</strong> <code class="inline">transcode_video</code> is a batch job. Nobody is waiting on a live playlist; an interruption costs a retry.</p>
+<p class="step-p"><strong>But VOD-on-spot exposes a bug you should fix first.</strong> <code class="inline">_claim_video</code> runs <code class="inline">UPDATE videos SET status='transcoding' WHERE id=%s AND status='uploaded'</code>. If the pod dies mid-transcode, the row stays at <code class="inline">transcoding</code> forever &#8212; the redelivered Kafka message no longer matches the <code class="inline">WHERE</code> clause, so it is never retried. The code already acknowledges this ("a stuck-job sweep is a separate concern"). Under on-demand it is theoretical. <strong>Under spot it becomes routine.</strong> Either add a claim timestamp plus a reaper, or set the VOD pool to on-demand until that exists. The manifest carries this as a comment so the next person finds it.</p>
+<h4 id="m06-taints-and-tolerations-you-need-both">Taints and tolerations &#8212; you need both</h4>
+<p class="step-p">Both pools taint their nodes:</p>
+<pre><code>taints:
+  - key: workload
+    value: transcode
+    effect: NoSchedule</code></pre>
+<p class="step-p">and the transcode pod carries both a matching toleration and a <code class="inline">nodeSelector</code>:</p>
+<pre><code>nodeSelector:
+  workload: transcode
+  transcode-mode: live      <span class="c"># or vod</span>
+tolerations:
+  - key: workload
+    operator: Equal
+    value: transcode
+    effect: NoSchedule</code></pre>
+<p class="step-p">Neither alone is sufficient, and the reason is that they do opposite jobs:</p>
+<ul>
+<li><strong>The taint repels.</strong> It stops CoreDNS, the LBC, ExternalDNS and anything else from drifting onto a $0.17/hr compute node. Without it, Karpenter launches a node for your transcode pod and the scheduler helpfully fills the spare capacity with system pods &#8212; which then block consolidation when the transcode finishes, and the node never goes away.</li>
+<li><strong>The <code class="inline">nodeSelector</code> attracts.</strong> It stops the transcode pod from being scheduled onto the general-purpose managed node group, where it would run at whatever CPU it could scrounge and never trigger a scale-up at all.</li>
+</ul>
+<p class="step-p">A tainted node with no selector: your pod might land on a system node. A selected node with no taint: system pods land on your expensive node. Use both.</p>
+<h4 id="m06-ephemeral-scratch-disk-the-tempfile-gotcha">Ephemeral scratch disk &#8212; the <code class="inline">tempfile</code> gotcha</h4>
+<p class="step-p"><code class="inline">transcode-worker</code> uses <code class="inline">tempfile.mkdtemp()</code> and <code class="inline">tempfile.TemporaryDirectory()</code>. In a container those resolve to <code class="inline">/tmp</code>, which is the container's <strong>writable layer</strong>, which lives on the node's root EBS volume under <code class="inline">/var/lib/containerd</code>. Kubernetes accounts for that as <strong><code class="inline">ephemeral-storage</code></strong>, and if a pod exceeds its ephemeral-storage <em>limit</em> the kubelet <strong>evicts it immediately, with no grace period</strong> &#8212; mid-encode, mid-stream.</p>
+<p class="step-p">Under Compose this was invisible: the dev box had a big disk and nobody was counting. On a Karpenter node, the disk is whatever you put in <code class="inline">blockDeviceMappings</code>, and the accounting is enforced.</p>
+<p class="step-p">Do the arithmetic.</p>
+<p class="step-p"><strong>Live.</strong> <code class="inline">LIVE_LIST_SIZE = 30</code> segments of 4 seconds, three renditions at 5000k/2800k/1400k. Per 4-second interval that is 2.5 + 1.4 + 0.7 &#8776; 4.6 MB, so 30 segments &#8776; <strong>140 MB steady state</strong>. <code class="inline">-hls_flags delete_segments</code> only removes files as they rotate out, and a stall (the watchdog case) lets them accumulate. Request <strong>5 Gi</strong>, limit <strong>8 Gi</strong> &#8212; generous, and effectively free.</p>
+<p class="step-p"><strong>VOD.</strong> <code class="inline">transcode_video</code> downloads the full source &#8212; up to <code class="inline">MAX_UPLOAD_BYTES</code>, which every <code class="inline">config.env</code> in this repo sets to <strong>2 GiB</strong> &#8212; <em>and</em> writes the full HLS output alongside it, in the same scratch dir, before either is cleaned up.</p>
+<p class="step-p">The output is the part that does not have a fixed ceiling. Its size tracks <em>duration</em>, not source size: a one-hour encode yields roughly 2.25 GB at 1080p + 1.26 GB at 720p + 0.63 GB at 480p &#8776; <strong>4.1 GB per hour</strong>. And 2 GiB of source can be a long video &#8212; at a modest 1.5 Mbps that is about three hours, so &#8776; 12 GB of output. Peak concurrent usage on that worst case is 2 GiB in + 12 GB out &#8776; <strong>14 GiB</strong>.</p>
+<p class="step-p">Request <strong>40 Gi</strong>, limit <strong>50 Gi</strong>. That is deliberate headroom over the 14 GiB worst case rather than a tight fit, for two reasons: the duration ceiling is a bitrate assumption rather than an enforced limit, and an ephemeral-storage eviction is not a retry &#8212; it kills the encode with no grace period. Disk on a node that lives twenty minutes is the cheapest insurance on this platform.</p>
+<p class="step-p">Two consequences.</p>
+<p class="step-p"><strong>Pods must declare <code class="inline">ephemeral-storage</code>.</strong> If they do not, Karpenter has no idea disk is needed and will happily bin-pack four VOD jobs onto a node with a 20 GiB root volume:</p>
+<pre><code><span class="c"># live transcode pod &#8212; this is what k8s/apps/base/transcode/scaledjob-live.yaml</span>
+<span class="c"># ends up carrying in Module 14</span>
+resources:
+  requests: { cpu: "2500m", memory: "2Gi", ephemeral-storage: "5Gi" }
+  limits:   { memory: "2Gi", ephemeral-storage: "8Gi" }
+env:
+  - { name: TMPDIR, value: /scratch }
+volumes:
+  - name: scratch
+    emptyDir: { sizeLimit: 8Gi }
+volumeMounts:
+  - name: scratch
+    mountPath: /scratch</code></pre>
+<p class="step-p">Memory <code class="inline">limit == request</code>, deliberately: that makes the pod Guaranteed QoS, so the kubelet will not evict it under node memory pressure mid-encode. The <code class="inline">ephemeral-storage</code> limit is higher than the request on purpose &#8212; it is a ceiling, not a reservation, and the <code class="inline">emptyDir</code>'s <code class="inline">sizeLimit</code> matches it.</p>
+<p class="step-p">Mount the <code class="inline">emptyDir</code> at <code class="inline">/scratch</code> and point <code class="inline">TMPDIR</code> at it. Python's <code class="inline">tempfile</code> honours <code class="inline">TMPDIR</code>, so <code class="inline">mkdtemp()</code> lands on the volume with no code change. A named mount rather than overmounting <code class="inline">/tmp</code> because (a) it makes the requirement visible in the manifest, (b) it gives <code class="inline">sizeLimit</code> enforcement with a clear eviction message instead of a mysterious kill, (c) it keeps scratch off the container overlay filesystem, which is measurably slower for the many small writes ffmpeg's HLS muxer produces, and (d) the container runs with <code class="inline">readOnlyRootFilesystem: true</code>, so a writable path has to be an explicit volume anyway.</p>
+<p class="step-p"><strong>The node's root volume must hold all of it.</strong> Per node: AL2023 (~3 GiB) + the transcode image with ffmpeg (~1.5 GiB) + the sum of every scheduled pod's ephemeral-storage request. A <code class="inline">c6i.2xlarge</code> running two VOD jobs at 40 Gi needs 3 + 1.5 + 80 &#8776; 85 GiB, and three would need 125 GiB. The <code class="inline">EC2NodeClass</code> in this module uses <strong>200 GiB</strong> and stops the arithmetic from being a recurring worry. That volume would cost $16/month if it ran all month &#8212; but a node that lives twenty minutes costs about half a cent. <strong>Node root volumes are effectively free; size them generously.</strong></p>
+<p class="step-p">gp3's free baseline of 125 MB/s is plenty: ffmpeg writing three renditions while the uploader reads them back runs at about 5 MB/s. Do not pay for provisioned throughput.</p>
+<h4 id="m06-consolidation-the-one-line-that-must-differ-between-the-pools">Consolidation: the one line that must differ between the pools</h4>
+<pre><code><span class="c"># live</span>
+disruption:
+  consolidationPolicy: WhenEmpty
+  consolidateAfter: 2m
+
+<span class="c"># vod</span>
+disruption:
+  consolidationPolicy: WhenEmptyOrUnderutilized
+  consolidateAfter: 1m</code></pre>
+<p class="step-p"><code class="inline">WhenEmptyOrUnderutilized</code> &#8212; the default &#8212; lets Karpenter <strong>evict running pods</strong> to repack them onto fewer or cheaper nodes. That is excellent for stateless web workloads and catastrophic for a live transcode: it is a self-inflicted spot interruption, with all the consequences described above, on a node you deliberately paid on-demand prices for.</p>
+<p class="step-p"><code class="inline">WhenEmpty</code> restricts Karpenter to removing nodes with zero non-DaemonSet pods. Scale-to-zero still works perfectly &#8212; when the stream ends, the pod exits, the node is empty, and two minutes later it is gone. It simply never touches a node that is doing work.</p>
+<p class="step-p"><code class="inline">consolidateAfter</code> is the settling delay. Without it, a node would be terminated the instant a job finished, and the next job 30 seconds later would pay the full 90-second launch penalty again. Two minutes for live (streams cluster together), one for VOD.</p>
+<p class="step-p">Belt and braces on the live pod itself, so drift and expiry cannot touch it either:</p>
+<pre><code>metadata:
+  annotations:
+    karpenter.sh/do-not-disrupt: "true"</code></pre>
+</div>
+<h3 id="m06-do-it">Do it</h3>
+<p class="step-p"><code class="inline">AWS_PROFILE=linkify-streaming</code> and <code class="inline">AWS_REGION=us-east-1</code> exported.</p>
+<h4 id="m06-61-pick-a-version">6.1 &#8212; Pick a version</h4>
+<pre><code>helm show chart oci://public.ecr.aws/karpenter/karpenter | grep '^version:'</code></pre>
+<pre class="out"><code>version: 1.13.0</code></pre>
+<p class="step-p">Pin whatever that reports and use it consistently &#8212; the CloudFormation template, the CRDs and the chart must all come from the same release:</p>
+<pre><code>export KARPENTER_VERSION="1.13.0"
+export KARPENTER_DOCS_VERSION="v1.13"     <span class="c"># major.minor of the above, with the 'v'</span>
+export CLUSTER_NAME=streaming
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)</code></pre>
+<h4 id="m06-62-tag-the-subnets-and-security-group">6.2 &#8212; Tag the subnets and security group</h4>
+<p class="step-p">Karpenter finds where to launch by <strong>tag lookup</strong>, not by hard-coded IDs. The <code class="inline">EC2NodeClass</code> selects on <code class="inline">karpenter.sh/discovery: streaming</code>, so those tags must exist first. <a href="part-1-foundations.html#m02">Module 2</a> may already have set them; this is idempotent either way.</p>
+<pre><code>PRIVATE_SUBNETS=$(aws ec2 describe-subnets \
+  --filters "Name=tag:kubernetes.io/role/internal-elb,Values=1" \
+            "Name=tag:kubernetes.io/cluster/${CLUSTER_NAME},Values=owned,shared" \
+  --query 'Subnets[].SubnetId' --output text)
+echo "$PRIVATE_SUBNETS"
+
+aws ec2 create-tags --resources $PRIVATE_SUBNETS \
+  --tags "Key=karpenter.sh/discovery,Value=${CLUSTER_NAME}"
+
+CLUSTER_SG=$(aws eks describe-cluster --name "$CLUSTER_NAME" \
+  --query 'cluster.resourcesVpcConfig.clusterSecurityGroupId' --output text)
+
+aws ec2 create-tags --resources "$CLUSTER_SG" \
+  --tags "Key=karpenter.sh/discovery,Value=${CLUSTER_NAME}"</code></pre>
+<p class="step-p"><strong>Private subnets only.</strong> A transcode node has no reason to hold a public IP; it reaches S3 through the gateway endpoint and everything else through the NAT gateway.</p>
+<p class="step-p">Note what Karpenter nodes must <em>not</em> be: Karpenter has to run on nodes it does not manage, otherwise it can terminate the node it is running on and nothing is left to bring anything back. That is what the managed node group from <a href="part-1-foundations.html#m03">Module 3</a> is for. Its own instances must never match this discovery tag.</p>
+<h4 id="m06-63-the-cloudformation-stack">6.3 &#8212; The CloudFormation stack</h4>
+<p class="step-p">One template creates four things you would otherwise assemble by hand:</p>
+<ul>
+<li><strong><code class="inline">KarpenterNodeRole-streaming</code></strong> &#8212; the IAM role assumed by the instances Karpenter launches (worker node policy, ECR read, CNI, SSM).</li>
+<li><strong>The instance profile</strong> wrapping that role.</li>
+<li><strong><code class="inline">KarpenterControllerPolicy-streaming</code></strong> &#8212; what the controller itself needs (<code class="inline">ec2:RunInstances</code>, <code class="inline">ec2:TerminateInstances</code>, <code class="inline">iam:PassRole</code>, pricing APIs, and so on).</li>
+<li><strong>An SQS interruption queue plus the EventBridge rules</strong> that route spot interruption notices, rebalance recommendations and scheduled-maintenance events into it.</li>
+</ul>
+<pre><code>curl -fsSL -o /tmp/karpenter-cfn.yaml \
+  "https://raw.githubusercontent.com/aws/karpenter-provider-aws/v${KARPENTER_VERSION}/website/content/en/${KARPENTER_DOCS_VERSION}/getting-started/getting-started-with-karpenter/cloudformation.yaml"
+
+aws cloudformation deploy \
+  --stack-name "Karpenter-${CLUSTER_NAME}" \
+  --template-file /tmp/karpenter-cfn.yaml \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides "ClusterName=${CLUSTER_NAME}"</code></pre>
+<p class="step-p">If that URL 404s, the docs directory for your version is named differently &#8212; browse <code class="inline">https://github.com/aws/karpenter-provider-aws/tree/v${KARPENTER_VERSION}/website/content/en</code> and use the folder you find.</p>
+<p class="step-p"><strong>The interruption queue is not optional for this workload.</strong> It is what delivers the two-minute spot warning so Karpenter can cordon and drain rather than having the instance vanish underneath a running pod. Without it, spot VOD jobs die with no notice at all.</p>
+<h4 id="m06-64-irsa-for-the-controller">6.4 &#8212; IRSA for the controller</h4>
+<p class="step-p">Karpenter's controller uses <strong>IRSA</strong>, not Pod Identity &#8212; it is the second of the two exceptions from <a href="part-2-platform.html#m04">Module 4</a>'s table, and the official getting-started path wires it this way.</p>
+<pre><code>eksctl create iamserviceaccount \
+  --cluster "$CLUSTER_NAME" \
+  --region us-east-1 \
+  --namespace kube-system \
+  --name karpenter \
+  --role-name "${CLUSTER_NAME}-karpenter" \
+  --attach-policy-arn "arn:aws:iam::${ACCOUNT_ID}:policy/KarpenterControllerPolicy-${CLUSTER_NAME}" \
+  --approve</code></pre>
+<h4 id="m06-65-let-karpenters-nodes-join-the-cluster">6.5 &#8212; Let Karpenter's nodes join the cluster</h4>
+<pre><code>aws eks create-access-entry \
+  --cluster-name "$CLUSTER_NAME" \
+  --principal-arn "arn:aws:iam::${ACCOUNT_ID}:role/KarpenterNodeRole-${CLUSTER_NAME}" \
+  --type EC2_LINUX</code></pre>
+<p class="step-p"><strong>This is the step people forget, and its failure mode is the worst in the module.</strong> Without it, Karpenter launches instances that boot perfectly, run the bootstrap script, present a certificate the API server does not recognise, and are rejected. You see instances appearing and disappearing in the EC2 console while <code class="inline">kubectl get nodes</code> shows nothing and <strong>not one Kubernetes event mentions the problem</strong>. The pod stays <code class="inline">Pending</code>, Karpenter keeps trying, and your bill keeps moving.</p>
+<p class="step-p">The cluster uses <code class="inline">authenticationMode: API</code> (access entries, no <code class="inline">aws-auth</code> ConfigMap), which is why this is an <code class="inline">aws eks</code> call rather than a ConfigMap edit. If a tutorial tells you to edit <code class="inline">aws-auth</code>, it predates access entries.</p>
+<h4 id="m06-66-install-the-controller">6.6 &#8212; Install the controller</h4>
+<pre><code>helm upgrade --install karpenter \
+  oci://public.ecr.aws/karpenter/karpenter \
+  --version "$KARPENTER_VERSION" \
+  -n kube-system \
+  --set "settings.clusterName=${CLUSTER_NAME}" \
+  --set "settings.interruptionQueue=Karpenter-${CLUSTER_NAME}" \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=karpenter \
+  --set controller.resources.requests.cpu=200m \
+  --set controller.resources.requests.memory=512Mi \
+  --set controller.resources.limits.memory=512Mi \
+  --wait
+
+kubectl -n kube-system rollout status deploy/karpenter</code></pre>
+<p class="step-p"><code class="inline">serviceAccount.create=false</code> for the same reason as the LBC in <a href="part-2-platform.html#m05">Module 5</a>: <code class="inline">eksctl</code> already made one carrying the IRSA annotation, and letting Helm replace it produces a controller with no AWS permissions.</p>
+<p class="step-p">The chart installs the <code class="inline">NodePool</code>, <code class="inline">EC2NodeClass</code> and <code class="inline">NodeClaim</code> CRDs. Confirm:</p>
+<pre><code>kubectl get crd | grep karpenter</code></pre>
+<pre class="out"><code>ec2nodeclasses.karpenter.k8s.aws     2026-07-29T10:14:02Z
+nodeclaims.karpenter.sh              2026-07-29T10:14:02Z
+nodepools.karpenter.sh               2026-07-29T10:14:02Z</code></pre>
+<h4 id="m06-67-apply-the-node-class-and-node-pools">6.7 &#8212; Apply the node class and node pools</h4>
+<p class="step-p">The three manifests live in <code class="inline">k8s/infra/karpenter/</code>. The <code class="inline">EC2NodeClass</code> describes <em>how</em> to build a node (AMI, IAM role, where, what disk); each <code class="inline">NodePool</code> describes <em>when and what shape</em> it is allowed to be.</p>
+<pre><code>kubectl apply -f k8s/infra/karpenter/ec2nodeclass.yaml
+kubectl apply -f k8s/infra/karpenter/nodepool-live.yaml
+kubectl apply -f k8s/infra/karpenter/nodepool-vod.yaml</code></pre>
+<p class="step-p"><code class="inline">ec2nodeclass.yaml</code>, in full:</p>
+<pre><code>apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: transcode
+spec:
+  amiSelectorTerms:
+    - alias: al2023@latest
+  role: KarpenterNodeRole-streaming
+  subnetSelectorTerms:
+    - tags: { karpenter.sh/discovery: streaming }
+  securityGroupSelectorTerms:
+    - tags: { karpenter.sh/discovery: streaming }
+  blockDeviceMappings:
+    - deviceName: /dev/xvda          <span class="c"># AL2023 root device</span>
+      ebs:
+        volumeSize: 200Gi            <span class="c"># scratch for ffmpeg &#8212; see sizing above</span>
+        volumeType: gp3
+        iops: 3000                   <span class="c"># free gp3 baseline</span>
+        throughput: 125              <span class="c"># free gp3 baseline, MB/s</span>
+        encrypted: true
+        deleteOnTermination: true
+  metadataOptions:
+    httpEndpoint: enabled
+    httpTokens: required
+    httpPutResponseHopLimit: 2
+  tags:
+    Project: streaming
+    Workload: transcode
+    ManagedBy: karpenter</code></pre>
+<p class="step-p">The <code class="inline">alias: al2023@latest</code> form pins the family and tracks the current EKS-optimized AL2023 release for your cluster version. Do <strong>not</strong> also set <code class="inline">spec.amiFamily</code> &#8212; with an alias it is derived, and setting both is rejected by the validating webhook.</p>
+<p class="step-p"><code class="inline">nodepool-live.yaml</code> &#8212; note the capacity type and the consolidation policy, which are the two lines that make it the live pool:</p>
+<pre><code>apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: transcode-live
+spec:
+  template:
+    metadata:
+      labels: { workload: transcode, transcode-mode: live }
+    spec:
+      nodeClassRef: { group: karpenter.k8s.aws, kind: EC2NodeClass, name: transcode }
+      taints:
+        - key: workload
+          value: transcode
+          effect: NoSchedule
+      requirements:
+        - { key: karpenter.sh/capacity-type,             operator: In, values: ["on-demand"] }
+        - { key: karpenter.k8s.aws/instance-category,    operator: In, values: ["c", "m"] }
+        - { key: karpenter.k8s.aws/instance-generation,  operator: Gt, values: ["5"] }
+        - { key: karpenter.k8s.aws/instance-cpu,         operator: In, values: ["4", "8"] }
+        - { key: kubernetes.io/arch,                     operator: In, values: ["amd64"] }
+      expireAfter: 24h
+      terminationGracePeriod: 30m
+  limits:
+    cpu: "32"                        <span class="c"># hard ceiling &#8776; 12 concurrent streams</span>
+  disruption:
+    consolidationPolicy: WhenEmpty   <span class="c"># never repack a running live transcode</span>
+    consolidateAfter: 2m</code></pre>
+<p class="step-p"><code class="inline">limits.cpu: "32"</code> is a <strong>hard ceiling on total CPU this pool may provision</strong>, and it is your protection against a runaway loop turning into a four-figure bill. When the limit is reached, Karpenter stops launching and leaves pods <code class="inline">Pending</code> &#8212; which is a visible, cheap failure. Set it deliberately; do not remove it.</p>
+<p class="step-p"><code class="inline">expireAfter: 24h</code> recycles nodes daily so AMI security patches land without anyone remembering to do it. A pod annotated <code class="inline">karpenter.sh/do-not-disrupt: "true"</code> blocks expiry until it finishes, and <code class="inline">terminationGracePeriod: 30m</code> is the outer bound &#8212; long enough for a stream to end naturally, short enough that a wedged pod does not pin a node forever.</p>
+<p class="step-p"><code class="inline">nodepool-vod.yaml</code> differs in four places: <code class="inline">capacity-type</code> allows <code class="inline">["spot", "on-demand"]</code>, <code class="inline">instance-cpu</code> allows <code class="inline">16</code>, <code class="inline">limits.cpu</code> is <code class="inline">64</code>, and <code class="inline">consolidationPolicy</code> is <code class="inline">WhenEmptyOrUnderutilized</code> with <code class="inline">consolidateAfter: 1m</code>. Everything else is identical.</p>
+<div class="confirm section">
+<h3 id="m06-verify">Verify</h3>
+<p class="step-p">The checkpoint is a dummy Deployment: one pod, 3 CPUs requested, the transcode toleration and node selector, and an image that does nothing. It asks for more CPU than any existing node has free, so it is guaranteed to be <code class="inline">Pending</code>, which is exactly the signal Karpenter reacts to.</p>
+<p class="step-p">Open a second terminal and leave this running:</p>
+<pre><code>kubectl get nodes -L karpenter.sh/nodepool,node.kubernetes.io/instance-type,karpenter.sh/capacity-type -w</code></pre>
+<p class="step-p">In the first terminal:</p>
+<pre><code>kubectl apply -f - &lt;&lt;'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: karpenter-smoke-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: karpenter-smoke-test }
+  template:
+    metadata:
+      labels: { app: karpenter-smoke-test }
+    spec:
+      nodeSelector:
+        workload: transcode
+        transcode-mode: live
+      tolerations:
+        - key: workload
+          operator: Equal
+          value: transcode
+          effect: NoSchedule
+      containers:
+        - name: pause
+          image: public.ecr.aws/eks-distro/kubernetes/pause:3.9
+          resources:
+            requests:
+              cpu: "3"
+              memory: "2Gi"
+              ephemeral-storage: "5Gi"
+EOF</code></pre>
+<p class="step-p"><strong>Within a second or two</strong>, Karpenter should decide:</p>
+<pre><code>kubectl -n kube-system logs deploy/karpenter --tail=20</code></pre>
+<pre class="out"><code>{"level":"INFO","message":"found provisionable pod(s)","Pods":"default/karpenter-smoke-test-6d9f8c4b7-x2klm","duration":"18.4ms"}
+{"level":"INFO","message":"computed new nodeclaim(s) to fit pod(s)","nodeclaims":1,"pods":1}
+{"level":"INFO","message":"created nodeclaim","NodePool":{"name":"transcode-live"},"NodeClaim":{"name":"transcode-live-vz8qd"},"requests":{"cpu":"3155m","memory":"2Gi","ephemeral-storage":"5Gi","pods":"6"},"instance-types":"c6i.xlarge, c6in.xlarge, c7i.xlarge, m6i.xlarge, m7i.xlarge and 4 other(s)"}
+{"level":"INFO","message":"launched nodeclaim","provider-id":"aws:///us-east-1a/i-0f3ab29c7d51e8a44","instance-type":"c6i.xlarge","zone":"us-east-1a","capacity-type":"on-demand"}</code></pre>
+<p class="step-p">Read that <code class="inline">requests</code> line: <code class="inline">3155m</code>, not <code class="inline">3000m</code> &#8212; Karpenter added the DaemonSet overhead (CNI, kube-proxy, Pod Identity agent) before choosing. That is the arithmetic that makes it pick the right size.</p>
+<p class="step-p"><strong>Within about 60 seconds</strong> the node appears in the watch terminal, and it is Ready shortly after:</p>
+<pre class="out"><code>NAME                          STATUS     ROLES    AGE   VERSION   NODEPOOL         INSTANCE-TYPE   CAPACITY-TYPE
+ip-10-0-33-14.ec2.internal    Ready      &lt;none&gt;   62m   v1.35.0   &lt;none&gt;           t3.medium       &lt;none&gt;
+ip-10-0-66-201.ec2.internal   Ready      &lt;none&gt;   62m   v1.35.0   &lt;none&gt;           t3.medium       &lt;none&gt;
+ip-10-0-41-88.ec2.internal    NotReady   &lt;none&gt;   8s    v1.35.0   transcode-live   c6i.xlarge      on-demand
+ip-10-0-41-88.ec2.internal    Ready      &lt;none&gt;   34s   v1.35.0   transcode-live   c6i.xlarge      on-demand</code></pre>
+<p class="step-p"><code class="inline">NODEPOOL=transcode-live</code>, <code class="inline">CAPACITY-TYPE=on-demand</code>, a <code class="inline">c</code> family with 4 vCPU. All three columns matter &#8212; if capacity type says <code class="inline">spot</code>, the pod landed on the wrong pool.</p>
+<p class="step-p">Confirm the pod is actually running on it:</p>
+<pre><code>kubectl get pod -l app=karpenter-smoke-test -o wide</code></pre>
+<p class="step-p">Now delete it and watch the other half of the loop:</p>
+<pre><code>kubectl delete deploy karpenter-smoke-test</code></pre>
+<p class="step-p">The node is empty immediately; <code class="inline">consolidateAfter: 2m</code> means Karpenter waits two minutes before acting, then drains and terminates:</p>
+<pre class="out"><code>{"level":"INFO","message":"disrupting nodeclaim(s) via delete, terminating 1 nodes","command-id":"...","reason":"empty"}</code></pre>
+<pre class="out"><code>ip-10-0-41-88.ec2.internal   Ready,SchedulingDisabled   &lt;none&gt;   3m    v1.35.0   transcode-live   c6i.xlarge   on-demand
+ip-10-0-41-88.ec2.internal   NotReady                   &lt;none&gt;   3m    ...</code></pre>
+<p class="step-p">and then it is gone from <code class="inline">kubectl get nodes</code>. <strong>Do not skip this half.</strong> A cluster that scales up and never scales down is worse than no autoscaling at all &#8212; it just costs money more slowly. Verify the node disappears, and if it does not, find out why before moving on.</p>
+<p class="step-p">Finally, confirm you are back to where you started:</p>
+<pre><code>kubectl get nodes
+kubectl get nodeclaims</code></pre>
+<p class="step-p">Two <code class="inline">t3.medium</code> managed nodes, no NodeClaims.</p>
+</div>
+<div class="gotcha section">
+<h3 id="m06-what-breaks">What breaks</h3>
+<p class="step-p">Ordered by how often each actually happens.</p>
+<h4 id="m06-1-pod-stays-pending-and-karpenters-logs-say-nothing-at-all">1. Pod stays <code class="inline">Pending</code>, and Karpenter's logs say nothing at all</h4>
+<p class="step-p">Karpenter has not noticed the pod, which almost always means the pod does not match any NodePool.</p>
+<pre><code>kubectl describe pod <span class="ph">&lt;name&gt;</span> | grep -A10 Events
+kubectl -n kube-system logs deploy/karpenter --tail=50</code></pre>
+<p class="step-p">The mismatch is usually one of:</p>
+<ul>
+<li>The toleration does not exactly match the taint. <code class="inline">key</code>, <code class="inline">value</code> and <code class="inline">effect</code> must all agree; <code class="inline">operator: Equal</code> with no <code class="inline">value</code> matches nothing.</li>
+<li>The <code class="inline">nodeSelector</code> labels are not on the NodePool's <code class="inline">template.metadata.labels</code>. <code class="inline">workload: transcode</code> and <code class="inline">transcode-mode: live</code> must both be there.</li>
+<li>The pod requests more than any allowed instance type provides &#8212; a 16 vCPU request against a pool restricted to <code class="inline">["4", "8"]</code> is unsatisfiable and Karpenter correctly does nothing.</li>
+</ul>
+<p class="step-p"><code class="inline">kubectl get nodepool transcode-live -o yaml</code> and compare against the pod spec line by line.</p>
+<h4 id="m06-2-instances-launch-and-terminate-repeatedly-kubectl-get-nodes-never-shows-them">2. Instances launch and terminate repeatedly; <code class="inline">kubectl get nodes</code> never shows them</h4>
+<p class="step-p">The missing access entry. This is the one with no Kubernetes-side signal at all.</p>
+<pre><code>aws eks list-access-entries --cluster-name streaming
+aws ec2 describe-instances \
+  --filters "Name=tag:karpenter.sh/nodepool,Values=transcode-live" \
+  --query 'Reservations[].Instances[].[InstanceId,State.Name,LaunchTime]' --output table</code></pre>
+<p class="step-p">If <code class="inline">KarpenterNodeRole-streaming</code> is not in the access entries list, run the <code class="inline">create-access-entry</code> command from step 6.5. To see the node's own view, connect with SSM and read the bootstrap log:</p>
+<pre><code>aws ssm start-session --target <span class="ph">&lt;instance-id&gt;</span>
+sudo journalctl -u kubelet -n 100</code></pre>
+<p class="step-p"><code class="inline">Unauthorized</code> from the API server confirms it.</p>
+<h4 id="m06-3-nodeclaim-created-but-stuck-never-launching-an-instance">3. <code class="inline">NodeClaim</code> created but stuck, never launching an instance</h4>
+<pre><code>kubectl get nodeclaims
+kubectl describe nodeclaim <span class="ph">&lt;name&gt;</span></code></pre>
+<p class="step-p">Read the conditions and events. The usual causes:</p>
+<ul>
+<li><strong><code class="inline">no subnets matched selector</code></strong> or <strong><code class="inline">no security groups matched selector</code></strong> &#8212; the discovery tags from step 6.2 are missing. Re-run the tagging commands and check with <code class="inline">aws ec2 describe-subnets --filters "Name=tag:karpenter.sh/discovery,Values=streaming" --query 'Subnets[].SubnetId'</code>.</li>
+<li><strong><code class="inline">InsufficientInstanceCapacity</code></strong> &#8212; AWS has none of that shape in that AZ right now. Genuinely happens with spot. Widening <code class="inline">instance-cpu</code> or adding a family gives Karpenter more options.</li>
+<li><strong><code class="inline">UnauthorizedOperation</code> on <code class="inline">ec2:RunInstances</code></strong> &#8212; the controller's IRSA is wrong. Check <code class="inline">kubectl -n kube-system get sa karpenter -o yaml</code> for the <code class="inline">eks.amazonaws.com/role-arn</code> annotation.</li>
+<li><strong><code class="inline">limits exceeded</code></strong> &#8212; the pool hit <code class="inline">limits.cpu</code>. Working as designed; either something is looping, or you need a bigger ceiling.</li>
+</ul>
+<h4 id="m06-4-node-appears-but-the-pod-still-will-not-schedule-onto-it">4. Node appears but the pod still will not schedule onto it</h4>
+<p class="step-p">Usually an <code class="inline">ephemeral-storage</code> request larger than the node's allocatable disk, or a second label mismatch.</p>
+<pre><code>kubectl describe node <span class="ph">&lt;new-node&gt;</span> | grep -A8 Allocatable
+kubectl describe pod <span class="ph">&lt;name&gt;</span> | grep -A10 Events</code></pre>
+<p class="step-p"><code class="inline">0/3 nodes are available: 1 Insufficient ephemeral-storage</code> against a 200 GiB root volume means the pod is asking for more than the kubelet reserves as allocatable &#8212; kubelet keeps back a slice for images and system use, so allocatable is meaningfully less than 200 GiB.</p>
+<h4 id="m06-5-pod-evicted-mid-run-with-pod-ephemeral-local-storage-usage-exceeds-the-total-limit-of-containers">5. Pod evicted mid-run with <code class="inline">Pod ephemeral local storage usage exceeds the total limit of containers</code></h4>
+<p class="step-p">The <code class="inline">tempfile</code> problem, in production. The transcode wrote more scratch than its limit allowed.</p>
+<pre><code>kubectl get events --sort-by=.lastTimestamp | grep -i evict
+kubectl describe pod <span class="ph">&lt;name&gt;</span> | grep -A5 "Last State"</code></pre>
+<p class="step-p">Raise the pod's <code class="inline">ephemeral-storage</code> limit (and <code class="inline">emptyDir.sizeLimit</code> to match), and check the numbers in the sizing section above against the actual source file. A 2 GiB VOD source with an 8 Gi limit will always lose &#8212; 2 GiB in plus the ladder out does not fit, which is why VOD gets 40Gi/50Gi and live gets 5Gi/8Gi.</p>
+<h4 id="m06-6-nodes-never-go-away-after-pods-finish">6. Nodes never go away after pods finish</h4>
+<pre><code>kubectl get nodes -L karpenter.sh/nodepool
+kubectl -n kube-system logs deploy/karpenter --tail=100 | grep -i -e disrupt -e consolidat
+kubectl get pods --all-namespaces --field-selector spec.nodeName=<span class="ph">&lt;node&gt;</span> -o wide</code></pre>
+<p class="step-p"><code class="inline">WhenEmpty</code> means literally empty. If any non-DaemonSet pod is still there, the node stays. The usual culprit is a system pod that got scheduled before the taint existed, or a completed Job's pod that was never cleaned up. Also check the node for a <code class="inline">karpenter.sh/do-not-disrupt</code> annotation left over from testing.</p>
+<h4 id="m06-7-exec-format-error-when-the-transcode-image-starts">7. <code class="inline">exec format error</code> when the transcode image starts</h4>
+<p class="step-p">An <code class="inline">arm64</code> node ran an <code class="inline">amd64</code> image, which means the <code class="inline">kubernetes.io/arch</code> requirement was widened or dropped.</p>
+<pre><code>kubectl get node <span class="ph">&lt;node&gt;</span> -o jsonpath='{.status.nodeInfo.architecture}'
+kubectl get nodepool transcode-live -o yaml | grep -A3 arch</code></pre>
+<p class="step-p">Restore <code class="inline">values: ["amd64"]</code> until CI publishes multi-arch images.</p>
+<p class="step-p"><strong>Next:</strong> <a href="part-2-platform.html#m07">Module 7 &#8212; Secrets</a>.</p>
+</div>
+</section>
+
+<section class="step" id="m07">
+  <div class="step-head">
+    <span class="step-num">07</span>
+    <h2>Secrets</h2>
+  </div>
+<p class="modnav"><em>Part II &#8212; Platform. Previous: <a href="part-2-platform.html#m06">Module 6</a>. Next: <a href="part-3-data-layer.html#m08">Module 8</a>.</em> ---</p>
+<h3 id="m07-what-youre-building">What you're building</h3>
+<p class="step-p">The end of <code class="inline">.env</code>. AWS Secrets Manager holds the credentials, the External Secrets Operator pulls them into the cluster on a schedule, and the applications read ordinary Kubernetes Secrets without knowing any of that happened. Non-secret configuration &#8212; the public RTMP and CDN URLs, the bucket name, the Kafka bootstrap address &#8212; moves to a ConfigMap in git where you can read it in a diff.</p>
+<p class="step-p">You will also retire several <code class="inline">.env</code> keys permanently, and deal with the fact that the file currently contains a live SSH password.</p>
+<div class="why section">
+<h3 id="m07-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m07-what-replaces-env-and-why-not-the-obvious-alternatives">What replaces <code class="inline">.env</code>, and why not the obvious alternatives</h4>
+<p class="step-p">Compose loads <code class="inline">.env</code> from disk and interpolates it into container environments. There is no equivalent on Kubernetes, and the naive translations are all worse than they look:</p>
+<ul>
+<li><strong><code class="inline">kubectl create secret</code> by hand.</strong> Works, once. Then nobody knows which cluster has which value, the secret is nowhere in version control, and recreating the cluster means recreating secrets from someone's terminal history.</li>
+<li><strong>Secrets committed to git.</strong> Kubernetes Secrets are base64, not encryption. Committing one is publishing it.</li>
+<li><strong>Sealed Secrets / SOPS.</strong> Encrypt the value into git, decrypt in-cluster. Legitimate, but the ciphertext still lives in the repo, rotation means a commit, and you now own a key-management problem.</li>
+<li><strong>AWS Secrets Manager + External Secrets Operator.</strong> The value lives in one place, with IAM controlling who can read it, CloudTrail recording who did, and rotation possible without a deploy. Git holds a <em>reference</em> &#8212; the secret's name &#8212; which is not sensitive.</li>
+</ul>
+<p class="step-p">The last one is what you are building. ESO is a controller that reads <code class="inline">ExternalSecret</code> resources, fetches from a provider, and writes ordinary Kubernetes Secrets. Your pods use <code class="inline">envFrom: secretRef</code> exactly as they would have anyway; nothing in the application knows AWS is involved.</p>
+<p class="step-p">Secrets Manager costs <strong>$0.40 per secret per month</strong> plus $0.05 per 10,000 API calls. Three secrets is $1.20/month, and <code class="inline">refreshInterval: 1h</code> across three secrets is about 2,200 calls a month &#8212; a cent. It is not a line item worth optimizing.</p>
+<h4 id="m07-secret-or-config-decide-per-key-not-per-file">Secret or config? Decide per key, not per file</h4>
+<p class="step-p"><code class="inline">.env</code> mixed the two because Compose gave no reason not to. Kubernetes distinguishes them, and it is worth honouring the distinction:</p>
+<p class="step-p"><strong>Secrets</strong> are things that grant access: database passwords, registry tokens, API credentials. They belong in Secrets Manager, gated by IAM, audited.</p>
+<p class="step-p"><strong>Config</strong> is everything else: hostnames, bucket names, ports, feature toggles. <code class="inline">RTMP_PUBLIC_URL</code> is literally printed on a web page for streamers to copy into OBS. <code class="inline">HLS_PUBLIC_BASE_URL</code> is in the <code class="inline">&lt;video&gt;</code> element of every viewer's browser. Treating them as secrets buys nothing and costs plenty &#8212; you cannot see the current value in a diff, you cannot review a change to it, and you pay $0.40/month for the privilege of hiding a URL that is on the internet.</p>
+<p class="step-p">So: <strong><code class="inline">RTMP_PUBLIC_URL</code>, <code class="inline">HLS_PUBLIC_BASE_URL</code>, <code class="inline">S3_BUCKET</code>, <code class="inline">UPLOAD_API_URL</code>, <code class="inline">KAFKA_BOOTSTRAP_SERVERS</code>, <code class="inline">AWS_REGION</code> go in a ConfigMap in git.</strong> Only the database credentials, the GHCR token and the MediaMTX API password go in Secrets Manager.</p>
+<h4 id="m07-every-key-in-the-current-env-and-where-it-goes">Every key in the current <code class="inline">.env</code>, and where it goes</h4>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th><code class="inline">.env</code> key today</th>
+<th>Destination</th>
+<th>Notes</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">POSTGRES_USER</code></td>
+<td><strong>Secrets Manager</strong> (RDS-managed)</td>
+<td>Folded into <code class="inline">POSTGRES_DSN</code> &#8212; see below</td>
+</tr>
+<tr>
+<td><code class="inline">POSTGRES_PASSWORD</code></td>
+<td><strong>Secrets Manager</strong> (RDS-managed)</td>
+<td>RDS creates and owns it; you never see it</td>
+</tr>
+<tr>
+<td><code class="inline">POSTGRES_DB</code></td>
+<td><strong>Secrets Manager</strong> (<code class="inline">streaming/db-endpoint</code>)</td>
+<td>Not a secret and <em>not</em> in the RDS-managed secret &#8212; see below. Created in <a href="part-3-data-layer.html#m08">Module 8</a> alongside the host and port</td>
+</tr>
+<tr>
+<td><code class="inline">MINIO_PUBLIC_URL</code></td>
+<td><strong>ConfigMap</strong>, renamed <code class="inline">HLS_PUBLIC_BASE_URL</code></td>
+<td>The <code class="inline">/media</code> path segment was MinIO's bucket name; CloudFront has no bucket segment. Code change in <a href="part-1-foundations.html#m00">Module 0</a>.</td>
+</tr>
+<tr>
+<td><code class="inline">RTMP_PUBLIC_URL</code></td>
+<td><strong>ConfigMap</strong></td>
+<td><strong>Currently missing from <code class="inline">.env</code> entirely.</strong> <code class="inline">web/main.py</code> does <code class="inline">os.environ["RTMP_PUBLIC_URL"]</code> at import, so the pod crashes on startup without it.</td>
+</tr>
+<tr>
+<td><code class="inline">MINIO_ROOT_USER</code></td>
+<td><strong>Retired</strong></td>
+<td>No MinIO. Replaced by Pod Identity.</td>
+</tr>
+<tr>
+<td><code class="inline">MINIO_ROOT_PASSWORD</code></td>
+<td><strong>Retired</strong></td>
+<td>Same</td>
+</tr>
+<tr>
+<td><code class="inline">S3_ACCESS_KEY</code></td>
+<td><strong>Retired</strong></td>
+<td>Same</td>
+</tr>
+<tr>
+<td><code class="inline">S3_SECRET_KEY</code></td>
+<td><strong>Retired</strong></td>
+<td>Same</td>
+</tr>
+<tr>
+<td><code class="inline">S3_ENDPOINT</code></td>
+<td><strong>Retired</strong></td>
+<td>Real S3 needs no endpoint override</td>
+</tr>
+<tr>
+<td><code class="inline">KAFKA_CLUSTER_ID</code></td>
+<td><strong>Retired</strong></td>
+<td>Strimzi generates and owns the KRaft cluster ID (<a href="part-3-data-layer.html#m10">Module 10</a>)</td>
+</tr>
+<tr>
+<td><code class="inline">SERVER_IP</code></td>
+<td><strong>Retired</strong></td>
+<td>The dev box is not part of this stack</td>
+</tr>
+<tr>
+<td><code class="inline">SERVER_USERNAME</code></td>
+<td><strong>Retired</strong></td>
+<td>Same</td>
+</tr>
+<tr>
+<td><code class="inline">SERVER_PASSWORD</code></td>
+<td><strong>Retired &#8212; and rotate it</strong></td>
+<td>See below</td>
+</tr>
+</tbody></table></div>
+<p class="step-p"><strong>On the retirements that Pod Identity causes:</strong> <code class="inline">MINIO_ROOT_USER</code>/<code class="inline">MINIO_ROOT_PASSWORD</code> and <code class="inline">S3_ACCESS_KEY</code>/<code class="inline">S3_SECRET_KEY</code> are the same two values wearing different names &#8212; Compose passed the MinIO root credentials straight through as the S3 keys. On AWS there is nothing to pass. The pod's ServiceAccount is associated with an IAM role, the SDK picks up temporary credentials from the Pod Identity agent, and they rotate themselves every few hours. <strong>The best thing you can do with a long-lived access key is not have one.</strong> Note this depends on the <code class="inline">s3_client()</code> change from <a href="part-1-foundations.html#m00">Module 0</a>: boto3 checks explicit arguments <em>first</em>, so as long as <code class="inline">aws_access_key_id=</code> is passed, Pod Identity credentials are fetched and then ignored.</p>
+<p class="step-p"><strong><code class="inline">KAFKA_CLUSTER_ID</code></strong> was a KRaft cluster identifier someone generated once and pasted into <code class="inline">.env</code>. Strimzi owns that now &#8212; it generates the ID when the <code class="inline">Kafka</code> resource is created and stores it in the cluster's own state. Keeping the old value around is worse than useless: if anyone ever set it, they would be asserting an identity that does not match the storage.</p>
+<h4 id="m07-serverpassword-read-this-part"><code class="inline">SERVER_PASSWORD</code> &#8212; read this part</h4>
+<p class="step-p">The first three lines of <code class="inline">.env</code> are:</p>
+<pre class="out"><code>SERVER_IP=100.64.0.9
+SERVER_USERNAME=fatima
+SERVER_PASSWORD=&lt;a real password&gt;</code></pre>
+<p class="step-p">Three things are true about this and all of them matter.</p>
+<p class="step-p"><strong>It is a live SSH credential for a real machine, sitting in plaintext on disk.</strong> Not an application secret &#8212; a login. Anyone who has ever had a copy of that file, or a backup of a laptop containing it, has shell access to the dev box as that user.</p>
+<p class="step-p"><strong>It does not belong in the same file as application config.</strong> Application config is copied around casually: pasted into chats, mounted into containers, included in support bundles, echoed by a debugging script that dumps the environment. That is fine for a bucket name. It is not fine for a login, and mixing the two guarantees the login gets the careless handling.</p>
+<p class="step-p"><strong>It has no Kubernetes equivalent, so it does not migrate.</strong> No pod SSHes to the dev box. There is no secret to create, no <code class="inline">ExternalSecret</code> to write. It is deleted, not moved.</p>
+<p class="step-p"><strong>Rotate it as part of this migration.</strong> Not because you know it leaked, but because you cannot know it did not &#8212; its exposure history includes every copy of the repo working tree and every shell that ever ran <code class="inline">env</code>. Change the password on the box, remove the three lines from <code class="inline">.env</code>, confirm <code class="inline">.env</code> is in <code class="inline">.gitignore</code> (it is), and &#8212; if the file was ever committed &#8212; remember that <code class="inline">git rm</code> does not remove it from history, so the rotation is the only thing that actually helps.</p>
+<h4 id="m07-secrets-manager-layout">Secrets Manager layout</h4>
+<p class="step-p">Everything under the <code class="inline">streaming/</code> prefix, which is what the IAM policy scopes to. Values are JSON objects, so one secret can hold several related keys and ESO can flatten them.</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Secret</th>
+<th>Contents</th>
+<th>Created by</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">rds!db-xxxxxxxx</code></td>
+<td><code class="inline">{username, password}</code> &#8212; and see the warning below</td>
+<td><strong>RDS</strong>, automatically (<a href="part-3-data-layer.html#m08">Module 8</a>)</td>
+</tr>
+<tr>
+<td><code class="inline">streaming/db-endpoint</code></td>
+<td><code class="inline">{"host": "...", "port": "5432", "dbname": "streaming"}</code></td>
+<td>You, in <a href="part-3-data-layer.html#m08">Module 8</a>, once the instance has an endpoint</td>
+</tr>
+<tr>
+<td><code class="inline">streaming/ghcr</code></td>
+<td><code class="inline">{"username": "...", "token": "..."}</code> for the image pull secret</td>
+<td>You</td>
+</tr>
+<tr>
+<td><code class="inline">streaming/mediamtx</code></td>
+<td><code class="inline">{"apiUser": "...", "apiPassword": "..."}</code></td>
+<td>You</td>
+</tr>
+</tbody></table></div>
+<p class="step-p"><strong>Let RDS own the database credential.</strong> <code class="inline">aws rds create-db-instance --manage-master-user-password</code> makes RDS generate the password, store it in its own secret, and optionally rotate it. You never see it, never paste it, and it exists in exactly one place. That secret's name is not under <code class="inline">streaming/</code>, which is why the IAM policy below allows <code class="inline">rds!db-*</code> as a second resource.</p>
+<p class="step-p"><strong>Do not assume what else is in that secret.</strong> The only fields AWS documents as being in an RDS-managed master user secret are <code class="inline">username</code> and <code class="inline">password</code>. AWS documents the secret's ARN and its status &#8212; it does not document the JSON shape, and it is free to change it. Plenty of writing online says the blob also carries <code class="inline">engine</code>, <code class="inline">host</code>, <code class="inline">port</code> and <code class="inline">dbname</code>; that shape comes from the <em>hand-created</em> "credentials for an RDS database" secret template, which is a different thing.</p>
+<p class="step-p">This matters more than it sounds, because the failure is silent. ESO's <code class="inline">extract</code> pulls whatever keys are there. Reference <code class="inline">{{ .host }}</code> when no <code class="inline">host</code> key exists and the template renders an empty string &#8212; the <code class="inline">ExternalSecret</code> reports <code class="inline">SecretSynced</code>, the Secret is created, and <code class="inline">POSTGRES_DSN</code> comes out as <code class="inline">postgresql://user:pw@:5432/?sslmode=require</code>. Everything says green and nothing connects.</p>
+<p class="step-p">So this course takes the endpoint from somewhere it controls: <strong><code class="inline">streaming/db-endpoint</code></strong>, a second, plain Secrets Manager entry holding the host, port and database name. None of those three is a credential &#8212; they are stable, non-secret facts about the instance, sitting in a private subnet &#8212; but putting them in Secrets Manager alongside the password gives the ESO template one uniform source instead of a mix of fetched values and hand-edited literals. It is already covered by the <code class="inline">streaming/*</code> resource pattern in the IAM policy below, so it needs no extra permission. Rotation still flows through untouched, because the password still comes from the secret RDS owns.</p>
+<h4 id="m07-the-derived-value-problem-composing-postgresdsn">The derived-value problem: composing <code class="inline">POSTGRES_DSN</code></h4>
+<p class="step-p">This is the one part of the migration where a straight key-to-key copy does not work, so it is worth understanding properly.</p>
+<p class="step-p"><code class="inline">docker-compose.yml</code> builds the DSN with shell interpolation at deploy time:</p>
+<pre><code>POSTGRES_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}</code></pre>
+<p class="step-p">Four <code class="inline">.env</code> values become one string, and every service gets the composed result. All five Python services then do <code class="inline">psycopg.connect(os.environ["POSTGRES_DSN"])</code>.</p>
+<p class="step-p"><strong>Kubernetes has no equivalent of that interpolation.</strong> Specifically:</p>
+<ul>
+<li><code class="inline">envFrom: secretRef</code> projects keys as literals. No templating.</li>
+<li><code class="inline">valueFrom: secretKeyRef</code> reads one key into one variable. No concatenation.</li>
+<li><code class="inline">$(VAR)</code> substitution in a container's <code class="inline">env</code> list <em>does</em> work &#8212; but only for variables defined earlier in that same container's <code class="inline">env</code>. To build the DSN that way you would have to expose <code class="inline">POSTGRES_USER</code>, <code class="inline">POSTGRES_PASSWORD</code>, <code class="inline">POSTGRES_DB</code> and the host as separate environment variables first, which puts the raw password in the pod spec's environment anyway, and means <code class="inline">kubectl describe pod</code> prints the variable names beside a value assembled from them.</li>
+</ul>
+<p class="step-p">The alternative &#8212; writing the composed DSN into Secrets Manager by hand &#8212; throws away the thing that made RDS-managed credentials worth having. Rotate the password and your hand-written DSN is stale, silently, until every service fails to connect at once.</p>
+<p class="step-p"><strong>ESO's <code class="inline">template</code> block solves it exactly.</strong> The template runs over the fetched data <em>before</em> the Kubernetes Secret is written, so composition happens once, in the operator, and the app sees a single literal value that stays correct across rotations:</p>
+<p class="step-p">This is <code class="inline">k8s/infra/secrets/externalsecret-db.yaml</code>, abridged &#8212; read the file itself, the comments in it are the argument:</p>
+<pre><code>  target:
+    name: streaming-db
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        POSTGRES_DSN: &gt;-
+          postgresql://{{ .username }}:{{ .password | urlquery }}@{{ .host }}:{{ .port }}/{{ .dbname }}?sslmode=require
+        host:     "{{ .host }}"
+        port:     "{{ .port }}"
+        username: "{{ .username }}"
+        password: "{{ .password }}"
+        dbname:   "{{ .dbname }}"
+  dataFrom:
+    <span class="c"># username + password. The name is generated, not chosen &#8212; Module 8 shows</span>
+    <span class="c"># you how to look it up.</span>
+    - extract:
+        key: rds!db-REPLACE-ME
+    <span class="c"># host + port + dbname. Created in Module 8. See the layout section above</span>
+    <span class="c"># for why these do not come out of the secret RDS manages.</span>
+    - extract:
+        key: streaming/db-endpoint</code></pre>
+<p class="step-p"><strong>Two <code class="inline">extract</code> entries, one flat namespace.</strong> ESO merges everything <code class="inline">dataFrom</code> produces into a single map before the template runs, so <code class="inline">.username</code> comes from the first secret and <code class="inline">.host</code> from the second and the template does not know or care which. A key present in both would be won by the later entry; there is no overlap here by design.</p>
+<p class="step-p">Three more details earn their place:</p>
+<p class="step-p"><strong><code class="inline">| urlquery</code> is not decoration.</strong> RDS-generated passwords contain punctuation. A password containing <code class="inline">@</code> produces <code class="inline">postgresql://user:pa@ss@host:5432/db</code>, and the URL parser splits on the <em>first</em> <code class="inline">@</code> &#8212; so it reads the host as <code class="inline">ss@host</code> and psycopg reports what looks like a DNS failure. A <code class="inline">/</code> truncates the database name instead. This will happen eventually, the symptom points at the wrong thing entirely, and one filter prevents it.</p>
+<p class="step-p"><strong><code class="inline">sslmode=require</code></strong> is appended because <a href="part-3-data-layer.html#m08">Module 8</a> sets <code class="inline">rds.force_ssl=1</code> on the parameter group. Without it every connection is refused at the server, which presents as <code class="inline">connection closed</code> rather than anything mentioning TLS.</p>
+<p class="step-p"><strong>The individual fields are kept as well</strong> because the <code class="inline">db-migrate</code> Job in <a href="part-3-data-layer.html#m08">Module 8</a> runs <code class="inline">psql</code>, which wants <code class="inline">PGHOST</code>/<code class="inline">PGUSER</code>/<code class="inline">PGPASSWORD</code>, not a DSN. Emitting both shapes from one <code class="inline">ExternalSecret</code> costs nothing.</p>
+<p class="step-p">Note that <code class="inline">engineVersion: v2</code> is required for these Go template functions. <code class="inline">v1</code> is the deprecated templating engine and silently behaves differently.</p>
+<h4 id="m07-the-thing-refreshinterval-does-not-do">The thing <code class="inline">refreshInterval</code> does not do</h4>
+<p class="step-p"><code class="inline">refreshInterval: 1h</code> re-fetches from Secrets Manager and rewrites the Kubernetes Secret. <strong>It does not restart your pods.</strong> A pod that read the Secret via <code class="inline">envFrom</code> at startup holds those values in its process environment until it dies. Rotate the RDS password and the Kubernetes Secret updates within the hour while every running pod continues using the old one &#8212; and keeps working, because the old password is still valid, right up until it is not.</p>
+<p class="step-p">Two honest options:</p>
+<ol>
+<li><strong>Accept it and write it down.</strong> After any rotation, <code class="inline">kubectl rollout restart deployment -n streaming --all</code>. This project has no rotation schedule, so this is the right answer for now &#8212; but it has to be in the runbook, not in someone's memory.</li>
+<li><strong>Run <a href="https://github.com/stakater/Reloader">Reloader</a></strong> &#8212; one small Deployment that watches Secrets and ConfigMaps and restarts the workloads that reference them. Worth it once rotation is automatic; premature before then.</li>
+</ol>
+<p class="step-p">The same applies to the ConfigMap: editing <code class="inline">streaming-config</code> does not restart anything either.</p>
+</div>
+<h3 id="m07-do-it">Do it</h3>
+<p class="step-p"><code class="inline">AWS_PROFILE=linkify-streaming</code> and <code class="inline">AWS_REGION=us-east-1</code> exported.</p>
+<h4 id="m07-71-create-the-secrets-you-own">7.1 &#8212; Create the secrets you own</h4>
+<p class="step-p">The GHCR pull token first. <code class="inline">ghcr.io/linkify-solutions-inc/*</code> images are private and cluster nodes have no GitHub credentials, so without this every pod fails with <code class="inline">ImagePullBackOff: denied</code>.</p>
+<p class="step-p">Generate a <strong>fine-grained personal access token with <code class="inline">read:packages</code> and nothing else</strong> at <code class="inline">https://github.com/settings/tokens</code>. Not a classic token with <code class="inline">repo</code> scope &#8212; that grants write access to source code to anything that can read this secret.</p>
+<pre><code>aws secretsmanager create-secret \
+  --name streaming/ghcr \
+  --description "GHCR pull token for the streaming platform" \
+  --secret-string '{"username":"<span class="ph">&lt;github-username&gt;</span>","token":"<span class="ph">&lt;ghp_...&gt;</span>"}'</code></pre>
+<p class="step-p">Then the MediaMTX API credentials. <a href="part-4-application.html#m12">Module 12</a> enables MediaMTX's control API on <code class="inline">:9997</code> for the NLB health check, and it should not be open:</p>
+<pre><code>aws secretsmanager create-secret \
+  --name streaming/mediamtx \
+  --secret-string "{\"apiUser\":\"mediamtx\",\"apiPassword\":\"$(openssl rand -base64 24)\"}"</code></pre>
+<p class="step-p">Generating it inline means the password never appears in your shell history or on your screen. Confirm both exist:</p>
+<pre><code>aws secretsmanager list-secrets \
+  --query 'SecretList[?starts_with(Name, `streaming/`)].[Name,CreatedDate]' --output table</code></pre>
+<p class="step-p">The RDS secret is not created here &#8212; <code class="inline">--manage-master-user-password</code> in <a href="part-3-data-layer.html#m08">Module 8</a> creates it.</p>
+<h4 id="m07-72-iam-role-for-eso">7.2 &#8212; IAM role for ESO</h4>
+<p class="step-p">Same Pod Identity trust policy as <a href="part-2-platform.html#m04">Modules 4</a> and <a href="part-2-platform.html#m05">5</a>:</p>
+<pre><code>ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+cat &gt; /tmp/pod-identity-trust.json &lt;&lt;'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "Service": "pods.eks.amazonaws.com" },
+      "Action": ["sts:AssumeRole", "sts:TagSession"]
+    }
+  ]
+}
+EOF
+
+aws iam create-role \
+  --role-name streaming-external-secrets \
+  --assume-role-policy-document file:///tmp/pod-identity-trust.json
+
+cat &gt; /tmp/eso-policy.json &lt;&lt;EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["secretsmanager:GetSecretValue", "secretsmanager:DescribeSecret"],
+      "Resource": [
+        "arn:aws:secretsmanager:us-east-1:${ACCOUNT_ID}:secret:streaming/*",
+        "arn:aws:secretsmanager:us-east-1:${ACCOUNT_ID}:secret:rds!db-*"
+      ]
+    }
+  ]
+}
+EOF
+
+aws iam put-role-policy \
+  --role-name streaming-external-secrets \
+  --policy-name read-streaming-secrets \
+  --policy-document file:///tmp/eso-policy.json</code></pre>
+<p class="step-p">Read-only, and scoped to two name patterns. ESO never needs to write, and this role cannot read a secret belonging to anything else in the account. The <code class="inline">rds!db-*</code> entry is separate because RDS names its managed secrets itself and will not put them under your prefix.</p>
+<h4 id="m07-73-install-eso">7.3 &#8212; Install ESO</h4>
+<pre><code>helm repo add external-secrets https://charts.external-secrets.io
+helm repo update
+helm search repo external-secrets/external-secrets --versions | head -3</code></pre>
+<p class="step-p">Pin what that reports:</p>
+<pre><code>export ESO_VERSION="&lt;version from helm search&gt;"
+
+helm install external-secrets external-secrets/external-secrets \
+  -n external-secrets --create-namespace \
+  --version "$ESO_VERSION" \
+  --set installCRDs=true
+
+aws eks create-pod-identity-association \
+  --cluster-name streaming \
+  --namespace external-secrets \
+  --service-account external-secrets \
+  --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/streaming-external-secrets"
+
+<span class="c"># Pod Identity credentials resolve at pod start, so the pod that is already</span>
+<span class="c"># running has none. Restart it.</span>
+kubectl -n external-secrets rollout restart deploy/external-secrets
+kubectl -n external-secrets rollout status deploy/external-secrets</code></pre>
+<p class="step-p">Three Deployments come up: <code class="inline">external-secrets</code> (the controller), <code class="inline">external-secrets-webhook</code> (validates the CRs) and <code class="inline">external-secrets-cert-controller</code> (issues the webhook's certificate). All three must be Ready before any <code class="inline">ExternalSecret</code> will be accepted &#8212; applying one against a not-yet-ready webhook fails with a connection-refused error mentioning <code class="inline">validate.externalsecret.external-secrets.io</code>.</p>
+<p class="step-p">Check which API version your install serves, because the manifests below use <code class="inline">v1</code>:</p>
+<pre><code>kubectl api-resources | grep externalsecret</code></pre>
+<pre class="out"><code>externalsecrets    es    external-secrets.io/v1    true    ExternalSecret</code></pre>
+<p class="step-p">If yours only offers <code class="inline">v1beta1</code>, either upgrade the chart or change <code class="inline">apiVersion</code> in the four manifests to match. The field layout is otherwise the same.</p>
+<h4 id="m07-74-create-the-namespace-and-the-store">7.4 &#8212; Create the namespace and the store</h4>
+<pre><code>kubectl create namespace streaming
+kubectl apply -f k8s/infra/secrets/clustersecretstore.yaml</code></pre>
+<pre><code>apiVersion: external-secrets.io/v1
+kind: ClusterSecretStore
+metadata:
+  name: aws-secretsmanager
+spec:
+  provider:
+    aws:
+      service: SecretsManager
+      region: us-east-1</code></pre>
+<p class="step-p">A <strong><code class="inline">ClusterSecretStore</code></strong>, not a namespaced <code class="inline">SecretStore</code>, because the same store serves <code class="inline">streaming</code> today and will serve other namespaces later without duplication.</p>
+<p class="step-p">There is deliberately <strong>no <code class="inline">auth:</code> block</strong>. With Pod Identity, the AWS SDK's default credential chain resolves through the agent automatically. Do <strong>not</strong> add <code class="inline">auth.jwt.serviceAccountRef</code> &#8212; ESO cannot impersonate a ServiceAccount whose role is bound by Pod Identity, and adding it produces <code class="inline">unable to assume role</code>, which reads like an IAM trust-policy problem and is actually a client-configuration problem. That error costs people an hour.</p>
+<p class="step-p">Confirm the store is valid:</p>
+<pre><code>kubectl get clustersecretstore aws-secretsmanager</code></pre>
+<pre class="out"><code>NAME                 AGE   STATUS   CAPABILITIES   READY
+aws-secretsmanager   10s   Valid    ReadWrite      True</code></pre>
+<p class="step-p"><code class="inline">Valid</code>/<code class="inline">True</code> means ESO authenticated to Secrets Manager successfully. If it says <code class="inline">Invalid</code>, stop here &#8212; no <code class="inline">ExternalSecret</code> will work.</p>
+<h4 id="m07-75-the-externalsecrets-and-the-configmap">7.5 &#8212; The ExternalSecrets and the ConfigMap</h4>
+<pre><code>kubectl apply -f k8s/infra/secrets/externalsecret-ghcr.yaml
+kubectl apply -f k8s/infra/secrets/externalsecret-mediamtx.yaml
+kubectl apply -f k8s/infra/secrets/configmap-app.yaml</code></pre>
+<p class="step-p">The GHCR one needs a <code class="inline">template</code> for a different reason than the database one &#8212; the shape, not the composition. The kubelet only honours a pull secret of type <code class="inline">kubernetes.io/dockerconfigjson</code> containing a single <code class="inline">.dockerconfigjson</code> key with a very specific JSON structure:</p>
+<pre><code>  target:
+    name: ghcr
+    template:
+      engineVersion: v2
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: |
+          {"auths":{"ghcr.io":{"username":"{{ .username }}","password":"{{ .token }}","auth":"{{ printf "%s:%s" .username .token | b64enc }}"}}}
+  dataFrom:
+    - extract:
+        key: streaming/ghcr</code></pre>
+<p class="step-p">The <code class="inline">auth</code> field is <code class="inline">username:token</code> base64-encoded &#8212; legacy, redundant with the two fields beside it, and required anyway by some registry clients. <code class="inline">b64enc</code> produces it.</p>
+<p class="step-p">Reference it from every pod spec with <code class="inline">imagePullSecrets: [{name: ghcr}]</code>, or once for the whole namespace by patching the default ServiceAccount:</p>
+<pre><code>kubectl -n streaming patch serviceaccount default \
+  -p '{"imagePullSecrets":[{"name":"ghcr"}]}'</code></pre>
+<p class="step-p">The ConfigMap holds the non-secret half. Edit <code class="inline">S3_BUCKET</code> to your real account ID before applying:</p>
+<pre><code>apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: streaming-config
+  namespace: streaming
+data:
+  RTMP_PUBLIC_URL: "rtmp://rtmp.k8s.linkifysolutions.com:1935"
+  HLS_PUBLIC_BASE_URL: "https://cdn.k8s.linkifysolutions.com"
+  UPLOAD_API_URL: "http://upload-api.streaming.svc.cluster.local:8000"
+  MEDIAMTX_RTMP_URL: "rtmp://mediamtx.streaming.svc.cluster.local:1935"
+  KAFKA_BOOTSTRAP_SERVERS: "streaming-kafka-bootstrap.kafka.svc.cluster.local:9092"
+  S3_BUCKET: "linkify-streaming-media-<span class="ph">&lt;accountid&gt;</span>"
+  AWS_REGION: "us-east-1"
+  S3_ADDRESSING_STYLE: "virtual"</code></pre>
+<p class="step-p"><code class="inline">RTMP_PUBLIC_URL</code> carries the explicit <code class="inline">:1935</code>. <code class="inline">web/main.py</code> builds <code class="inline">f"{RTMP_PUBLIC_URL}/{stream_key}"</code> and hands the result to a human to paste into OBS; OBS would default to 1935 anyway, but the explicit port makes the copy-pasted value self-documenting. This key <strong>is not in <code class="inline">.env</code> today</strong> &#8212; if you skip it, <code class="inline">web</code> crashes at import on <code class="inline">os.environ["RTMP_PUBLIC_URL"]</code>.</p>
+<p class="step-p"><code class="inline">KAFKA_BOOTSTRAP_SERVERS</code> uses the fully-qualified name because Kafka lives in the <code class="inline">kafka</code> namespace and the apps live in <code class="inline">streaming</code>. The short name resolves only within a namespace.</p>
+<p class="step-p">Consumed in <a href="part-4-application.html#m11">Module 11</a> like this:</p>
+<pre><code>envFrom:
+  - configMapRef: { name: streaming-config }
+  - secretRef:    { name: streaming-db }      <span class="c"># POSTGRES_DSN and the PG* fields</span></code></pre>
+<h4 id="m07-76-the-database-externalsecret">7.6 &#8212; The database ExternalSecret</h4>
+<p class="step-p"><code class="inline">k8s/infra/secrets/externalsecret-db.yaml</code> is written and ready, but <strong>it cannot sync yet</strong> &#8212; neither of the two secrets it reads exists until <a href="part-3-data-layer.html#m08">Module 8</a>: RDS creates <code class="inline">rds!db-&#8230;</code> with the instance, and you create <code class="inline">streaming/db-endpoint</code> once the instance has an endpoint to record. Module 8 does both, then substitutes the one placeholder and applies this file. There is no second copy of this manifest anywhere in the course &#8212; Module 8 applies <em>this</em> one.</p>
+<pre><code><span class="c"># In Module 8, once RDS exists:</span>
+aws rds describe-db-instances --db-instance-identifier streaming-db \
+  --query 'DBInstances[0].MasterUserSecret.SecretArn' --output text
+<span class="c"># then replace `rds!db-REPLACE-ME` in externalsecret-db.yaml with that secret's</span>
+<span class="c"># name and apply it. `streaming/db-endpoint` is already correct &#8212; you create it</span>
+<span class="c"># under exactly that name.</span></code></pre>
+<p class="step-p">Applying it now is harmless but produces a permanently failing resource, which makes the checkpoint below ambiguous. Leave it.</p>
+<div class="confirm section">
+<h3 id="m07-verify">Verify</h3>
+<p class="step-p"><strong>1. The store authenticated.</strong></p>
+<pre><code>kubectl get clustersecretstore aws-secretsmanager</code></pre>
+<p class="step-p"><code class="inline">STATUS=Valid</code>, <code class="inline">READY=True</code>.</p>
+<p class="step-p"><strong>2. The ExternalSecrets synced.</strong></p>
+<pre><code>kubectl get externalsecret -n streaming</code></pre>
+<pre class="out"><code>NAME                 STORE                REFRESH INTERVAL   STATUS         READY
+ghcr                 aws-secretsmanager   24h                SecretSynced   True
+streaming-mediamtx   aws-secretsmanager   1h                 SecretSynced   True</code></pre>
+<p class="step-p"><code class="inline">SecretSynced</code> / <code class="inline">True</code> on both. Anything else &#8212; <code class="inline">SecretSyncedError</code>, <code class="inline">ready=False</code> &#8212; means read the events:</p>
+<pre><code>kubectl describe externalsecret ghcr -n streaming | tail -20</code></pre>
+<p class="step-p"><strong>3. The generated Secrets exist and have the right shape.</strong></p>
+<pre><code>kubectl get secret -n streaming</code></pre>
+<pre class="out"><code>NAME                 TYPE                             DATA   AGE
+ghcr                 kubernetes.io/dockerconfigjson   1      45s
+streaming-mediamtx   Opaque                           2      45s</code></pre>
+<p class="step-p">The <code class="inline">TYPE</code> column on <code class="inline">ghcr</code> must read <code class="inline">kubernetes.io/dockerconfigjson</code>. If it says <code class="inline">Opaque</code>, the <code class="inline">template.type</code> line is missing and image pulls will fail with an error that never mentions the secret's type.</p>
+<p class="step-p">Prove the pull credential actually works, rather than assuming:</p>
+<pre><code>kubectl -n streaming get secret ghcr -o jsonpath='{.data.\.dockerconfigjson}' \
+  | base64 -d | python3 -m json.tool</code></pre>
+<pre class="out"><code>{
+    "auths": {
+        "ghcr.io": {
+            "username": "linkify-bot",
+            "password": "ghp_xxxxxxxxxxxxxxxxxxxx",
+            "auth": "bGlua2lmeS1ib3Q6Z2hwX3h4eHh4eHh4"
+        }
+    }
+}</code></pre>
+<p class="step-p"><strong>4. The template engine works &#8212; including <code class="inline">urlquery</code>.</strong> The database secret cannot sync until <a href="part-3-data-layer.html#m08">Module 8</a>, but you can validate the template today with a throwaway secret in the same shape, deliberately containing a password with the punctuation that breaks naive composition:</p>
+<pre><code>aws secretsmanager create-secret --name streaming/db-template-test \
+  --secret-string '{"username":"streaming","password":"p@ss/w0rd","host":"db.example.internal","port":"5432","dbname":"streaming"}'
+
+<span class="c"># Both `extract` keys are pointed at the one throwaway secret, because neither</span>
+<span class="c"># real source exists yet. Extracting the same secret twice is harmless &#8212; the</span>
+<span class="c"># merged map is the same either way.</span>
+sed -e 's|rds!db-REPLACE-ME|streaming/db-template-test|' \
+    -e 's|streaming/db-endpoint|streaming/db-template-test|' \
+    -e 's|name: streaming-db|name: streaming-db-test|' \
+    k8s/infra/secrets/externalsecret-db.yaml | kubectl apply -f -
+
+sleep 5
+kubectl -n streaming get secret streaming-db-test -o jsonpath='{.data.POSTGRES_DSN}' | base64 -d; echo</code></pre>
+<pre class="out"><code>postgresql://streaming:p%40ss%2Fw0rd@db.example.internal:5432/streaming?sslmode=require</code></pre>
+<p class="step-p"><strong>That is the checkpoint.</strong> The <code class="inline">@</code> became <code class="inline">%40</code> and the <code class="inline">/</code> became <code class="inline">%2F</code>, so the URL has exactly one <code class="inline">@</code> separating credentials from host and the database name is intact. Without <code class="inline">| urlquery</code> you would see <code class="inline">postgresql://streaming:p@ss/w0rd@db.example.internal:5432/...</code>, which psycopg parses as host <code class="inline">ss</code> and reports as a name-resolution failure.</p>
+<p class="step-p">Clean up the test:</p>
+<pre><code>kubectl -n streaming delete externalsecret streaming-db-test
+kubectl -n streaming delete secret streaming-db-test
+aws secretsmanager delete-secret --secret-id streaming/db-template-test \
+  --force-delete-without-recovery</code></pre>
+<p class="step-p">Run the same decode against the real <code class="inline">streaming-db</code> Secret at the end of <a href="part-3-data-layer.html#m08">Module 8</a>:</p>
+<pre><code>kubectl -n streaming get secret streaming-db -o jsonpath='{.data.POSTGRES_DSN}' | base64 -d</code></pre>
+<p class="step-p"><strong>5. <code class="inline">.env</code> has been dealt with.</strong> Not a command &#8212; a checklist:</p>
+<ul>
+<li>[ ] <code class="inline">SERVER_IP</code>, <code class="inline">SERVER_USERNAME</code>, <code class="inline">SERVER_PASSWORD</code> removed from <code class="inline">.env</code></li>
+<li>[ ] That SSH password <strong>rotated on the box</strong></li>
+<li>[ ] <code class="inline">MINIO_ROOT_*</code>, <code class="inline">S3_ACCESS_KEY</code>, <code class="inline">S3_SECRET_KEY</code>, <code class="inline">S3_ENDPOINT</code>, <code class="inline">KAFKA_CLUSTER_ID</code> removed</li>
+<li>[ ] <code class="inline">.env</code> confirmed in <code class="inline">.gitignore</code> (<code class="inline">git check-ignore -v .env</code>)</li>
+<li>[ ] <code class="inline">git log --all --full-history -- .env</code> returns nothing &#8212; if it returns commits, the values in them are compromised regardless of what the file says now</li>
+</ul>
+</div>
+<div class="gotcha section">
+<h3 id="m07-what-breaks">What breaks</h3>
+<p class="step-p">Ordered by how often each actually happens.</p>
+<h4 id="m07-1-externalsecret-shows-secretsyncederror">1. <code class="inline">ExternalSecret</code> shows <code class="inline">SecretSyncedError</code></h4>
+<pre><code>kubectl describe externalsecret <span class="ph">&lt;name&gt;</span> -n streaming | tail -25
+kubectl -n external-secrets logs deploy/external-secrets --tail=50</code></pre>
+<p class="step-p">The message names the cause:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Message</th>
+<th>Cause</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">AccessDeniedException</code></td>
+<td>IAM. Check the association, and that the secret name matches the policy's <code class="inline">streaming/*</code> or <code class="inline">rds!db-*</code> pattern.</td>
+</tr>
+<tr>
+<td><code class="inline">ResourceNotFoundException</code></td>
+<td>Secret name typo, or it is in a different region. <code class="inline">aws secretsmanager list-secrets --query 'SecretList[].Name'</code>.</td>
+</tr>
+<tr>
+<td><code class="inline">unable to assume role</code></td>
+<td>An <code class="inline">auth:</code> block in the <code class="inline">ClusterSecretStore</code>. Delete it &#8212; with Pod Identity there must be none.</td>
+</tr>
+<tr>
+<td><code class="inline">key not found in secret</code></td>
+<td>The JSON in Secrets Manager lacks a field the template references. Compare <code class="inline">aws secretsmanager get-secret-value --secret-id &lt;name&gt; --query SecretString</code> with the template.</td>
+</tr>
+</tbody></table></div>
+<h4 id="m07-2-clustersecretstore-shows-invalid">2. <code class="inline">ClusterSecretStore</code> shows <code class="inline">Invalid</code></h4>
+<p class="step-p">ESO cannot get credentials at all &#8212; usually because the pod started before the Pod Identity association existed.</p>
+<pre><code>kubectl describe clustersecretstore aws-secretsmanager | tail -20
+aws eks list-pod-identity-associations --cluster-name streaming \
+  --query 'associations[?namespace==`external-secrets`]'
+kubectl -n external-secrets rollout restart deploy/external-secrets</code></pre>
+<p class="step-p">Verify the ServiceAccount name is exactly <code class="inline">external-secrets</code>:</p>
+<pre><code>kubectl -n external-secrets get sa</code></pre>
+<h4 id="m07-3-pods-imagepullbackoff-with-denied-even-though-the-ghcr-secret-exists">3. Pods <code class="inline">ImagePullBackOff</code> with <code class="inline">denied</code> even though the <code class="inline">ghcr</code> Secret exists</h4>
+<pre><code>kubectl describe pod <span class="ph">&lt;name&gt;</span> -n streaming | grep -A10 Events
+kubectl -n streaming get secret ghcr -o jsonpath='{.type}'
+kubectl -n streaming get sa default -o yaml | grep -A3 imagePullSecrets</code></pre>
+<p class="step-p">Three usual causes: the Secret type is <code class="inline">Opaque</code> rather than <code class="inline">kubernetes.io/dockerconfigjson</code>; the pod spec has no <code class="inline">imagePullSecrets</code> and the ServiceAccount was never patched; or the PAT has expired or lacks <code class="inline">read:packages</code>. Test the credential outside Kubernetes to isolate it:</p>
+<pre><code>echo "<span class="ph">&lt;token&gt;</span>" | docker login ghcr.io -u "<span class="ph">&lt;username&gt;</span>" --password-stdin</code></pre>
+<h4 id="m07-4-postgresdsn-present-but-the-app-cannot-connect">4. <code class="inline">POSTGRES_DSN</code> present but the app cannot connect</h4>
+<p class="step-p">Decode it and look at it before assuming the database is at fault:</p>
+<pre><code>kubectl -n streaming get secret streaming-db -o jsonpath='{.data.POSTGRES_DSN}' | base64 -d; echo</code></pre>
+<ul>
+<li>More than one <code class="inline">@</code> before the host &#8594; <code class="inline">| urlquery</code> is missing from the template.</li>
+<li>No <code class="inline">?sslmode=require</code> &#8594; RDS with <code class="inline">rds.force_ssl=1</code> refuses the connection and reports it as a closed connection.</li>
+<li>Right-looking DSN, still failing &#8594; it is the security group, not this module. <a href="part-3-data-layer.html#m08">Module 8</a>.</li>
+</ul>
+<h4 id="m07-5-rotating-a-secret-changes-nothing">5. Rotating a secret changes nothing</h4>
+<p class="step-p">Working as designed, and covered above. ESO updated the Kubernetes Secret; the running pods still hold the old environment.</p>
+<pre><code>kubectl -n streaming get secret streaming-db -o jsonpath='{.metadata.annotations}' | jq
+kubectl rollout restart deployment -n streaming --all</code></pre>
+<p class="step-p">To force ESO to re-fetch immediately rather than waiting out <code class="inline">refreshInterval</code>:</p>
+<pre><code>kubectl -n streaming annotate externalsecret streaming-db force-sync="$(date +%s)" --overwrite</code></pre>
+<h4 id="m07-6-applying-an-externalsecret-fails-with-a-webhook-error">6. Applying an <code class="inline">ExternalSecret</code> fails with a webhook error</h4>
+<pre><code>kubectl -n external-secrets get pods
+kubectl -n external-secrets logs deploy/external-secrets-webhook --tail=30</code></pre>
+<p class="step-p"><code class="inline">connection refused</code> on <code class="inline">validate.externalsecret.external-secrets.io</code> means the webhook Deployment is not Ready yet &#8212; wait for all three ESO Deployments and retry. If it persists, the cert-controller has not issued the webhook's certificate; restart it.</p>
+<h4 id="m07-7-no-matches-for-kind-externalsecret-in-version-external-secretsiov1">7. <code class="inline">no matches for kind "ExternalSecret" in version "external-secrets.io/v1"</code></h4>
+<p class="step-p">Your chart version serves <code class="inline">v1beta1</code> only.</p>
+<pre><code>kubectl api-resources | grep external-secrets
+helm list -n external-secrets</code></pre>
+<p class="step-p">Either upgrade the chart or change <code class="inline">apiVersion</code> in the four manifests under <code class="inline">k8s/infra/secrets/</code>. Do not mix versions across files.</p>
+<p class="step-p"><strong>Next:</strong> <a href="part-3-data-layer.html#m08">Module 8 &#8212; RDS Postgres</a>. That is where the RDS-managed secret appears and <code class="inline">externalsecret-db.yaml</code> finally gets applied.</p>
+</div>
+</section>
+
+<footer class="finish">
+  <span class="eyebrow">End of Part II</span>
+  <p>The cluster now has a default gp3 StorageClass, a real HTTPS hostname, nodes that appear when workloads need them, and secrets synced from AWS Secrets Manager. Next is the data layer.</p>
+</footer>
+<div class="pager"><a href="part-1-foundations.html">&larr; Part I &mdash; Foundations</a><a href="part-3-data-layer.html">Part III &mdash; Data layer &rarr;</a></div>
+</main>
+</div>

@@ -1,0 +1,1489 @@
+<title>AWS/EKS &mdash; Part I: Foundations</title>
+<style>
+  :root {
+    --paper: #eef1f4;
+    --surface: #ffffff;
+    --surface-dim: #e4e8ec;
+    --ink: #1b232c;
+    --ink-dim: #57626d;
+    --line: #ccd3d9;
+    --amber: #a35f22;
+    --amber-ink: #7c4718;
+    --teal: #2d5f74;
+    --teal-bg: #dfe9ec;
+    --ok: #2f6b3e;
+    --ok-bg: #dfeee2;
+    --warn: #9a3d3d;
+    --warn-bg: #f2e0e0;
+    --code-bg: #1b232c;
+    --code-ink: #e7ebee;
+    --code-dim: #93a1ac;
+    --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+      --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+      --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+      --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+      --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+    --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+    --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+    --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+    --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1f4; --surface: #ffffff; --surface-dim: #e4e8ec;
+    --ink: #1b232c; --ink-dim: #57626d; --line: #ccd3d9;
+    --amber: #a35f22; --amber-ink: #7c4718; --teal: #2d5f74; --teal-bg: #dfe9ec;
+    --ok: #2f6b3e; --ok-bg: #dfeee2; --warn: #9a3d3d; --warn-bg: #f2e0e0;
+    --code-bg: #1b232c; --code-ink: #e7ebee; --code-dim: #93a1ac; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6; font-size: 16px;
+  }
+  ::selection { background: var(--amber); color: #fff; }
+  a { color: var(--amber-ink); }
+  code, pre, kbd {
+    font-family: "Cascadia Code", "Cascadia Mono", ui-monospace, "SF Mono", Consolas,
+      "Liberation Mono", monospace;
+  }
+
+  .topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .topbar-inner { max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 1.75rem; }
+  .eyebrow {
+    display: inline-block; font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--amber-ink); background: color-mix(in srgb, var(--amber) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    padding: 0.2rem 0.55rem; border-radius: 3px;
+  }
+  h1 {
+    margin: 0.65rem 0 0.35rem; font-size: 1.95rem; font-weight: 700;
+    letter-spacing: -0.015em; text-wrap: balance;
+  }
+  .subtitle {
+    margin: 0 0 1rem; color: var(--ink-dim); font-size: 1.02rem;
+    max-width: 64ch; text-wrap: pretty;
+  }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem;
+    font-size: 0.85rem; color: var(--ink-dim);
+  }
+  .meta-row strong { color: var(--ink); font-weight: 600; }
+
+  .layout {
+    max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 5rem;
+    display: grid; grid-template-columns: 210px minmax(0, 1fr);
+    gap: 2.5rem; align-items: start;
+  }
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+    .rail { display: none; }
+  }
+
+  .rail {
+    position: sticky; top: 1.5rem; display: flex; flex-direction: column;
+    gap: 0.1rem; max-height: calc(100vh - 3rem); overflow-y: auto;
+    padding-right: 0.4rem;
+  }
+  .rail-label {
+    font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 0.45rem;
+  }
+  .rail-label + .rail-label, .rail a + .rail-label { margin-top: 1.1rem; }
+  .rail a {
+    display: flex; gap: 0.5rem; align-items: baseline;
+    padding: 0.3rem 0 0.3rem 0.7rem; font-size: 0.85rem;
+    color: var(--ink-dim); text-decoration: none;
+    border-left: 2px solid var(--line); margin-left: -1px;
+  }
+  .rail a:hover { color: var(--ink); border-left-color: var(--amber); }
+  .rail a .n {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber-ink); font-size: 0.78rem; flex-shrink: 0;
+  }
+
+  main { min-width: 0; }
+
+  .intro { color: var(--ink-dim); max-width: 68ch; margin: 0 0 2rem; }
+  .intro strong { color: var(--ink); }
+  .intro p { margin: 0 0 0.9rem; text-wrap: pretty; }
+
+  .step {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.5rem 1.6rem 1.7rem;
+    margin-bottom: 1.5rem; box-shadow: var(--shadow); scroll-margin-top: 1.5rem;
+  }
+  .step-head {
+    display: flex; align-items: baseline; gap: 0.85rem;
+    margin-bottom: 0.9rem; flex-wrap: wrap;
+  }
+  .step-num {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber); font-size: 1.05rem; font-weight: 600;
+  }
+  .step h2 { margin: 0; font-size: 1.2rem; font-weight: 650; letter-spacing: -0.008em; }
+  .step h3 {
+    margin: 1.6rem 0 0.6rem; font-size: 0.99rem; font-weight: 650;
+    letter-spacing: -0.005em;
+  }
+  .step h3:first-child { margin-top: 0; }
+  .step h4 {
+    margin: 1.1rem 0 0.4rem; font-size: 0.9rem; font-weight: 650;
+    color: var(--ink-dim); letter-spacing: 0.01em;
+  }
+  .context-chip {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--teal); background: var(--teal-bg);
+    border-radius: 999px; padding: 0.18rem 0.65rem; white-space: nowrap;
+  }
+
+  .why, .confirm, .gotcha {
+    display: flex; gap: 0.7rem; border-radius: 0 6px 6px 0;
+    padding: 0.8rem 0.95rem; margin: 0 0 1rem;
+    font-size: 0.92rem; text-wrap: pretty;
+  }
+  .why { background: var(--teal-bg); border-left: 3px solid var(--teal); }
+  .why b { color: var(--teal); font-weight: 700; }
+  .confirm { background: var(--ok-bg); border-left: 3px solid var(--ok); }
+  .confirm b { color: var(--ok); font-weight: 700; }
+  .gotcha { background: var(--warn-bg); border-left: 3px solid var(--warn); }
+  .gotcha b { color: var(--warn); font-weight: 700; }
+
+  p.step-p { margin: 0 0 1rem; text-wrap: pretty; }
+  p.step-p:last-child { margin-bottom: 0; }
+  .step ul, .step ol { margin: 0 0 1rem; padding-left: 1.35rem; }
+  .step li { margin-bottom: 0.45rem; text-wrap: pretty; }
+  .step li:last-child { margin-bottom: 0; }
+  .step ul ul, .step ol ol, .step ul ol { margin: 0.4rem 0 0; }
+
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+    padding: 0.85rem 1rem; margin: 0 0 1rem; overflow-x: auto;
+    font-size: 0.85rem; line-height: 1.6;
+  }
+  pre code { color: inherit; }
+  pre .c { color: var(--code-dim); }
+  pre .ph { color: var(--code-key); }
+  pre.out {
+    background: var(--surface-dim); color: var(--ink); border: 1px solid var(--line);
+  }
+  pre.out .c { color: var(--ink-dim); }
+  code.inline {
+    background: var(--surface-dim); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.87em; word-break: break-word;
+  }
+
+  .tbl-wrap { overflow-x: auto; margin: 0 0 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 460px; }
+  th, td {
+    text-align: left; padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  th {
+    font-size: 0.73rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-dim); font-weight: 600;
+  }
+  td code { font-size: 0.85em; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .diagram {
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.1rem; margin: 0 0 1.2rem;
+  }
+  .dlayer {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 0.75rem 0.85rem; margin-bottom: 0.55rem;
+  }
+  .dlayer:last-child { margin-bottom: 0; }
+  .dlayer-title {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--amber-ink); margin-bottom: 0.5rem;
+  }
+  .dboxes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .dbox {
+    border: 1px solid var(--line); border-radius: 5px;
+    padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--paper);
+  }
+  .dbox b { display: block; font-weight: 650; font-size: 0.82rem; }
+  .dbox span {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; color: var(--ink-dim);
+  }
+  .dbox.accent {
+    border-color: var(--amber);
+    background: color-mix(in srgb, var(--amber) 8%, var(--paper));
+  }
+  .dbox.teal { border-color: var(--teal); background: var(--teal-bg); }
+  .darrow {
+    text-align: center; color: var(--ink-dim); font-size: 0.88rem;
+    margin: 0.15rem 0; font-family: "Cascadia Code", ui-monospace, monospace;
+  }
+
+  /* numbered end-to-end trace */
+  .trace { margin: 0 0 1.2rem; counter-reset: tr; }
+  .trace-item {
+    display: grid; grid-template-columns: 1.7rem minmax(0, 1fr);
+    gap: 0.85rem; padding-bottom: 1rem; position: relative;
+  }
+  .trace-item::before {
+    counter-increment: tr; content: counter(tr);
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.75rem; font-weight: 600; color: var(--amber-ink);
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 50%; width: 1.7rem; height: 1.7rem;
+    display: grid; place-items: center;
+  }
+  .trace-item:not(:last-child)::after {
+    content: ""; position: absolute; left: 0.85rem; top: 1.85rem; bottom: 0.1rem;
+    width: 1px; background: var(--line);
+  }
+  .trace-item > div { padding-top: 0.1rem; font-size: 0.92rem; }
+  .trace-item b { font-weight: 650; }
+  .trace-item .who {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.74rem; color: var(--teal); display: block; margin-bottom: 0.1rem;
+  }
+
+  .glossary { font-size: 0.9rem; }
+  .glossary dt {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-weight: 600; color: var(--amber-ink); margin-top: 0.8rem; font-size: 0.85rem;
+  }
+  .glossary dt:first-child { margin-top: 0; }
+  .glossary dd { margin: 0.15rem 0 0; color: var(--ink); text-wrap: pretty; }
+
+  footer.finish {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--amber); border-radius: 0 10px 10px 0;
+    padding: 1.3rem 1.5rem; box-shadow: var(--shadow); font-size: 0.97rem;
+  }
+  footer.finish .eyebrow { margin-bottom: 0.6rem; }
+  footer.finish p { margin: 0 0 0.8rem; text-wrap: pretty; }
+  footer.finish p:last-child { margin-bottom: 0; }
+
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  /* ---- additions for the AWS course ---------------------------------- */
+
+  /* Section-level variants of the three callouts: they hold whole sections
+     (headings, tables, code) rather than a single sentence. */
+  .why.section, .confirm.section, .gotcha.section {
+    display: block; border-radius: 0 8px 8px 0;
+    padding: 1.15rem 1.3rem 1.25rem; margin: 0 0 1.4rem; font-size: 1rem;
+  }
+  .why.section { background: color-mix(in srgb, var(--teal-bg) 60%, var(--surface)); }
+  .confirm.section { background: color-mix(in srgb, var(--ok-bg) 55%, var(--surface)); }
+  .gotcha.section { background: color-mix(in srgb, var(--warn-bg) 55%, var(--surface)); }
+  .section > h3:first-child { margin-top: 0; }
+  .why.section > h3:first-child { color: var(--teal); }
+  .confirm.section > h3:first-child { color: var(--ok); }
+  .gotcha.section > h3:first-child { color: var(--warn); }
+  .section > *:last-child { margin-bottom: 0; }
+  .section pre.out { background: var(--surface); }
+
+  .step h4 { color: var(--ink); font-size: 0.95rem; }
+
+  .modnav {
+    font-size: 0.85rem; color: var(--ink-dim); margin: 0 0 1.2rem;
+    padding-bottom: 0.8rem; border-bottom: 1px solid var(--line);
+  }
+
+  blockquote {
+    margin: 0 0 1rem; padding: 0.1rem 0 0.1rem 1rem;
+    border-left: 3px solid var(--line); color: var(--ink-dim);
+  }
+  blockquote p.step-p:last-child { margin-bottom: 0; }
+
+  .step li > pre, .step li > .tbl-wrap { margin-top: 0.5rem; }
+
+  .pager {
+    display: flex; flex-wrap: wrap; gap: 0.75rem 1rem;
+    justify-content: space-between; margin-top: 1.5rem;
+    font-size: 0.9rem;
+  }
+  .pager a { text-decoration: none; }
+  .pager a:hover { text-decoration: underline; }
+
+  .rail a.home { border-left-color: var(--amber); color: var(--ink); }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="eyebrow">AWS &middot; EKS course &middot; Part I</span>
+    <h1>Foundations</h1>
+    <p class="subtitle">The code changes that have to happen before AWS exists, the account and cost guardrails, the VPC design, and the EKS cluster itself.</p>
+    <div class="meta-row">
+      <span><strong>Modules:</strong> 0&ndash;3</span>
+      <span><strong>Region:</strong> us-east-1</span>
+      <span><strong>Cluster:</strong> streaming</span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+<nav class="rail">
+  <div class="rail-label">Part I &mdash; Foundations</div>
+  <a href="#m00"><span class="n">00</span> Pre-flight: the code must change first</a>
+  <a href="#m01"><span class="n">01</span> AWS account, access, and not getting a surprise bill</a>
+  <a href="#m02"><span class="n">02</span> The VPC</a>
+  <a href="#m03"><span class="n">03</span> The EKS cluster</a>
+  <div class="rail-label">Course</div>
+  <a href="index.html" class="home"><span class="n">&#8617;</span> Course index</a>
+  <a href="part-2-platform.html"><span class="n">II</span> Platform</a>
+  <a href="part-3-data-layer.html"><span class="n">III</span> Data layer</a>
+  <a href="part-4-application.html"><span class="n">IV</span> The application</a>
+  <a href="part-5-elastic.html"><span class="n">V</span> Elastic and automated</a>
+</nav>
+
+<main>
+<section class="step" id="m00">
+  <div class="step-head">
+    <span class="step-num">00</span>
+    <h2>Pre-flight: the code must change first</h2>
+  </div>
+<h3 id="m00-what-youre-building">What you're building</h3>
+<p class="step-p">A version of the five services that <em>can</em> run on AWS. No AWS resources yet, no account, no cluster &#8212; this module is entirely edits to <code class="inline">services/</code>, <code class="inline">postgres/</code>, <code class="inline">docker-compose.yml</code> and the test env stubs, verified by <code class="inline">docker compose up</code> and the existing pytest suite still passing. At the end of it, nothing about the application behaves differently on your laptop, and every hard blocker to running it on EKS is gone.</p>
+<div class="why section">
+<h3 id="m00-why-it-works-this-way">Why it works this way</h3>
+<p class="step-p">The instinct with a migration like this is lift-and-shift: containers are containers, Kubernetes runs containers, so point it at a cluster and go. That instinct is right about 80% of this codebase and wrong about the 20% that stops you dead.</p>
+<p class="step-p">Three things in the code make "just deploy it" impossible, and they are impossible in different ways:</p>
+<ol>
+<li><strong>The S3 bucket is hardcoded to <code class="inline">media</code>.</strong> You cannot create an S3 bucket called <code class="inline">media</code>. Not "you shouldn't" &#8212; you <em>can't</em>. Someone took the name a decade ago and S3 bucket names are globally unique across every AWS account on earth. There is no infrastructure workaround: no alias, no rename, no per-account namespace. The bucket name has to come out of the code.</li>
+<li><strong><code class="inline">web</code> builds HLS URLs with a <code class="inline">/media</code> path segment</strong> that only made sense because MinIO puts the bucket in the URL path. Behind CloudFront the bucket <em>is</em> the origin, so that segment points at an S3 key that does not exist. Every player 403s, and the failure looks exactly like a CORS problem, which is the wrong thing to spend two days on.</li>
+<li><strong><code class="inline">s3_client()</code> passes explicit credentials to boto3.</strong> boto3 checks explicit arguments first in its credential chain, so passing <code class="inline">aws_access_key_id</code> means the pod's IAM role is attached, present, valid &#8212; and silently ignored. And the vars are read with <code class="inline">os.environ[...]</code>, so you cannot fix that by not setting them: the process dies at import with a <code class="inline">KeyError</code>.</li>
+</ol>
+<p class="step-p">None of these produce a helpful error message on AWS. Blocker 1 fails at bucket-creation time with <code class="inline">BucketAlreadyExists</code> (which reads like a mistake you made). Blocker 2 fails in the browser. Blocker 3 fails as <code class="inline">AccessDenied</code> on a role that visibly has the permission.</p>
+<p class="step-p">There are two more changes in this module that are not blockers in the same absolute sense but that you will regret skipping: the database schema has to become re-runnable because RDS has no init hook, and every service should report <em>all</em> its missing config at once instead of dying on the first one.</p>
+<p class="step-p">Do this work before you have an AWS account. It's free, it's testable locally, and it means that when something breaks in Module 11, it's an AWS problem and not this.</p>
+</div>
+<h3 id="m00-do-it">Do it</h3>
+<h4 id="m00-01-the-bucket-name-upload-api-transcode-worker">0.1 &#8212; The bucket name (<code class="inline">upload-api</code>, <code class="inline">transcode-worker</code>)</h4>
+<p class="step-p"><code class="inline">services/upload-api/main.py</code> has the literal <code class="inline">"media"</code> in two places.</p>
+<pre><code>+BUCKET = os.environ.get("S3_BUCKET", "media")
++
++
+ def s3_client():</code></pre>
+<pre><code>     try:
+-        s3_client().head_bucket(Bucket="media")
++        s3_client().head_bucket(Bucket=BUCKET)
+         checks["minio"] = "ok"
+     except Exception as exc:  <span class="c"># noqa: BLE001</span>
+         checks["minio"] = f"error: {exc}"</code></pre>
+<pre><code>         try:
+             s3_client().upload_fileobj(
+-                _SizeLimitedReader(file.file, MAX_UPLOAD_BYTES), "media", object_key
++                _SizeLimitedReader(file.file, MAX_UPLOAD_BYTES), BUCKET, object_key
+             )</code></pre>
+<p class="step-p"><code class="inline">services/transcode-worker/main.py</code> has it once, as a module constant, and the three call sites (<code class="inline">upload_file</code> in <code class="inline">_upload_pass</code>, <code class="inline">download_file</code> and <code class="inline">upload_file</code> in <code class="inline">transcode_video</code>) already read that constant &#8212; so it is a one-line change:</p>
+<pre><code> MEDIAMTX_RTMP_BASE = os.environ.get("MEDIAMTX_RTMP_URL", "rtmp://mediamtx:1935")
+-BUCKET = "media"
++BUCKET = os.environ.get("S3_BUCKET", "media")</code></pre>
+<p class="step-p">The default of <code class="inline">"media"</code> is deliberate: Compose sets nothing and keeps working, and MinIO's <code class="inline">minio-init</code> service still creates <code class="inline">local/media</code>. On EKS you set <code class="inline">S3_BUCKET=linkify-streaming-media-&lt;accountid&gt;</code> and the same image does the right thing.</p>
+<p class="step-p">Why the bucket ends up named <code class="inline">linkify-streaming-media-&lt;accountid&gt;</code>: bucket names must be globally unique, and appending your AWS account ID is the standard way to guarantee that without inventing a random suffix you then have to remember. That name is fixed in the <a href="index.html#conventions-used-throughout">conventions table</a> and you'll create the bucket in <a href="part-3-data-layer.html#m09">Module 9</a>.</p>
+<h4 id="m00-02-the-media-path-segment-in-web">0.2 &#8212; The <code class="inline">/media</code> path segment in <code class="inline">web</code></h4>
+<p class="step-p">Today:</p>
+<pre><code>manifest_url = f"{MINIO_PUBLIC_URL}/media/hls/{prefix}/{content_id}/master.m3u8"</code></pre>
+<p class="step-p">With MinIO, <code class="inline">MINIO_PUBLIC_URL</code> was a host (<code class="inline">http://box:9000</code>) and <code class="inline">/media/</code> was the <strong>bucket name</strong> in a path-style S3 URL: <code class="inline">http://box:9000/media/hls/live/&lt;id&gt;/master.m3u8</code>. Path-style URLs put the bucket in the path.</p>
+<p class="step-p">With CloudFront in front of one S3 bucket, the distribution's origin <em>is</em> that bucket. There is no bucket segment. <code class="inline">https://cdn.k8s.linkifysolutions.com/media/hls/live/&lt;id&gt;/master.m3u8</code> asks CloudFront for the S3 key <code class="inline">media/hls/live/&lt;id&gt;/master.m3u8</code>, and the key that exists is <code class="inline">hls/live/&lt;id&gt;/master.m3u8</code>. S3 returns 403 (not 404 &#8212; with a bucket policy scoped to <code class="inline">hls/*</code>, a request for a key outside that prefix is denied before the existence check), CloudFront passes it through, and <code class="inline">hls.js</code> reports a network error in the console.</p>
+<p class="step-p">That failure mode is worth naming precisely, because you will otherwise misdiagnose it: the browser shows a failed cross-origin request to your CDN, so it looks like the CORS configuration from <a href="part-3-data-layer.html#m09">Module 9</a> is wrong. It isn't. The URL is wrong. The tell is that <code class="inline">curl -I</code> on the same URL &#8212; no <code class="inline">Origin</code> header, no CORS involved &#8212; also returns 403.</p>
+<p class="step-p">Rename the variable and drop the segment:</p>
+<pre><code>-MINIO_PUBLIC_URL = os.environ["MINIO_PUBLIC_URL"]
++# On AWS this is the CloudFront distribution and HLS keys start at "hls/".
++# Under docker compose it's MinIO, where "/media" is the bucket segment of a
++# path-style URL &#8212; hence the fallback, so compose keeps working unchanged.
++HLS_PUBLIC_BASE_URL = os.environ.get("HLS_PUBLIC_BASE_URL") or (
++    os.environ["MINIO_PUBLIC_URL"] + "/media"
++)</code></pre>
+<pre><code>     prefix = "live" if content_type == "stream" else "vod"
+-    manifest_url = f"{MINIO_PUBLIC_URL}/media/hls/{prefix}/{content_id}/master.m3u8"
++    manifest_url = f"{HLS_PUBLIC_BASE_URL}/hls/{prefix}/{content_id}/master.m3u8"</code></pre>
+<p class="step-p">(Section 0.5 replaces the <code class="inline">os.environ[...]</code> reads here with <code class="inline">require()</code>. Write it this way first if you want to keep the steps separate, or skip straight to the 0.5 version.)</p>
+<p class="step-p">On EKS you set <code class="inline">HLS_PUBLIC_BASE_URL=https://cdn.k8s.linkifysolutions.com</code> and <code class="inline">MINIO_PUBLIC_URL</code> never gets set at all.</p>
+<p class="step-p">The alternative designs, so you can defend the choice: you could keep a literal <code class="inline">media/</code> prefix inside the bucket, which means editing key construction in <em>two</em> files instead of one and carrying a meaningless path segment in every object forever. Or you could deploy a CloudFront Function that rewrites <code class="inline">/media/x</code> to <code class="inline">/x</code>, which costs ~$0.10 per million invocations plus a piece of JavaScript to version and debug at 2am when playback breaks. One line of Python is better than either.</p>
+<h4 id="m00-03-s3client-in-both-s3-services">0.3 &#8212; <code class="inline">s3_client()</code> in both S3 services</h4>
+<p class="step-p">Both <code class="inline">upload-api/main.py</code> and <code class="inline">transcode-worker/main.py</code> contain the identical function. Three things about it are incompatible with EKS:</p>
+<ul>
+<li><strong>Explicit credentials win.</strong> boto3's credential resolution order checks the arguments you passed to <code class="inline">boto3.client()</code> before it checks anything else. Pass <code class="inline">aws_access_key_id</code> and the EKS Pod Identity credentials are never consulted. The role is attached, the token is mounted, and boto3 doesn't look.</li>
+<li><strong><code class="inline">os.environ[...]</code> raises on absent.</strong> So "stop setting them" is not a fix by itself &#8212; the module fails to import and the pod crash-loops with a <code class="inline">KeyError: 'S3_ENDPOINT'</code> that <code class="inline">kubectl logs</code> will show you, if you think to look at the previous container.</li>
+<li><strong><code class="inline">endpoint_url</code> plus <code class="inline">addressing_style: "path"</code> is MinIO's shape.</strong> Real S3 still accepts path-style today, but AWS has deprecated it for new buckets and virtual-hosted style is the supported direction. Path-style also breaks TLS hostname matching for bucket names containing dots &#8212; and the bucket name is about to become an env var that somebody will eventually set to something dotted.</li>
+</ul>
+<p class="step-p">Replace the function, identically, in both files:</p>
+<pre><code>def s3_client():
+    <span class="c"># Endpoint and static credentials are set for MinIO under docker compose</span>
+    <span class="c"># and unset on AWS, where boto3 resolves the region from AWS_REGION and</span>
+    <span class="c"># picks up credentials from the EKS Pod Identity agent. Passing explicit</span>
+    <span class="c"># keys would make boto3 ignore that role entirely.</span>
+    kwargs = {
+        "config": Config(
+            s3={"addressing_style": os.environ.get("S3_ADDRESSING_STYLE", "path")},
+            retries={"max_attempts": 5, "mode": "adaptive"},
+        )
+    }
+    endpoint = os.environ.get("S3_ENDPOINT")
+    if endpoint:
+        kwargs["endpoint_url"] = endpoint
+    access_key = os.environ.get("S3_ACCESS_KEY")
+    secret_key = os.environ.get("S3_SECRET_KEY")
+    if access_key and secret_key:
+        kwargs["aws_access_key_id"] = access_key
+        kwargs["aws_secret_access_key"] = secret_key
+    return boto3.client("s3", **kwargs)</code></pre>
+<p class="step-p">Behaviour, spelled out:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th></th>
+<th><code class="inline">S3_ENDPOINT</code></th>
+<th><code class="inline">S3_ACCESS_KEY</code> / <code class="inline">S3_SECRET_KEY</code></th>
+<th><code class="inline">S3_ADDRESSING_STYLE</code></th>
+<th>Result</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>docker compose</td>
+<td><code class="inline">http://minio:9000</code></td>
+<td>set</td>
+<td>unset &#8594; <code class="inline">path</code></td>
+<td>Identical to today. Zero regression.</td>
+</tr>
+<tr>
+<td>EKS</td>
+<td>unset</td>
+<td>unset</td>
+<td><code class="inline">virtual</code></td>
+<td><code class="inline">https://&lt;bucket&gt;.s3.us-east-1.amazonaws.com</code>, credentials from the pod's role</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">The <code class="inline">retries</code> block is new and is not strictly required. It's there because S3 across a NAT-free VPC endpoint under a transcoder writing a segment every two seconds will occasionally return <code class="inline">SlowDown</code>, and adaptive mode backs off correctly instead of failing the upload.</p>
+<p class="step-p">One thing to carry forward to <a href="part-4-application.html#m11">Module 11</a>: <strong>set <code class="inline">AWS_REGION</code> explicitly</strong> in the Deployment spec for both services. Pod Identity injects it, but that's an implementation detail that a chart upgrade can change, and boto3's failure when it's missing is <code class="inline">NoRegionError: You must specify a region</code> raised at client-construction time &#8212; inside a request handler, surfacing as a 500 with a stack trace nobody was expecting.</p>
+<h4 id="m00-04-postgresinitsql-becomes-a-re-runnable-migration">0.4 &#8212; <code class="inline">postgres/init.sql</code> becomes a re-runnable migration</h4>
+<p class="step-p">Compose mounts <code class="inline">./postgres/init.sql</code> into <code class="inline">/docker-entrypoint-initdb.d/</code>, a hook the official Postgres image provides: on first boot with an empty data directory, it runs everything in that directory.</p>
+<p class="step-p"><strong>RDS has no such hook.</strong> There is no <code class="inline">/docker-entrypoint-initdb.d</code>, there is no way to hand a SQL file to the instance at creation time, and the instance lives in a private subnet where you can't reach it from your laptop without a bastion. The mechanism you'll use in <a href="part-3-data-layer.html#m08">Module 8</a> is a Kubernetes <code class="inline">Job</code> that mounts the SQL as a ConfigMap and runs <code class="inline">psql</code> from inside the cluster.</p>
+<p class="step-p">That Job runs on every deploy. Which means the SQL has to be safe to apply twice &#8212; today the second run fails with <code class="inline">relation "streamers" already exists</code>, the Job exhausts its <code class="inline">backoffLimit</code>, and it reports <code class="inline">Failed</code> in a way that is indistinguishable from a real schema error.</p>
+<p class="step-p">Move the file and make every statement idempotent:</p>
+<pre><code>mkdir -p postgres/migrations
+git mv postgres/init.sql postgres/migrations/001_baseline.sql</code></pre>
+<pre><code>-CREATE TABLE streamers (
++CREATE TABLE IF NOT EXISTS streamers (</code></pre>
+<pre><code>-CREATE TABLE streams (
++CREATE TABLE IF NOT EXISTS streams (</code></pre>
+<pre><code>-CREATE TABLE videos (
++CREATE TABLE IF NOT EXISTS videos (</code></pre>
+<pre><code>-CREATE TABLE view_events (
++CREATE TABLE IF NOT EXISTS view_events (</code></pre>
+<p class="step-p">Four mechanical edits. Then update the Compose mount so local dev still gets its schema (see 0.6).</p>
+<p class="step-p">The numbered-file convention matters for what comes next. Every future schema change is a new file &#8212; <code class="inline">002_add_thumbnails.sql</code> &#8212; that is itself idempotent (<code class="inline">ALTER TABLE ... ADD COLUMN IF NOT EXISTS</code>, <code class="inline">CREATE INDEX IF NOT EXISTS</code>). The Job's loop applies <code class="inline">/migrations/*.sql</code> in lexical order every time, and re-applying is a no-op.</p>
+<p class="step-p">Be honest with yourself about what this is: <strong>it is not a migration tool.</strong> There's no version table, so it can't detect out-of-order application, can't roll back, and can't express a change that isn't naturally idempotent &#8212; a data backfill, a column rename. For four tables and a two-person team that is the right amount of machinery. When you need a destructive change, adopt Alembic or Atlas; the numbered-file layout is already the shape those tools expect, so the switch is cheap.</p>
+<h4 id="m00-05-a-shared-configpy-per-service">0.5 &#8212; A shared <code class="inline">config.py</code> per service</h4>
+<p class="step-p">From <code class="inline">SPEC.md</code>, in the list of reasons the current <code class="inline">.env</code> approach has to go:</p>
+<blockquote><p class="step-p">Today's <code class="inline">.env</code> drift already caused one real outage this session &#8212; a value silently missing from the file crashed <code class="inline">web</code> on redeploy &#8212; so this isn't optional polish.</p></blockquote>
+<p class="step-p">That is the failure mode this change addresses, and moving to Secrets Manager in <a href="part-2-platform.html#m07">Module 7</a> does not fix it. The problem isn't where the value is stored; it's that <code class="inline">os.environ["X"]</code> fails on the <em>first</em> missing variable, tells you about that one, and says nothing about the other three that are also missing. You fix it, redeploy, wait for the rollout, and find the next one. On Compose that loop is 20 seconds. On EKS with an image pull and a readiness probe it's several minutes each time, and you do it in the middle of a broken deploy.</p>
+<p class="step-p">Add this file to each service directory that needs it &#8212; <code class="inline">upload-api</code>, <code class="inline">transcode-worker</code>, <code class="inline">web</code>, <code class="inline">ingest-webhook</code>, <code class="inline">analytics-worker</code>:</p>
+<pre><code><span class="c"># services/<span class="ph">&lt;service&gt;</span>/config.py</span>
+"""Read required env vars, then report every missing one at once.
+
+os.environ["X"] fails on the first missing var and hides the rest, which
+turns a bad deploy into a serial guessing game (see SPEC.md).
+"""
+import os
+import sys
+
+_missing: list[str] = []
+
+
+def require(name: str, default: str | None = None) -&gt; str:
+    value = os.environ.get(name, default)
+    if value is None:
+        _missing.append(name)
+        return ""
+    return value
+
+
+def seal() -&gt; None:
+    if _missing:
+        sys.exit("missing required environment variables: " + ", ".join(sorted(_missing)))</code></pre>
+<p class="step-p">It has to be copied per service rather than shared from the repo root: each <code class="inline">Dockerfile</code> is <code class="inline">COPY . .</code> with the service directory as the build context, so nothing above <code class="inline">services/&lt;service&gt;/</code> exists inside the image. Fifteen duplicated lines across five services is the cheaper trade against restructuring every build context and Dockerfile.</p>
+<p class="step-p"><code class="inline">seal()</code> uses <code class="inline">sys.exit</code> with a string, which exits non-zero and prints the message to stderr &#8212; so it shows up in <code class="inline">kubectl logs</code> as a plain sentence rather than a traceback, and the container goes to <code class="inline">CrashLoopBackOff</code> immediately rather than serving traffic in a broken state.</p>
+<p class="step-p">Here is <code class="inline">services/web/main.py</code>'s header using it:</p>
+<pre><code>import httpx
+from config import require, seal
+from fastapi import FastAPI, Form, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+templates = Jinja2Templates(directory="templates")
+
+UPLOAD_API_URL = require("UPLOAD_API_URL")
+RTMP_PUBLIC_URL = require("RTMP_PUBLIC_URL")
+<span class="c"># AWS: the CloudFront domain, HLS keys start at "hls/".</span>
+<span class="c"># Compose: MinIO, where "/media" is the bucket segment of a path-style URL.</span>
+HLS_PUBLIC_BASE_URL = os.environ.get("HLS_PUBLIC_BASE_URL") or (
+    require("MINIO_PUBLIC_URL") + "/media"
+)
+seal()</code></pre>
+<p class="step-p">Note the ordering: every <code class="inline">require()</code> runs before <code class="inline">seal()</code>, so a boot with none of the three set prints</p>
+<pre class="out"><code>missing required environment variables: MINIO_PUBLIC_URL, RTMP_PUBLIC_URL, UPLOAD_API_URL</code></pre>
+<p class="step-p">and you fix all three in one pass. <code class="inline">os</code> is still imported for the <code class="inline">HLS_PUBLIC_BASE_URL</code> fallback &#8212; <code class="inline">HLS_PUBLIC_BASE_URL</code> is genuinely optional, so it stays an <code class="inline">os.environ.get</code>, and only the MinIO fallback path registers <code class="inline">MINIO_PUBLIC_URL</code> as required.</p>
+<p class="step-p">Apply the same pattern to the others:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Service</th>
+<th><code class="inline">require()</code> calls</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">upload-api</code></td>
+<td><code class="inline">KAFKA_BOOTSTRAP_SERVERS</code>, <code class="inline">POSTGRES_DSN</code></td>
+</tr>
+<tr>
+<td><code class="inline">transcode-worker</code></td>
+<td><code class="inline">KAFKA_BOOTSTRAP_SERVERS</code>, <code class="inline">POSTGRES_DSN</code></td>
+</tr>
+<tr>
+<td><code class="inline">ingest-webhook</code></td>
+<td><code class="inline">KAFKA_BOOTSTRAP_SERVERS</code>, <code class="inline">POSTGRES_DSN</code></td>
+</tr>
+<tr>
+<td><code class="inline">analytics-worker</code></td>
+<td><code class="inline">KAFKA_BOOTSTRAP_SERVERS</code>, <code class="inline">POSTGRES_DSN</code></td>
+</tr>
+<tr>
+<td><code class="inline">web</code></td>
+<td><code class="inline">UPLOAD_API_URL</code>, <code class="inline">RTMP_PUBLIC_URL</code>, and <code class="inline">MINIO_PUBLIC_URL</code> only when <code class="inline">HLS_PUBLIC_BASE_URL</code> is unset</td>
+</tr>
+</tbody></table></div>
+<p class="step-p"><code class="inline">POSTGRES_DSN</code> in <code class="inline">upload-api</code> and the workers is read inside <code class="inline">pg_connect()</code> rather than at module level today. Hoist it to a module-level <code class="inline">POSTGRES_DSN = require("POSTGRES_DSN")</code> and have <code class="inline">pg_connect()</code> use the constant &#8212; otherwise a missing DSN still fails at first-request time instead of at boot, which is the whole point of the change. <code class="inline">S3_BUCKET</code>, <code class="inline">S3_ENDPOINT</code>, <code class="inline">S3_ACCESS_KEY</code>, <code class="inline">S3_SECRET_KEY</code> and <code class="inline">S3_ADDRESSING_STYLE</code> all stay as <code class="inline">os.environ.get</code> with defaults: they're genuinely optional in one environment or the other, and that is exactly the distinction <code class="inline">require()</code> is meant to encode.</p>
+<h4 id="m00-06-compose-and-the-test-stubs-in-the-same-commit">0.6 &#8212; Compose and the test stubs, in the same commit</h4>
+<p class="step-p">If you do 0.1&#8211;0.5 and stop, local dev breaks (the init.sql mount points at a moved file) and CI goes red (the tests import modules whose env expectations changed). Both are one-liners; do them now.</p>
+<p class="step-p"><strong><code class="inline">docker-compose.yml</code></strong> &#8212; repoint the schema mount:</p>
+<pre><code>     volumes:
+       - postgres-data:/var/lib/postgresql/data
+-      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
++      - ./postgres/migrations:/docker-entrypoint-initdb.d</code></pre>
+<p class="step-p">The Postgres image runs every <code class="inline">.sql</code> in that directory in lexical order, so mounting the directory gets you the same behaviour as before <em>and</em> picks up <code class="inline">002_*.sql</code> when it exists, with no further Compose edits.</p>
+<p class="step-p">Nothing else in <code class="inline">docker-compose.yml</code> needs to change. <code class="inline">S3_BUCKET</code> is unset there and defaults to <code class="inline">media</code>; <code class="inline">S3_ENDPOINT</code>/<code class="inline">S3_ACCESS_KEY</code>/<code class="inline">S3_SECRET_KEY</code> are already set on <code class="inline">upload-api</code> and <code class="inline">transcode-worker</code>; <code class="inline">MINIO_PUBLIC_URL</code> is already set on <code class="inline">web</code> and the fallback handles it. If you'd rather be explicit than rely on defaults, add <code class="inline">S3_BUCKET: media</code> to <code class="inline">upload-api</code> and <code class="inline">transcode-worker</code> &#8212; it documents the contract and costs nothing.</p>
+<p class="step-p"><strong><code class="inline">services/web/test_main.py</code></strong> &#8212; the stubs work as-is, because the <code class="inline">MINIO_PUBLIC_URL</code> fallback covers the renamed variable. Add one line so the AWS path is exercised too if you want coverage of it; otherwise leave it alone.</p>
+<p class="step-p"><strong><code class="inline">.github/workflows/ci.yml</code></strong> &#8212; the dummy env block feeds all three test services. It already sets <code class="inline">KAFKA_BOOTSTRAP_SERVERS</code>, <code class="inline">POSTGRES_DSN</code>, <code class="inline">UPLOAD_API_URL</code>, <code class="inline">MINIO_PUBLIC_URL</code> and <code class="inline">RTMP_PUBLIC_URL</code>, which covers every <code class="inline">require()</code> in the table above. No change needed &#8212; but re-read that block after you edit any service's header, because a <code class="inline">require()</code> you add without a matching stub turns into a <code class="inline">sys.exit</code> at import and pytest reports it as a collection error, not a test failure.</p>
+<p class="step-p"><strong><code class="inline">services/transcode-worker/test_main.py</code></strong> sets only <code class="inline">KAFKA_BOOTSTRAP_SERVERS</code>. Once <code class="inline">POSTGRES_DSN</code> moves to a module-level <code class="inline">require()</code>, add it:</p>
+<pre><code> os.environ.setdefault("KAFKA_BOOTSTRAP_SERVERS", "test:9092")
++os.environ.setdefault("POSTGRES_DSN", "postgresql://test")</code></pre>
+<p class="step-p"><code class="inline">services/ingest-webhook/test_main.py</code> already sets both.</p>
+<div class="confirm section">
+<h3 id="m00-verify">Verify</h3>
+<p class="step-p">This is the checkpoint. Do not start <a href="part-1-foundations.html#m01">Module 1</a> until both halves pass.</p>
+<p class="step-p"><strong>1. The application still works locally.</strong></p>
+<pre><code>docker compose down -v          <span class="c"># -v so postgres re-initialises from the new path</span>
+docker compose up -d
+docker compose ps</code></pre>
+<p class="step-p">Every service <code class="inline">running</code>, <code class="inline">minio-init</code> and <code class="inline">kafka-init</code> <code class="inline">exited (0)</code>. Then:</p>
+<pre><code>curl -s localhost:8001/health</code></pre>
+<pre class="out"><code>{"postgres":"ok","minio":"ok"}</code></pre>
+<p class="step-p"><code class="inline">"minio":"ok"</code> is the meaningful half &#8212; it's <code class="inline">head_bucket(Bucket=BUCKET)</code> going through the rewritten <code class="inline">s3_client()</code> against the env-var bucket name. If that returns <code class="inline">ok</code>, 0.1 and 0.3 are both correct.</p>
+<p class="step-p">Confirm the schema landed from the new location:</p>
+<pre><code>docker compose exec postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c '\dt'</code></pre>
+<pre class="out"><code>             List of relations
+ Schema |    Name     | Type  |  Owner
+--------+-------------+-------+----------
+ public | streamers   | table | streaming
+ public | streams     | table | streaming
+ public | videos      | table | streaming
+ public | view_events | table | streaming
+(4 rows)</code></pre>
+<p class="step-p">Then open <code class="inline">http://localhost:8080</code>, create a streamer, upload a short MP4, and watch it. The watch page's manifest URL should be unchanged from before this module &#8212; <code class="inline">http://&lt;your-minio-host&gt;/media/hls/vod/&lt;id&gt;/master.m3u8</code>. That's the fallback in 0.2 doing its job: on Compose, nothing moved.</p>
+<p class="step-p"><strong>2. The tests still pass.</strong></p>
+<pre><code>for s in transcode-worker ingest-webhook web; do
+  (cd "services/$s" &amp;&amp; pip install -q -r requirements-dev.txt &amp;&amp; pytest -q) || echo "FAILED: $s"
+done</code></pre>
+<pre class="out"><code>....................                                                     [100%]
+20 passed in 0.84s</code></pre>
+<p class="step-p">Exact counts will differ; what matters is zero failures and zero collection errors. A collection error that says <code class="inline">SystemExit: missing required environment variables: ...</code> means you added a <code class="inline">require()</code> without a matching stub in that service's <code class="inline">test_main.py</code> &#8212; go back to 0.6.</p>
+<p class="step-p"><strong>3. The idempotency check that the whole of Module 8 depends on.</strong></p>
+<pre><code>docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  &lt; postgres/migrations/001_baseline.sql</code></pre>
+<pre class="out"><code>NOTICE:  relation "streamers" already exists, skipping
+NOTICE:  relation "streams" already exists, skipping
+NOTICE:  relation "videos" already exists, skipping
+NOTICE:  relation "view_events" already exists, skipping</code></pre>
+<p class="step-p"><code class="inline">NOTICE</code> lines and exit code 0. If you get <code class="inline">ERROR: relation "streamers" already exists</code> you missed an <code class="inline">IF NOT EXISTS</code>, and the <code class="inline">db-migrate</code> Job in Module 8 will fail on its second run.</p>
+</div>
+<div class="gotcha section">
+<h3 id="m00-what-breaks">What breaks</h3>
+<p class="step-p"><strong><code class="inline">web</code> renders a watch page but the video never loads, console shows a failed request to the CDN.</strong> The single most common outcome of getting 0.2 half-right &#8212; usually <code class="inline">HLS_PUBLIC_BASE_URL</code> set <em>with</em> a trailing slash, producing <code class="inline">//hls/...</code>, or set to the CloudFront domain without the <code class="inline">https://</code> scheme. Read the actual URL out of the page rather than guessing:</p>
+<pre><code>curl -s "http://localhost:8080/watch/video/<span class="ph">&lt;id&gt;</span>" | grep -o 'https\?://[^"]*master.m3u8'</code></pre>
+<p class="step-p">Then <code class="inline">curl -I</code> that exact URL. A 403 with no <code class="inline">Origin</code> header involved means the path is wrong, not CORS.</p>
+<p class="step-p"><strong><code class="inline">upload-api</code> returns <code class="inline">{"minio":"error: An error occurred (403) when calling the HeadBucket operation"}</code> on AWS while uploads work fine.</strong> <code class="inline">head_bucket</code> requires <code class="inline">s3:ListBucket</code> on the <em>bucket</em> ARN, which is a different resource from the <code class="inline">arn:.../raw/*</code> that <code class="inline">PutObject</code> needs. The IAM policy in <a href="part-3-data-layer.html#m09">Module 9</a> includes it for exactly this reason. On Compose you won't see this at all &#8212; MinIO's root credentials can do everything.</p>
+<p class="step-p"><strong>A pod crash-loops with <code class="inline">KeyError: 'S3_ENDPOINT'</code> (or any other var).</strong> You applied 0.3 to one of the two files and not the other. They are byte-identical functions and it is easy to fix <code class="inline">upload-api</code>, feel done, and forget <code class="inline">transcode-worker</code>.</p>
+<pre><code>grep -n 'os.environ\[' services/*/main.py</code></pre>
+<p class="step-p">After this module the only <code class="inline">os.environ[...]</code> reads left should be none &#8212; everything required goes through <code class="inline">require()</code>, everything optional through <code class="inline">os.environ.get</code>.</p>
+<p class="step-p"><strong>The <code class="inline">db-migrate</code> Job fails on its second run in Module 8.</strong> <code class="inline">IF NOT EXISTS</code> missed on one statement. Diagnostic is verification step 3 above, run twice.</p>
+<p class="step-p"><strong>boto3 on EKS raises <code class="inline">NoRegionError</code> at client construction.</strong> <code class="inline">AWS_REGION</code> is not set on the pod. It surfaces as a 500 from <code class="inline">/health</code> or an unhandled exception in the transcoder's upload thread, not as a startup failure, because <code class="inline">s3_client()</code> is called per-request.</p>
+<pre><code>kubectl -n streaming exec deploy/upload-api -- env | grep -E 'AWS_REGION|AWS_DEFAULT_REGION'</code></pre>
+<p class="step-p"><strong>CI goes red with <code class="inline">SystemExit</code> during collection.</strong> A <code class="inline">require()</code> without a stub. The CI env block is in <code class="inline">.github/workflows/ci.yml</code> under the <code class="inline">test</code> job; the per-file stubs are the <code class="inline">os.environ.setdefault</code> lines at the top of each <code class="inline">test_main.py</code>. Both have to cover every <code class="inline">require()</code> in that service.</p>
+<p class="step-p">Next: <a href="part-1-foundations.html#m01">Module 1 &#8212; AWS account, access, and not getting a surprise bill</a>.</p>
+</div>
+</section>
+
+<section class="step" id="m01">
+  <div class="step-head">
+    <span class="step-num">01</span>
+    <h2>AWS account, access, and not getting a surprise bill</h2>
+  </div>
+<h3 id="m01-what-youre-building">What you're building</h3>
+<p class="step-p">A way to get an AWS credential onto your laptop that expires, is protected by MFA, and never touches a git repository &#8212; plus the two pieces of cost tooling that have to exist <em>before</em> you create anything that bills. At the end, <code class="inline">aws sts get-caller-identity</code> returns your account and role, <code class="inline">aws budgets</code> has an alarm pointed at a real inbox, and the CLI tools every later module depends on are installed at pinned versions.</p>
+<p class="step-p">Nothing in this module costs money. Everything after it does.</p>
+<div class="why section">
+<h3 id="m01-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m01-iam-identity-center-not-an-iam-user">IAM Identity Center, not an IAM user</h4>
+<p class="step-p">The obvious path is: create an IAM user, generate an access key pair, paste it into <code class="inline">~/.aws/credentials</code>, done. Do not do this.</p>
+<p class="step-p">An IAM access key is a <strong>permanent credential</strong>. It does not expire. Once created it exists in <code class="inline">~/.aws/credentials</code>, then in a CI secret, then in a <code class="inline">.env</code> on a server, then in a Slack message, and eventually in a git commit. That is not a hypothetical failure mode for this project &#8212; the repo's own <code class="inline">.env</code> on the dev box has <code class="inline">SERVER_PASSWORD</code> sitting in plaintext right now. Long-lived credentials leak because there is nothing about them that forces them not to.</p>
+<p class="step-p"><strong>IAM Identity Center</strong> (the service formerly called AWS SSO) issues short-lived credentials instead. You authenticate in a browser, with MFA, and the CLI receives a session that expires &#8212; typically 8 hours. If the cached session file leaks tomorrow, it's already useless. There is no key to rotate because there is no key.</p>
+<p class="step-p">The operational difference you'll feel: once a day you run <code class="inline">aws sso login</code>, a browser tab opens, you approve it, and every <code class="inline">aws</code>/<code class="inline">eksctl</code>/<code class="inline">kubectl</code> command works for the rest of the day. When the session expires, commands fail with <code class="inline">The SSO session associated with this profile has expired</code> and you log in again. That's the whole cost.</p>
+<h4 id="m01-why-administratoraccess-is-the-right-permission-set-here">Why <code class="inline">AdministratorAccess</code> is the right permission set here</h4>
+<p class="step-p">This will look wrong if you've read anything about least privilege, so here is the reasoning.</p>
+<p class="step-p">Building this platform touches roughly 40 IAM actions across a dozen services: EKS, EC2, VPC, IAM itself, CloudFormation, RDS, S3, CloudFront, Route 53, ACM, Secrets Manager, ELB. The failure mode of a too-tight policy is a CloudFormation stack that runs for twelve minutes and then rolls back with <code class="inline">AccessDenied</code> on an action you cannot easily identify from the error. You would lose days to that, and you'd learn nothing about EKS in the process.</p>
+<p class="step-p">The security controls that actually matter for a <em>human building infrastructure</em> are: MFA enforced, credentials that expire, CloudTrail recording what happened, and a budget alarm. Identity Center gives you the first two for free.</p>
+<p class="step-p">Least privilege is the right lesson &#8212; for <strong>workload</strong> roles, where the blast radius is a running container that an attacker might reach. You'll do that properly in <a href="part-2-platform.html#m07">Module 7</a> and <a href="part-3-data-layer.html#m09">Module 9</a>, where <code class="inline">upload-api</code> gets <code class="inline">PutObject</code> on <code class="inline">raw/*</code> and literally nothing else. That's where the scoping exercise teaches you something.</p>
+<h4 id="m01-why-us-east-1-non-negotiably">Why <code class="inline">us-east-1</code>, non-negotiably</h4>
+<p class="step-p">Three reasons, in priority order:</p>
+<ol>
+<li><strong>ACM certificates used by CloudFront must be in us-east-1.</strong> This is a hard AWS constraint with no exceptions and no workaround. CloudFront is a global service whose control plane lives in us-east-1, and it will only attach a certificate from that region. If your cluster were in <code class="inline">ca-central-1</code>, you would maintain <em>two</em> certificates for one domain &#8212; a regional one for the ALB and a us-east-1 one for CloudFront &#8212; with two DNS validation records and two independent renewal paths that fail at different times. Being in us-east-1 means one wildcard cert covers both. <a href="part-2-platform.html#m05">Module 5</a> issues it.</li>
+<li><strong>It's the cheapest region</strong> for EC2, EBS, RDS and NAT Gateway. On a budget where the EKS control plane alone is $73/month, a 5&#8211;10% regional delta is real money.</li>
+<li><strong>Deepest spot capacity</strong> for the compute-optimised instance families Karpenter will pick for VOD transcoding in <a href="part-2-platform.html#m06">Module 6</a>. Thin spot pools mean frequent interruptions.</li>
+</ol>
+<p class="step-p">The counterpoint you should be able to state if someone asks: us-east-1 has the largest blast radius of any AWS region &#8212; when it has a bad day, a noticeable fraction of the internet has a bad day. And if Canadian data residency ever became a requirement, you'd move to <code class="inline">ca-central-1</code> at roughly +8% cost <em>and still</em> need a second us-east-1 certificate for CloudFront. This project stores stream keys and view timestamps, no personal data, so the cheap correct-by-construction option wins.</p>
+<h4 id="m01-the-arn-gotcha-learned-now-rather-than-in-module-3">The ARN gotcha, learned now rather than in Module 3</h4>
+<p class="step-p">When you assume an Identity Center role, <code class="inline">aws sts get-caller-identity</code> returns an <strong>assumed-role session ARN</strong>:</p>
+<pre class="out"><code>arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_AdministratorAccess_abc1234567890def/intern</code></pre>
+<p class="step-p">EKS Access Entries in <a href="part-1-foundations.html#m03">Module 3</a> need the underlying <strong>role ARN</strong>, which looks different &#8212; it has the reserved-SSO path in it and no session name:</p>
+<pre class="out"><code>arn:aws:iam::123456789012:role/aws-reserved/sso.amazonaws.com/us-east-1/AWSReservedSSO_AdministratorAccess_abc1234567890def</code></pre>
+<p class="step-p">Write yours down at the end of this module. You will need it twice and it is annoying to reconstruct.</p>
+</div>
+<h3 id="m01-do-it">Do it</h3>
+<h4 id="m01-11-enable-identity-center-and-create-the-user">1.1 &#8212; Enable Identity Center and create the user</h4>
+<p class="step-p">This part is console-only and done once by whoever owns the AWS account. It cannot be scripted meaningfully from a laptop that has no credentials yet.</p>
+<ol>
+<li>Sign in to the AWS console as the account root or an existing admin. <strong>Set the region selector to <code class="inline">us-east-1</code> before you start</strong> &#8212; Identity Center is regional and its home region cannot be changed later without deleting the instance.</li>
+<li><strong>IAM Identity Center &#8594; Enable.</strong> If the account is not part of an AWS Organization, this creates one with the account as management account. That's expected.</li>
+<li><strong>Permission sets &#8594; Create permission set &#8594; Predefined &#8594; <code class="inline">AdministratorAccess</code>.</strong> Set the session duration to 8 hours. (Default is 1 hour, which means logging in repeatedly during a 15-minute <code class="inline">eksctl create cluster</code>.)</li>
+<li><strong>Users &#8594; Add user.</strong> Username <code class="inline">intern</code>, a real email address &#8212; the invitation goes there and it's also the MFA enrolment path.</li>
+<li><strong>AWS accounts &#8594; select the account &#8594; Assign users &#8594; <code class="inline">intern</code> &#8594; <code class="inline">AdministratorAccess</code>.</strong></li>
+<li><p class="step-p"><strong>Settings &#8594; Authentication &#8594; Multi-factor authentication &#8594; Edit.</strong> Set:</p>
+<ul>
+<li><em>Prompt users for MFA</em>: <strong>Every time they sign in</strong></li>
+<li><em>If a user does not yet have a registered MFA device</em>: <strong>Require them to register an MFA device at sign-in</strong></li>
+</ul>
+<p class="step-p">Enforcing MFA is the control that makes the short-lived-credential design actually worth something. Without it, a stolen password is a full session.</p></li>
+<li>Note the <strong>AWS access portal URL</strong> from the Identity Center dashboard. It looks like <code class="inline">https://d-1234567890.awsapps.com/start</code>. You need it in the next step.</li>
+</ol>
+<p class="step-p">The invited user completes the email invitation, sets a password, and enrols an MFA device (any TOTP app).</p>
+<h4 id="m01-12-configure-the-cli-profile">1.2 &#8212; Configure the CLI profile</h4>
+<p class="step-p">Install the AWS CLI first if you haven't &#8212; see 1.5, or run <code class="inline">brew install awscli</code> now and come back for the version check.</p>
+<pre><code>aws configure sso</code></pre>
+<p class="step-p">Answer as follows. The profile name is fixed by the <a href="index.html#conventions-used-throughout">conventions table</a> and every later module assumes it:</p>
+<pre class="out"><code>SSO session name (Recommended): linkify
+SSO start URL [None]: https://d-1234567890.awsapps.com/start
+SSO region [None]: us-east-1
+SSO registration scopes [sso:account:access]: &lt;press enter&gt;</code></pre>
+<p class="step-p">A browser opens; approve the request. The CLI then lists the accounts and roles you have access to:</p>
+<pre class="out"><code>The only AWS account available to you is: 123456789012
+Using the account ID 123456789012
+The only role available to you is: AdministratorAccess
+Using the role name "AdministratorAccess"
+CLI default client Region [None]: us-east-1
+CLI default output format [None]: json
+CLI profile name [AdministratorAccess-123456789012]: linkify-streaming</code></pre>
+<p class="step-p">Then set the two environment variables every shell block in this course assumes. Put them in your shell profile (<code class="inline">~/.zshrc</code> or <code class="inline">~/.bashrc</code>) so they survive a new terminal:</p>
+<pre><code>export AWS_PROFILE=linkify-streaming
+export AWS_REGION=us-east-1</code></pre>
+<p class="step-p">Log in:</p>
+<pre><code>aws sso login</code></pre>
+<p class="step-p">You'll run that once a day. When a command fails with <code class="inline">The SSO session associated with this profile has expired or is otherwise invalid</code>, that's what it means.</p>
+<h4 id="m01-13-cost-explorer-on-day-zero">1.3 &#8212; Cost Explorer, on day zero</h4>
+<pre><code><span class="c"># Console only &#8212; there is no CLI call that enables it.</span>
+<span class="c"># Billing and Cost Management &#8594; Cost Explorer &#8594; Launch Cost Explorer</span></code></pre>
+<p class="step-p">Cost Explorer takes roughly <strong>24 hours</strong> to populate after you enable it, and it does not backfill from before you turned it on. Enabling it on day ten means you have no data for days one through ten &#8212; which are exactly the days you'll want to look at when you're trying to work out why the bill jumped.</p>
+<p class="step-p">While you're in the Billing console, activate cost allocation tags:</p>
+<pre><code><span class="c"># Billing and Cost Management &#8594; Cost allocation tags &#8594; User-defined cost allocation tags</span>
+<span class="c"># Find "Project" &#8594; Activate</span></code></pre>
+<p class="step-p">The tag will not appear in that list until at least one resource has been tagged with it, so you may have to come back after <a href="part-1-foundations.html#m03">Module 3</a>. Do come back. Without activated cost allocation tags, Cost Explorer cannot break the bill down by tag, and you will find yourself staring at a line called <strong>"EC2-Other: $61"</strong> with no way to learn that it's EBS volumes and NAT gateway data processing. Everything you create in this course carries <code class="inline">Project=streaming</code>.</p>
+<h4 id="m01-14-the-budget-alarm-before-you-create-anything">1.4 &#8212; The budget alarm, before you create anything</h4>
+<pre><code>aws budgets create-budget \
+  --account-id "$(aws sts get-caller-identity --query Account --output text)" \
+  --budget '{
+    "BudgetName": "streaming-monthly",
+    "BudgetLimit": {"Amount": "200", "Unit": "USD"},
+    "TimeUnit": "MONTHLY",
+    "BudgetType": "COST"
+  }' \
+  --notifications-with-subscribers '[
+    {"Notification":{"NotificationType":"ACTUAL","ComparisonOperator":"GREATER_THAN","Threshold":50,"ThresholdType":"PERCENTAGE"},
+     "Subscribers":[{"SubscriptionType":"EMAIL","Address":"info@linkifysolutions.com"}]},
+    {"Notification":{"NotificationType":"FORECASTED","ComparisonOperator":"GREATER_THAN","Threshold":100,"ThresholdType":"PERCENTAGE"},
+     "Subscribers":[{"SubscriptionType":"EMAIL","Address":"info@linkifysolutions.com"}]}
+  ]'</code></pre>
+<p class="step-p">Two notifications, and the difference between them matters:</p>
+<ul>
+<li><strong>ACTUAL at 50%</strong> fires when you have already spent $100. It's a status report.</li>
+<li><strong>FORECASTED at 100%</strong> fires when AWS's projection of your month-end spend crosses $200 &#8212; which can happen on day three. That's the one that saves you money, because it fires while there's still something you can do.</li>
+</ul>
+<p class="step-p">Budgets is a global service; the <code class="inline">aws budgets</code> API is only available in <code class="inline">us-east-1</code>, which is where you already are.</p>
+<p class="step-p">The $200 limit is set against the ~$240/month all-on figure from the <a href="index.html#what-this-costs">README</a>. It is meant to fire. Treat the first FORECASTED email as information, not an emergency &#8212; but read it.</p>
+<h4 id="m01-15-tools-pinned">1.5 &#8212; Tools, pinned</h4>
+<p class="step-p">Version skew between <code class="inline">eksctl</code>, <code class="inline">kubectl</code> and the EKS API produces confusing errors, so pin these rather than taking whatever <code class="inline">brew</code> last cached.</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Tool</th>
+<th>Version</th>
+<th>Why this version</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">aws</code> CLI</td>
+<td>v2, &#8805; 2.20</td>
+<td>v1 has no <code class="inline">configure sso</code>. Anything &#8805;2.20 is fine.</td>
+</tr>
+<tr>
+<td><code class="inline">kubectl</code></td>
+<td>1.35.x</td>
+<td><strong>Must be within one minor version of the cluster.</strong> The cluster is 1.35 (<a href="part-1-foundations.html#m03">Module 3</a>).</td>
+</tr>
+<tr>
+<td><code class="inline">eksctl</code></td>
+<td>&#8805; 0.200</td>
+<td>Needs access-entry and pod-identity-association support in the cluster config schema.</td>
+</tr>
+<tr>
+<td><code class="inline">helm</code></td>
+<td>&#8805; 3.16</td>
+<td>Every add-on from <a href="part-2-platform.html#m04">Module 4</a> onward is a Helm chart.</td>
+</tr>
+<tr>
+<td><code class="inline">k9s</code></td>
+<td>latest, optional</td>
+<td>A terminal UI for the cluster. Optional, but debugging pod scheduling in it is much faster than repeated <code class="inline">kubectl describe</code>.</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">macOS:</p>
+<pre><code>brew install awscli eksctl helm k9s
+
+<span class="c"># kubectl pinned to match the cluster. Apple Silicon shown; use amd64 on Intel.</span>
+curl -LO "https://dl.k8s.io/release/v1.35.7/bin/darwin/arm64/kubectl"
+chmod +x kubectl &amp;&amp; sudo mv kubectl /usr/local/bin/kubectl</code></pre>
+<p class="step-p">Linux / WSL2:</p>
+<pre><code>curl -LO "https://dl.k8s.io/release/v1.35.7/bin/linux/amd64/kubectl"
+chmod +x kubectl &amp;&amp; sudo mv kubectl /usr/local/bin/kubectl</code></pre>
+<p class="step-p">The <code class="inline">kubectl</code> <strong>&#177;1 minor</strong> rule is the one to internalise. The Kubernetes project supports a client one minor version older or newer than the server. A 1.33 client against a 1.35 server may work for <code class="inline">get pods</code> and then fail on something subtler &#8212; an API version that doesn't exist yet, a field the client strips silently on <code class="inline">apply</code>. When a <code class="inline">kubectl</code> command behaves inexplicably later in this course, check <code class="inline">kubectl version</code> before you check anything else.</p>
+<p class="step-p">Confirm all four:</p>
+<pre><code>kubectl version --client &amp;&amp; eksctl version &amp;&amp; helm version --short &amp;&amp; aws --version</code></pre>
+<div class="confirm section">
+<h3 id="m01-verify">Verify</h3>
+<p class="step-p">This is the checkpoint. It has to pass before <a href="part-1-foundations.html#m02">Module 2</a>.</p>
+<pre><code>aws sts get-caller-identity</code></pre>
+<pre class="out"><code>{
+    "UserId": "AROAEXAMPLEID:intern",
+    "Account": "123456789012",
+    "Arn": "arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_AdministratorAccess_abc1234567890def/intern"
+}</code></pre>
+<p class="step-p">Three things to check in that output, not just that it succeeded:</p>
+<ol>
+<li><strong><code class="inline">Account</code></strong> is the account you expect. If you have access to more than one, this is where you find out you picked the wrong one.</li>
+<li><strong><code class="inline">Arn</code></strong> contains <code class="inline">assumed-role/AWSReservedSSO_</code>. If it says <code class="inline">user/something</code> instead, you are on an IAM user credential &#8212; probably an old <code class="inline">[default]</code> profile in <code class="inline">~/.aws/credentials</code> shadowing your intent. Check <code class="inline">echo $AWS_PROFILE</code>.</li>
+<li>The <strong>role suffix</strong> &#8212; <code class="inline">AWSReservedSSO_AdministratorAccess_abc1234567890def</code> in the example. Save the full IAM role ARN now:</li>
+</ol>
+<pre><code>aws sts get-caller-identity --query Arn --output text
+<span class="c"># arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_AdministratorAccess_abc1234567890def/intern</span>
+
+<span class="c"># The role ARN that EKS Access Entries need, derived from the above:</span>
+<span class="c"># arn:aws:iam::123456789012:role/aws-reserved/sso.amazonaws.com/us-east-1/AWSReservedSSO_AdministratorAccess_abc1234567890def</span></code></pre>
+<p class="step-p">You can also list it directly, which avoids transcription errors:</p>
+<pre><code>aws iam list-roles --path-prefix /aws-reserved/sso.amazonaws.com/ \
+  --query 'Roles[?starts_with(RoleName, `AWSReservedSSO_AdministratorAccess`)].Arn' --output text</code></pre>
+<p class="step-p">Then confirm the budget exists:</p>
+<pre><code>aws budgets describe-budgets \
+  --account-id "$(aws sts get-caller-identity --query Account --output text)" \
+  --query 'Budgets[].{Name:BudgetName,Limit:BudgetLimit.Amount}' --output table</code></pre>
+<pre class="out"><code>-------------------------------------
+|          DescribeBudgets          |
++--------+--------------------------+
+|  Limit |          Name            |
++--------+--------------------------+
+|  200.0 |  streaming-monthly       |
++--------+--------------------------+</code></pre>
+<p class="step-p">And that the region is right, because a wrong region here silently produces a cluster you cannot put a CloudFront certificate on:</p>
+<pre><code>aws configure get region --profile linkify-streaming</code></pre>
+<pre class="out"><code>us-east-1</code></pre>
+</div>
+<div class="gotcha section">
+<h3 id="m01-what-breaks">What breaks</h3>
+<p class="step-p"><strong><code class="inline">Error loading SSO Token: Token for linkify does not exist</code> or <code class="inline">The SSO session associated with this profile has expired</code>.</strong> Far and away the most common, because it recurs daily.</p>
+<pre><code>aws sso login</code></pre>
+<p class="step-p"><strong>Commands use the wrong identity &#8212; an old IAM user, or the wrong account.</strong> <code class="inline">AWS_PROFILE</code> isn't set in this shell, or a <code class="inline">[default]</code> profile in <code class="inline">~/.aws/credentials</code> is taking precedence. Env vars beat config files, so:</p>
+<pre><code>echo $AWS_PROFILE
+aws configure list        <span class="c"># shows which profile and where each value came from</span></code></pre>
+<p class="step-p">The <code class="inline">Type</code> column in <code class="inline">aws configure list</code> tells you whether a value came from the environment, the config file, or a default &#8212; that's the fastest way to find a shadowing credential.</p>
+<p class="step-p"><strong>The browser opens for <code class="inline">aws sso login</code> and the approval succeeds, but the CLI still fails.</strong> Usually a mismatched SSO region: the session was registered against one region and the portal lives in another. Check <code class="inline">~/.aws/config</code>; the <code class="inline">[sso-session linkify]</code> block must have <code class="inline">sso_region = us-east-1</code>. If it doesn't, re-run <code class="inline">aws configure sso</code>.</p>
+<p class="step-p"><strong><code class="inline">aws budgets create-budget</code> returns <code class="inline">AccessDeniedException</code>.</strong> Budget and billing APIs are gated separately from IAM permissions. In an Organization, the management account must have <strong>IAM access to billing</strong> enabled (Account settings &#8594; IAM user and role access to Billing Information). <code class="inline">AdministratorAccess</code> alone is not enough if that toggle is off.</p>
+<p class="step-p"><strong>Cost Explorer shows no data.</strong> It's been less than 24 hours. There is nothing to fix; this is why the module says to enable it on day zero.</p>
+<p class="step-p"><strong><code class="inline">kubectl</code> behaves strangely against the cluster in a later module.</strong> Check the version skew first, before you debug anything else:</p>
+<pre><code>kubectl version</code></pre>
+<p class="step-p">Client and server minor versions must be within one of each other. If you installed <code class="inline">kubectl</code> via <code class="inline">brew</code> rather than the pinned URL, you likely have whatever the latest release is, which may be two or more minors ahead of the 1.35 cluster.</p>
+<p class="step-p">Next: <a href="part-1-foundations.html#m02">Module 2 &#8212; The VPC</a>.</p>
+</div>
+</section>
+
+<section class="step" id="m02">
+  <div class="step-head">
+    <span class="step-num">02</span>
+    <h2>The VPC</h2>
+  </div>
+<h3 id="m02-what-youre-building">What you're building</h3>
+<p class="step-p">Nothing, yet. This module is the network design: the reasoning behind the VPC that <code class="inline">eksctl</code> will create for you in <a href="part-1-foundations.html#m03">Module 3</a>, and the two things you must add to it by hand afterwards &#8212; subnet tags and an S3 Gateway endpoint &#8212; because their absence produces silent failures rather than errors.</p>
+<p class="step-p">It's short on commands and long on why, deliberately. <code class="inline">eksctl create cluster</code> builds a VPC in about four minutes. Understanding what it built, and being able to say why each choice is right, is the part that takes longer and matters more. If a load balancer never appears in <a href="part-4-application.html#m12">Module 12</a>, or pods get stuck at <code class="inline">ContainerCreating</code>, or the bill has a $60 line item called "EC2-Other", the answer is in this module.</p>
+<div class="why section">
+<h3 id="m02-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m02-the-pod-cidr-reasoning-from-the-kubeadm-box-inverts-completely">The pod-CIDR reasoning from the kubeadm box inverts completely</h4>
+<p class="step-p">On the bare-metal cluster under <code class="inline">k8s/cluster/</code>, <code class="inline">kubeadm-config.yaml</code> says:</p>
+<pre><code>networking:
+  <span class="c"># Calico's default pod CIDR. Deliberately not 10.x or 172.16-31.x: the box's</span>
+  <span class="c"># LAN is 10.50.0.0/24 and Docker's bridges hold 172.17-172.20.0.0/16.</span>
+  podSubnet: 192.168.0.0/16</code></pre>
+<p class="step-p">That comment is correct reasoning for that cluster. Calico ran an <strong>overlay</strong>: pod IPs existed only inside the cluster, encapsulated when they crossed between nodes, invisible to anything on the LAN. Because they were invisible, the only requirement on the pod CIDR was that it not <em>collide</em> with a range the node also had to route to. A /16 was free &#8212; 65,536 addresses that cost nothing because they weren't real.</p>
+<p class="step-p"><strong>EKS with the AWS VPC CNI has no overlay and no pod CIDR at all.</strong> Every pod gets a real, routable, secondary IPv4 address on an elastic network interface attached to its node, drawn from <strong>the subnet that node sits in</strong>. A pod's IP is a VPC IP. You can reach it from an EC2 instance in the same VPC. Security groups apply to it.</p>
+<p class="step-p">Delete the <code class="inline">podSubnet</code> mental model entirely. Three consequences follow, and each one bites in a different module:</p>
+<p class="step-p"><strong>1. Subnet sizing is driven by pods, not nodes.</strong> A 20-node cluster running 30 pods each consumes 600 subnet addresses, not 20. Run out and pods stick in <code class="inline">ContainerCreating</code> with <code class="inline">failed to assign an IP address to container</code> &#8212; an error that reads like a CNI bug and is actually an exhausted subnet.</p>
+<p class="step-p"><strong>2. There is a warm IP pool on top of that.</strong> The CNI pre-allocates addresses so pod startup doesn't have to wait for an EC2 API call. With the default <code class="inline">WARM_ENI_TARGET=1</code>, each node keeps one entire spare ENI's worth of addresses allocated the moment it joins &#8212; roughly 12 subnet IPs on a <code class="inline">t3.medium</code>, before a single application pod is scheduled. A Karpenter node that lives for eight minutes still holds a full ENI's worth of addresses for those eight minutes.</p>
+<p class="step-p"><strong>3. Pod-to-pod traffic across AZs is billable inter-AZ data transfer,</strong> at $0.01/GB in each direction. On the kubeadm box, pod-to-pod was free because it was one box. Here, <code class="inline">transcode-worker</code> pulling RTMP from MediaMTX is a real network flow: a 1080p ingest is about 9 Mbps, &#8776; 4 GB/hour. If those two pods land in different availability zones, that's roughly <strong>$0.08/hour per stream</strong>, and it appears on your bill as "EC2-Other" with no further explanation. <a href="part-5-elastic.html#m14">Module 14</a> deals with keeping transcode pods near MediaMTX.</p>
+<h4 id="m02-work-the-numbers-how-many-pods-fit-on-a-t3medium">Work the numbers: how many pods fit on a t3.medium</h4>
+<p class="step-p">This is the calculation that turns "the CNI uses VPC IPs" into a subnet size.</p>
+<p class="step-p">An EC2 instance type has a fixed maximum number of ENIs and a fixed number of IPv4 addresses per ENI. For a <code class="inline">t3.medium</code>: <strong>3 ENIs, 6 IPv4 addresses each.</strong></p>
+<p class="step-p">The first address on every ENI is that interface's own primary address &#8212; it belongs to the node's networking, not to a pod. So the assignable count is:</p>
+<pre class="out"><code>max pods = ENIs &#215; (IPv4 per ENI &#8722; 1) + 2
+         = 3    &#215; (6 &#8722; 1)            + 2
+         = 17</code></pre>
+<p class="step-p">The <code class="inline">+ 2</code> is for pods that use <strong>host networking</strong> and therefore consume no ENI address at all: <code class="inline">aws-node</code> (the CNI itself) and <code class="inline">kube-proxy</code> run in the host network namespace on every node. <code class="inline">ebs-csi-node</code> from <a href="part-2-platform.html#m04">Module 4</a> does too.</p>
+<p class="step-p">So: <strong>17 pods per <code class="inline">t3.medium</code></strong>, and the node group in <a href="part-1-foundations.html#m03">Module 3</a> is 2 of them, giving you 34 pod slots for a workload that needs about 18. That headroom is intentional and it is not large.</p>
+<p class="step-p">Now the subnet. A <strong>/19</strong> gives 8,192 addresses; AWS reserves 5 in every subnet (network address, VPC router, DNS, one reserved for future use, broadcast), leaving <strong>8,187 usable</strong>.</p>
+<pre class="out"><code>8,187 usable addresses &#247; ~18 addresses per fully-packed t3.medium &#8776; 450 nodes</code></pre>
+<p class="step-p">You will never run 450 nodes. That's the point &#8212; the /19 removes the entire failure class, and it is completely free. IPv4 addresses inside your own VPC cost nothing; you are not buying them.</p>
+<p class="step-p">Compare a /24, which is what most tutorials use and what looks "reasonable":</p>
+<pre class="out"><code>251 usable addresses &#247; ~18 &#8776; 13 nodes</code></pre>
+<p class="step-p">Thirteen nodes sounds like plenty for a learning cluster right up until Karpenter spins up six transcode nodes for a burst of VOD jobs while the system node group is at four, and the fourteenth node's pods fail to get addresses. The failure is intermittent, load-dependent, and reads like a CNI problem. Size the subnet at /19 and never think about it again.</p>
+<p class="step-p">One knob you should <em>not</em> turn: <code class="inline">ENABLE_PREFIX_DELEGATION</code>. It raises a <code class="inline">t3.medium</code>'s pod ceiling from 17 to 110 by assigning /28 prefixes (16 addresses at a time) instead of individual addresses. You don't need 110 pods on a 4 GiB node &#8212; you'd run out of memory at roughly 20 &#8212; and prefix delegation would allocate addresses in blocks of 16 whether you use them or not. It's the right setting for large nodes with high pod density; it's pure waste here.</p>
+<h4 id="m02-two-azs-of-workloads-in-a-vpc-that-spans-three">Two AZs of workloads, in a VPC that spans three</h4>
+<p class="step-p">EKS requires the control plane to have subnets in <strong>at least two availability zones</strong> &#8212; that's a hard API requirement, not a recommendation, and cluster creation fails without it.</p>
+<p class="step-p"><code class="inline">eksctl</code> builds the VPC with a public and a private subnet in each of three AZs, because three is its default and the extra subnets cost nothing. Your <strong>nodes</strong> live in two of them (<code class="inline">us-east-1a</code> and <code class="inline">us-east-1b</code>), pinned by the node group's <code class="inline">availabilityZones</code> in <a href="part-1-foundations.html#m03">Module 3</a>. The third AZ's subnets sit empty for now and give Karpenter a third spot capacity pool to choose from in <a href="part-2-platform.html#m06">Module 6</a>, which materially improves spot availability for VOD transcoding.</p>
+<p class="step-p">Concentrating the running workload in two AZs is a cost decision, not an availability one: every byte between two pods in different AZs is billable, and this platform's hot path is video moving between pods.</p>
+<p class="step-p">The intended layout:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Subnet</th>
+<th>AZ</th>
+<th>Size</th>
+<th>Purpose</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>public-1a</td>
+<td>us-east-1a</td>
+<td>/24</td>
+<td>NAT gateway, ALB, NLB</td>
+</tr>
+<tr>
+<td>public-1b</td>
+<td>us-east-1b</td>
+<td>/24</td>
+<td>ALB, NLB</td>
+</tr>
+<tr>
+<td>public-1c</td>
+<td>us-east-1c</td>
+<td>/24</td>
+<td>ALB, NLB</td>
+</tr>
+<tr>
+<td>private-1a</td>
+<td>us-east-1a</td>
+<td>/19</td>
+<td>Nodes and pods</td>
+</tr>
+<tr>
+<td>private-1b</td>
+<td>us-east-1b</td>
+<td>/19</td>
+<td>Nodes and pods</td>
+</tr>
+<tr>
+<td>private-1c</td>
+<td>us-east-1c</td>
+<td>/19</td>
+<td>Spare &#8212; Karpenter spot pool</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">The VPC CIDR is <code class="inline">10.42.0.0/16</code>. Not <code class="inline">10.0.0.0/16</code>, which is every tutorial's default and therefore the first range that collides the day you peer anything to anything. Not <code class="inline">192.168.0.0/16</code>, because you want the kubeadm dev box reachable over Tailscale without a route conflict.</p>
+<p class="step-p"><code class="inline">eksctl</code> chooses the exact subnet CIDRs inside that /16 itself. Rather than assume, confirm what it actually built once the cluster exists:</p>
+<pre><code>aws ec2 describe-subnets \
+  --filters "Name=tag:alpha.eksctl.io/cluster-name,Values=streaming" \
+  --query 'Subnets[].{Name:Tags[?Key==`Name`]|[0].Value,AZ:AvailabilityZone,CIDR:CidrBlock}' \
+  --output table</code></pre>
+<p class="step-p">If a later requirement means you need the CIDRs pinned exactly rather than eksctl-chosen, <code class="inline">cluster.yaml</code> accepts an explicit <code class="inline">vpc.subnets</code> block listing each AZ's CIDR &#8212; check the eksctl schema for the current field names before writing one.</p>
+<p class="step-p"><strong>Public versus private, and why nodes are private.</strong> Public subnets have a route to an internet gateway; anything with a public IP in them is reachable from the internet. Load balancers go there, because being reachable is their job. Nodes go in private subnets with no public IPs at all &#8212; the only things that reach your pods are the load balancers you explicitly create. Outbound traffic from private subnets goes through a NAT gateway.</p>
+<h4 id="m02-one-nat-gateway-and-the-honest-tradeoff">One NAT gateway, and the honest tradeoff</h4>
+<p class="step-p">A NAT gateway costs about <strong>$0.045/hour</strong> &#8212; $32.85/month &#8212; plus $0.045 per GB processed. The textbook design is one per AZ, so that an AZ failure doesn't take out egress for the others. That's three of them: <strong>$98.55/month in hourly charges alone</strong>, before a single byte moves.</p>
+<p class="step-p">Against a total budget of roughly $240/month, of which the EKS control plane is already an unavoidable $73, three NAT gateways would be the second-largest line item on the bill. One NAT gateway in <code class="inline">public-1a</code>, with all three private route tables pointing at it, is the right call.</p>
+<p class="step-p">State the tradeoff plainly, because the point is being able to defend it rather than to pretend it doesn't exist: <strong>if <code class="inline">us-east-1a</code> has a zone-level failure, nodes in <code class="inline">1b</code> and <code class="inline">1c</code> lose all outbound internet.</strong> No image pulls from ghcr.io, no Secrets Manager API calls, no reaching anything external. Pods already running keep running &#8212; their traffic to RDS, to Kafka, to each other, stays inside the VPC. Nothing new starts.</p>
+<p class="step-p">That's a real availability hit, and it is not this design's weakest link. You have one RDS instance in one AZ (<a href="part-3-data-layer.html#m08">Module 8</a>) and one MediaMTX replica (<a href="part-4-application.html#m12">Module 12</a>). Both are single points of failure that are cheaper to fix than $65/month. Spend the money there first if you ever spend it.</p>
+<h4 id="m02-the-s3-gateway-vpc-endpoint-the-most-important-cost-decision-in-the-design">The S3 Gateway VPC Endpoint &#8212; the most important cost decision in the design</h4>
+<p class="step-p">This is the one to get right, and it costs nothing.</p>
+<p class="step-p">Without it, <strong>every HLS segment the transcoder writes to S3 leaves the VPC through the NAT gateway</strong>, and NAT charges $0.045 per GB processed. S3 is a public AWS endpoint; from a private subnet, "public" means "via NAT".</p>
+<p class="step-p">Work out what that means for one hour of one live stream. From <code class="inline">services/transcode-worker/main.py</code>, the ABR ladder is three renditions:</p>
+<pre class="out"><code>1080p  5000 kbps
+ 720p  2800 kbps
+ 480p  1400 kbps
+      &#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;
+       9200 kbps  =  9.2 Mbps  of video</code></pre>
+<p class="step-p">(Plus three AAC audio tracks at 128 kbps each, which adds about 4%. Ignore them; the number is big enough without.)</p>
+<pre class="out"><code>9.2 Mbit/s &#215; 3600 s = 33,120 Mbit
+33,120 Mbit &#247; 8     = 4,140 MB  &#8776;  4.1 GB per hour
+4.1 GB &#215; $0.045/GB  =  $0.19 per hour</code></pre>
+<p class="step-p"><strong>Nineteen cents an hour, per live stream, to move bytes you have already paid to produce.</strong> For comparison, the <code class="inline">c6i.xlarge</code> that Karpenter would launch to do the actual encoding is about $0.17/hour on demand &#8212; so the NAT charge slightly <em>exceeds</em> the cost of the compute doing the work. You are paying more to ship the output than to create it.</p>
+<p class="step-p">Scale it out. Leave one test stream running around the clock for a month:</p>
+<pre class="out"><code>730 hours &#215; $0.19 = $139/month</code></pre>
+<p class="step-p">On a $200 budget where $73 is already spoken for by the control plane. That single line would appear as <strong>"EC2-Other"</strong> on your bill with no further breakdown, which is why <a href="part-1-foundations.html#m01">Module 1</a> has you activate cost allocation tags.</p>
+<p class="step-p">An <strong>S3 Gateway endpoint</strong> removes all of it. It is not a proxy or an appliance &#8212; it's an entry in your route tables that says "traffic destined for S3's address ranges in this region goes straight out of the VPC, not to the NAT gateway." Gateway endpoints support S3 and DynamoDB, and they are <strong>free</strong>. (Do not confuse them with <em>Interface</em> endpoints, which are ENIs backed by PrivateLink and cost about $7.30/month each plus per-GB charges. For S3 you want Gateway.)</p>
+<pre><code><span class="c"># Run this once the cluster's VPC exists &#8212; see "Do it" below.</span>
+aws ec2 create-vpc-endpoint \
+  --vpc-id "$VPC_ID" \
+  --service-name com.amazonaws.us-east-1.s3 \
+  --vpc-endpoint-type Gateway \
+  --route-table-ids $PRIVATE_RTBS</code></pre>
+<p class="step-p">What still goes through NAT afterwards, so you know what the remaining $32.85 buys: container image pulls from ghcr.io (roughly 400 MB per service image, once per new node &#8212; which is why Karpenter node churn has a real, if small, cost), Secrets Manager API calls (kilobytes), and ACM/EKS control-plane chatter. All small. The video does not.</p>
+<h4 id="m02-subnet-tags-absence-produces-silence-not-errors">Subnet tags: absence produces silence, not errors</h4>
+<p class="step-p">Three separate controllers discover AWS resources by <strong>tag</strong>, not by configuration. If a tag is missing, the controller does not error &#8212; it finds nothing, and reports that it found nothing in a place you are not looking.</p>
+<p class="step-p"><strong>Public subnets</strong>, all three:</p>
+<pre class="out"><code>kubernetes.io/role/elb            = 1
+kubernetes.io/cluster/streaming   = shared
+Project                           = streaming</code></pre>
+<p class="step-p"><code class="inline">kubernetes.io/role/elb</code> is how the AWS Load Balancer Controller decides where an <strong>internet-facing</strong> ALB or NLB can go. Without it, an Ingress you create in <a href="part-4-application.html#m12">Module 12</a> sits with <code class="inline">ADDRESS</code> empty forever, and the reason is one event on the Ingress object reading <code class="inline">couldn't auto-discover subnets</code>. Nothing else tells you.</p>
+<p class="step-p"><strong>Private subnets</strong>, all three:</p>
+<pre class="out"><code>kubernetes.io/role/internal-elb   = 1
+kubernetes.io/cluster/streaming   = shared
+karpenter.sh/discovery            = streaming
+Project                           = streaming</code></pre>
+<p class="step-p"><code class="inline">kubernetes.io/role/internal-elb</code> is the same mechanism for internal load balancers. <code class="inline">karpenter.sh/discovery</code> is what Karpenter's <code class="inline">EC2NodeClass</code> matches on in <a href="part-2-platform.html#m06">Module 6</a> &#8212; its <code class="inline">subnetSelectorTerms</code> is a tag query, and if nothing matches, Karpenter logs <code class="inline">no subnets matched selector</code> and quietly never launches an instance while your pods sit <code class="inline">Pending</code>.</p>
+<p class="step-p"><code class="inline">eksctl</code> applies the <code class="inline">kubernetes.io/role/*</code> and <code class="inline">kubernetes.io/cluster/*</code> tags itself when it creates the VPC. <strong><code class="inline">karpenter.sh/discovery</code> it does not</strong> &#8212; that one is yours to add, along with the matching tag on the cluster security group.</p>
+</div>
+<h3 id="m02-do-it">Do it</h3>
+<p class="step-p">There is nothing to create in this module. These are the commands you run <strong>immediately after <code class="inline">eksctl create cluster</code> finishes</strong> in <a href="part-1-foundations.html#m03">Module 3</a> &#8212; before any pod writes to S3 and before you install Karpenter. They're here because the reasoning for them is here.</p>
+<pre><code>export AWS_PROFILE=linkify-streaming
+export AWS_REGION=us-east-1
+
+<span class="c"># The VPC eksctl created</span>
+VPC_ID=$(aws eks describe-cluster --name streaming \
+  --query cluster.resourcesVpcConfig.vpcId --output text)
+echo "$VPC_ID"</code></pre>
+<p class="step-p"><strong>Add the S3 Gateway endpoint to every private route table:</strong></p>
+<pre><code>PRIVATE_RTBS=$(aws ec2 describe-route-tables \
+  --filters "Name=vpc-id,Values=$VPC_ID" \
+            "Name=tag:Name,Values=*Private*" \
+  --query 'RouteTables[].RouteTableId' --output text)
+echo "$PRIVATE_RTBS"
+
+aws ec2 create-vpc-endpoint \
+  --vpc-id "$VPC_ID" \
+  --service-name com.amazonaws.us-east-1.s3 \
+  --vpc-endpoint-type Gateway \
+  --route-table-ids $PRIVATE_RTBS \
+  --tag-specifications 'ResourceType=vpc-endpoint,Tags=[{Key=Project,Value=streaming}]'</code></pre>
+<p class="step-p">(<code class="inline">$PRIVATE_RTBS</code> is intentionally unquoted &#8212; the command takes a list and the shell needs to split it.)</p>
+<p class="step-p"><strong>Tag the private subnets for Karpenter:</strong></p>
+<pre><code>PRIVATE_SUBNETS=$(aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=*Private*" \
+  --query 'Subnets[].SubnetId' --output text)
+
+aws ec2 create-tags --resources $PRIVATE_SUBNETS \
+  --tags Key=karpenter.sh/discovery,Value=streaming Key=Project,Value=streaming</code></pre>
+<p class="step-p"><strong>Tag the cluster security group for Karpenter</strong> (it matches on this too):</p>
+<pre><code>CLUSTER_SG=$(aws eks describe-cluster --name streaming \
+  --query cluster.resourcesVpcConfig.clusterSecurityGroupId --output text)
+
+aws ec2 create-tags --resources "$CLUSTER_SG" \
+  --tags Key=karpenter.sh/discovery,Value=streaming</code></pre>
+<div class="confirm section">
+<h3 id="m02-verify">Verify</h3>
+<p class="step-p">Run these after the commands above. All three must pass before <a href="part-2-platform.html#m06">Module 6</a>, and the first must pass before anything writes to S3.</p>
+<p class="step-p"><strong>1. The S3 route exists in every private route table.</strong></p>
+<pre><code>aws ec2 describe-route-tables --route-table-ids $PRIVATE_RTBS \
+  --query 'RouteTables[].Routes[?GatewayId!=null &amp;&amp; starts_with(GatewayId, `vpce-`)].[DestinationPrefixListId,GatewayId]' \
+  --output text</code></pre>
+<pre class="out"><code>pl-63a5400a	vpce-0a1b2c3d4e5f67890
+pl-63a5400a	vpce-0a1b2c3d4e5f67890
+pl-63a5400a	vpce-0a1b2c3d4e5f67890</code></pre>
+<p class="step-p">One line per private route table. <code class="inline">pl-63a5400a</code> is the managed prefix list for S3 in us-east-1 &#8212; the set of address ranges S3 serves from. If a route table is missing from that output, its subnet's pods will pay NAT charges for every byte to S3, silently.</p>
+<p class="step-p"><strong>2. Subnet tags are present.</strong></p>
+<pre><code>aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" \
+  --query 'Subnets[].{Name:Tags[?Key==`Name`]|[0].Value,
+                      elb:Tags[?Key==`kubernetes.io/role/elb`]|[0].Value,
+                      internal:Tags[?Key==`kubernetes.io/role/internal-elb`]|[0].Value,
+                      karpenter:Tags[?Key==`karpenter.sh/discovery`]|[0].Value}' \
+  --output table</code></pre>
+<p class="step-p">Every <strong>public</strong> subnet must show <code class="inline">elb = 1</code>. Every <strong>private</strong> subnet must show <code class="inline">internal = 1</code> and <code class="inline">karpenter = streaming</code>. A <code class="inline">None</code> in a column that should have a value is the failure &#8212; and it is the failure you will not notice until a controller silently does nothing three modules later.</p>
+<p class="step-p"><strong>3. Nodes are in private subnets with no public IP.</strong></p>
+<pre><code>aws ec2 describe-instances \
+  --filters "Name=tag:eks:cluster-name,Values=streaming" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[].Instances[].{Id:InstanceId,Private:PrivateIpAddress,Public:PublicIpAddress,Subnet:SubnetId}' \
+  --output table</code></pre>
+<p class="step-p"><code class="inline">Public</code> must be <code class="inline">None</code> for every node. A public IP on a node means it landed in a public subnet &#8212; the node group's <code class="inline">privateNetworking: true</code> didn't take effect &#8212; and your nodes are directly addressable from the internet.</p>
+<p class="step-p"><strong>4. Questions you should be able to answer without looking.</strong> These are the checkpoint as much as the commands are:</p>
+<ul>
+<li>How many pods fit on a <code class="inline">t3.medium</code>, and where does the number come from? <em>(17: 3 ENIs &#215; 5 assignable + 2 host-network pods.)</em></li>
+<li>Why is <code class="inline">podSubnet</code> meaningless on EKS? <em>(No overlay. Pods get real VPC addresses from the node's subnet.)</em></li>
+<li>What does one hour of one live stream cost in NAT charges without the S3 endpoint? <em>(&#8776; $0.19 &#8212; 4.1 GB at $0.045/GB.)</em></li>
+<li>What breaks if <code class="inline">us-east-1a</code> fails? <em>(Everything loses outbound internet; running pods keep running.)</em></li>
+<li>What happens if <code class="inline">karpenter.sh/discovery</code> is missing from the private subnets? <em>(Karpenter launches nothing and logs <code class="inline">no subnets matched selector</code>. Pods stay <code class="inline">Pending</code>.)</em></li>
+</ul>
+</div>
+<div class="gotcha section">
+<h3 id="m02-what-breaks">What breaks</h3>
+<p class="step-p"><strong>An Ingress or Service of type LoadBalancer never gets an address.</strong> By far the most common networking failure, and always a tag. The controller's logs say so explicitly:</p>
+<pre><code>kubectl logs -n kube-system deploy/aws-load-balancer-controller | grep -i subnet
+kubectl describe ingress -n streaming <span class="ph">&lt;name&gt;</span>     <span class="c"># Events at the bottom</span></code></pre>
+<p class="step-p"><code class="inline">couldn't auto-discover subnets</code> means <code class="inline">kubernetes.io/role/elb</code> (internet-facing) or <code class="inline">kubernetes.io/role/internal-elb</code> (internal) is missing. Re-run verification step 2.</p>
+<p class="step-p"><strong>Karpenter never launches a node; pods stay <code class="inline">Pending</code> indefinitely.</strong> Same class of problem, different tag.</p>
+<pre><code>kubectl logs -n karpenter deploy/karpenter | grep -i 'selector\|matched'</code></pre>
+<p class="step-p"><code class="inline">no subnets matched selector</code> or <code class="inline">no instance profile / security groups matched</code> means <code class="inline">karpenter.sh/discovery</code> is missing on the subnets or on the cluster security group. Both are in the "Do it" section above.</p>
+<p class="step-p"><strong>A bill line item called "EC2-Other" that you cannot explain.</strong> It's some combination of EBS volumes, NAT gateway data processing, and inter-AZ transfer &#8212; the three things AWS lumps together under that label. Check the S3 endpoint first (verification step 1); it's the largest of the three by a wide margin on this workload. Then use Cost Explorer grouped by the <code class="inline">Project</code> tag you activated in <a href="part-1-foundations.html#m01">Module 1</a>, and by usage type.</p>
+<p class="step-p"><strong>Pods stuck in <code class="inline">ContainerCreating</code> with <code class="inline">failed to assign an IP address to container</code>.</strong> The subnet is out of addresses.</p>
+<pre><code>kubectl describe pod -n streaming <span class="ph">&lt;name&gt;</span>          <span class="c"># the message is in Events</span>
+aws ec2 describe-subnets --subnet-ids <span class="ph">&lt;subnet&gt;</span> \
+  --query 'Subnets[].AvailableIpAddressCount'</code></pre>
+<p class="step-p">With /19 subnets you should never see this. If you do, either the subnets came out smaller than intended (verification in "Why it works this way" &#8212; check the actual CIDRs) or something is leaking ENIs. <code class="inline">kubectl logs -n kube-system ds/aws-node</code> is the CNI's own view.</p>
+<p class="step-p"><strong>Nodes cannot pull images; pods sit in <code class="inline">ImagePullBackOff</code> with a timeout.</strong> Something is wrong on the path to the NAT gateway &#8212; a missing default route in a private route table, or a NAT gateway that failed to create. This is distinct from an authentication failure, which says <code class="inline">unauthorized</code> rather than timing out.</p>
+<pre><code>aws ec2 describe-nat-gateways --filter "Name=vpc-id,Values=$VPC_ID" \
+  --query 'NatGateways[].{Id:NatGatewayId,State:State,Subnet:SubnetId}' --output table
+aws ec2 describe-route-tables --route-table-ids $PRIVATE_RTBS \
+  --query 'RouteTables[].Routes[?DestinationCidrBlock==`0.0.0.0/0`]'</code></pre>
+<p class="step-p"><strong>Cross-AZ data transfer charges you did not expect.</strong> Two pods that talk a lot landed in different zones. Find out where things actually are:</p>
+<pre><code>kubectl get pods -n streaming -o wide
+kubectl get nodes -L topology.kubernetes.io/zone</code></pre>
+<p class="step-p">The pair that matters most is <code class="inline">transcode-worker</code> and <code class="inline">mediamtx</code> &#8212; see <a href="part-5-elastic.html#m14">Module 14</a> for keeping them together.</p>
+<p class="step-p">Next: <a href="part-1-foundations.html#m03">Module 3 &#8212; The EKS cluster</a>.</p>
+</div>
+</section>
+
+<section class="step" id="m03">
+  <div class="step-head">
+    <span class="step-num">03</span>
+    <h2>The EKS cluster</h2>
+  </div>
+<h3 id="m03-what-youre-building">What you're building</h3>
+<p class="step-p">An EKS cluster named <code class="inline">streaming</code>, running Kubernetes 1.35, in a VPC that matches the design from <a href="part-1-foundations.html#m02">Module 2</a>, with two <code class="inline">t3.medium</code> nodes in a managed node group. One file &#8212; <code class="inline">infra/eks/cluster.yaml</code> &#8212; and one command produce all of it: VPC, subnets with the right tags, IAM roles, the OIDC provider, the control plane, the node group, access entries, and the core add-ons.</p>
+<p class="step-p">It takes 15&#8211;20 minutes and it is the first thing in this course that costs money. The EKS control plane starts billing at $0.10/hour ($73/month) the moment the API server is up, whether or not you ever run a pod on it.</p>
+<div class="why section">
+<h3 id="m03-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m03-eksctl-not-terraform">eksctl, not Terraform</h4>
+<p class="step-p">Terraform is the better tool in a working environment with more than one engineer and a state backend that somebody maintains. This is not that, and here's the specific reasoning for choosing <code class="inline">eksctl</code> anyway:</p>
+<p class="step-p"><strong>One file, one command, and the failure mode is readable.</strong> <code class="inline">eksctl</code> drives CloudFormation. When something fails, it fails as a stack event with a message &#8212; <code class="inline">AccessDenied</code> on a specific action, <code class="inline">LimitExceeded</code> on a specific quota &#8212; that you can read in the CloudFormation console and act on. Terraform's failure mode on EKS is frequently a partially-applied plan and a state file that no longer describes reality, and recovering from that requires understanding Terraform's state model before you have finished understanding EKS.</p>
+<p class="step-p"><strong>The comparison is not 1 file vs 1 file.</strong> The <code class="inline">terraform-aws-modules/eks</code> module needs roughly 150 lines across four files, plus a VPC module, plus an S3 backend with a DynamoDB lock table that you have to create first &#8212; and you need <code class="inline">for_each</code> and module composition to be second nature before any of it reads clearly. That's a real amount of Terraform to learn in order to learn EKS.</p>
+<p class="step-p"><strong>eksctl has first-class support for the two modern features this design depends on</strong> &#8212; <code class="inline">accessConfig.authenticationMode: API</code> and <code class="inline">iam.podIdentityAssociations</code> &#8212; at about three lines each.</p>
+<p class="step-p">The honest cost, which you should say out loud rather than discover: <strong>eksctl has no state file, so drift is unmanaged.</strong> If you click something in the console, eksctl will neither know nor reconcile it. Three habits contain that:</p>
+<ol>
+<li><code class="inline">infra/eks/cluster.yaml</code> lives in git and is treated as the truth. If you change the cluster, change the file.</li>
+<li>Cluster-level changes go through <code class="inline">eksctl upgrade cluster</code> / <code class="inline">eksctl create nodegroup</code>, not the console.</li>
+<li>Everything <em>above</em> the cluster is declarative by other means &#8212; Helm with values files in git for add-ons (<a href="part-2-platform.html#m04">Module 4</a> onward), Kustomize for workloads (<a href="part-4-application.html#m11">Module 11</a>), ArgoCD reconciling both (<a href="part-5-elastic.html#m15">Module 15</a>).</li>
+</ol>
+<p class="step-p">Which tool owns what:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Layer</th>
+<th>Tool</th>
+<th>Why</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>VPC, cluster, node group, OIDC, access entries, EKS add-ons</td>
+<td><code class="inline">eksctl</code> + <code class="inline">cluster.yaml</code></td>
+<td>One declarative file</td>
+</tr>
+<tr>
+<td>Karpenter, LB Controller, ExternalDNS, ESO, Strimzi, metrics-server</td>
+<td><code class="inline">helm</code> + values files in git</td>
+<td>Versioned, upgradeable, <code class="inline">helm diff</code> works</td>
+</tr>
+<tr>
+<td>Workloads, StorageClass, NodePools, Secrets</td>
+<td><code class="inline">kubectl apply -k</code> (Kustomize)</td>
+<td>Plain YAML in git</td>
+</tr>
+<tr>
+<td>RDS, S3, CloudFront, Route 53, ACM, Secrets Manager</td>
+<td><code class="inline">aws</code> CLI, scripted under <code class="inline">infra/aws/</code></td>
+<td>~8 one-time resources; a Terraform module for these is more machinery than the resources are worth</td>
+</tr>
+</tbody></table></div>
+<h4 id="m03-kubernetes-135">Kubernetes 1.35</h4>
+<p class="step-p">EKS currently offers 1.33 (standard support ending now), 1.34, 1.35, and 1.36.</p>
+<p class="step-p">Take <strong>1.35</strong>, for a reason specific to this project rather than a general one: <code class="inline">k8s/cluster/kubeadm-config.yaml</code> pins <code class="inline">kubernetesVersion: v1.35.7</code>. Matching it means every manifest, every API version, and every <code class="inline">kubectl</code> behaviour you already learned on the kubeadm box transfers to EKS unchanged. Migration debugging is hard enough without simultaneously chasing API deprecations. 1.35 has roughly eight months of standard support left, which outlives this project; upgrading later is <code class="inline">eksctl upgrade cluster --version=1.36</code>.</p>
+<p class="step-p">Two 1.35-specific notes:</p>
+<ul>
+<li><strong>containerd 1.x support ends with 1.35.</strong> The EKS-optimised AL2023 AMIs already ship containerd 2.x, so it is a non-issue for you &#8212; but it is why you shouldn't sit on 1.35 past 1.37.</li>
+<li><strong>Upstream Ingress NGINX was retired in March 2026</strong> &#8212; no further releases, bug fixes or security patches. That's why <a href="part-4-application.html#m12">Module 12</a> uses the AWS Load Balancer Controller and an ALB rather than the ingress-nginx everyone's blog posts assume.</li>
+</ul>
+<p class="step-p">Do not reach for 1.36 on the theory that newer is better. It enables <code class="inline">StrictIPCIDRValidation</code> by default (non-canonical CIDR notation in manifests is now rejected &#8212; the kind of thing that was fine in your <code class="inline">metallb-pool.yaml</code> and now isn't) and it removes kube-proxy's IPVS mode.</p>
+<h4 id="m03-authenticationmode-api-and-why-every-old-blog-post-is-wrong-here"><code class="inline">authenticationMode: API</code> &#8212; and why every old blog post is wrong here</h4>
+<p class="step-p">This is the single most important stanza in the file, and it is where existing documentation on the internet will actively mislead you.</p>
+<p class="step-p">For most of EKS's life, mapping an IAM principal to a Kubernetes identity was done through a ConfigMap called <code class="inline">aws-auth</code> in <code class="inline">kube-system</code>. You edited YAML that mapped role ARNs to Kubernetes usernames and groups. Every EKS tutorial written before 2024 describes this, and a great many written since still do.</p>
+<p class="step-p">It has one catastrophic property: <strong>it is a ConfigMap, and it is the thing that authorises access to the cluster.</strong> Corrupt it &#8212; a typo in an ARN, a botched <code class="inline">kubectl edit</code>, a bad <code class="inline">apply</code> &#8212; and you have removed your own access to the cluster. You can no longer edit the ConfigMap, because editing it requires the access it grants. There is no AWS-side recovery path. The remediation is to delete the cluster and build a new one.</p>
+<p class="step-p"><strong>EKS Access Entries</strong> replace it with a real AWS API. <code class="inline">aws eks create-access-entry</code> and <code class="inline">aws eks associate-access-policy</code> are IAM-authorised calls, recorded in CloudTrail, and fixable by any principal holding <code class="inline">eks:*</code> &#8212; which is an entirely separate axis from whatever is inside the cluster. You cannot lock yourself out with a typo.</p>
+<p class="step-p">Three modes exist:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Mode</th>
+<th>Behaviour</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">CONFIG_MAP</code></td>
+<td>Legacy. <code class="inline">aws-auth</code> only.</td>
+</tr>
+<tr>
+<td><code class="inline">API_AND_CONFIG_MAP</code></td>
+<td>Both consulted. Exists for migrating an existing cluster.</td>
+</tr>
+<tr>
+<td><code class="inline">API</code></td>
+<td>Access entries only. <code class="inline">aws-auth</code> is not read.</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">Use <strong><code class="inline">API</code></strong>. The hybrid mode's whole purpose is to let a running cluster migrate gradually; a green-field cluster has nothing to migrate, and a dual source of truth for "who can access this" is exactly the confusion you are trying to avoid. When you later read a blog post telling you to <code class="inline">kubectl edit configmap aws-auth</code>, the correct response on this cluster is that the ConfigMap does not do anything.</p>
+<p class="step-p"><code class="inline">bootstrapClusterCreatorAdminPermissions: true</code> gives the principal that runs <code class="inline">eksctl create cluster</code> &#8212; you &#8212; cluster-admin automatically. The extra <code class="inline">accessEntries</code> block adds your SSO role a second time, explicitly. That is not redundant: the bootstrap entry is tied to the exact principal that created the cluster, and if that principal is ever deleted or its SSO role is recreated with a new suffix, the explicit entry is what keeps you in.</p>
+<p class="step-p">This is where you need the role ARN you saved in <a href="part-1-foundations.html#m01">Module 1</a> &#8212; the <code class="inline">arn:aws:iam::...:role/aws-reserved/sso.amazonaws.com/us-east-1/AWSReservedSSO_...</code> form, <strong>not</strong> the <code class="inline">arn:aws:sts::...:assumed-role/.../intern</code> form that <code class="inline">get-caller-identity</code> prints. Access entries reject the STS session ARN, and the error does not spell out why.</p>
+<h4 id="m03-iamwithoidc-true-still-needed-even-with-pod-identity"><code class="inline">iam.withOIDC: true</code> &#8212; still needed, even with Pod Identity</h4>
+<p class="step-p">The cluster gets two mechanisms for giving pods AWS permissions, and it uses both deliberately.</p>
+<p class="step-p"><strong>EKS Pod Identity</strong> is the modern one: an agent runs as a DaemonSet (<code class="inline">eks-pod-identity-agent</code>, in the add-ons list), and you associate a ServiceAccount with an IAM role through a plain AWS API call. No OIDC provider, no trust-policy editing, roles are reusable across clusters. It's what <code class="inline">upload-api</code> and <code class="inline">transcode-worker</code> will use in <a href="part-3-data-layer.html#m09">Module 9</a>, and what makes the <code class="inline">s3_client()</code> rewrite from <a href="part-1-foundations.html#m00">Module 0</a> necessary.</p>
+<p class="step-p"><strong>IRSA</strong> (IAM Roles for Service Accounts) is the older mechanism: the cluster publishes an OIDC identity document, you register it with IAM as an identity provider, and each role's trust policy names the cluster's OIDC issuer plus a specific ServiceAccount. More moving parts, and the trust policy is fiddly.</p>
+<p class="step-p">You need OIDC anyway, because the <strong>AWS Load Balancer Controller</strong> and <strong>Karpenter</strong> still expect IRSA. <code class="inline">iam: withOIDC: true</code> creates and registers the provider at cluster-creation time. Adding it later is possible but means a separate <code class="inline">eksctl utils associate-iam-oidc-provider</code> run, so turn it on now.</p>
+<h4 id="m03-control-plane-logging-and-the-retention-note">Control-plane logging, and the retention note</h4>
+<p class="step-p"><code class="inline">cloudWatch.clusterLogging</code> turns on control-plane log types. Three are worth having:</p>
+<ul>
+<li><strong><code class="inline">api</code></strong> &#8212; API server logs. Requests, errors, admission failures.</li>
+<li><strong><code class="inline">audit</code></strong> &#8212; who changed what, when. The only way to answer "what deleted my Deployment".</li>
+<li><strong><code class="inline">authenticator</code></strong> &#8212; authentication decisions. When an access entry doesn't work, this is where the reason is.</li>
+</ul>
+<p class="step-p"><code class="inline">controllerManager</code> and <code class="inline">scheduler</code> are omitted; they're high-volume and rarely what you need on a cluster this size.</p>
+<p class="step-p"><strong>Set <code class="inline">logRetentionInDays</code>.</strong> CloudWatch log groups default to "Never expire". At $0.03/GB/month for storage, audit logs on a cluster you leave running will quietly accumulate a bill line that nobody attributes to EKS. Seven days is enough to debug something that happened while you were asleep.</p>
+<h4 id="m03-two-t3medium-nodes-and-why-its-tight-on-purpose">Two <code class="inline">t3.medium</code> nodes, and why it's tight on purpose</h4>
+<p class="step-p">Two nodes, one in each of <code class="inline">us-east-1a</code> and <code class="inline">us-east-1b</code>, 2 vCPU and 4 GiB each. Here's what has to fit on them by the end of the course:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Component</th>
+<th>Pods</th>
+<th>Memory request each</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>CoreDNS</td>
+<td>2</td>
+<td>70 Mi</td>
+</tr>
+<tr>
+<td>AWS Load Balancer Controller</td>
+<td>2</td>
+<td>100 Mi</td>
+</tr>
+<tr>
+<td>External Secrets (controller, webhook, cert-controller)</td>
+<td>3</td>
+<td>64 Mi</td>
+</tr>
+<tr>
+<td>ExternalDNS</td>
+<td>1</td>
+<td>64 Mi</td>
+</tr>
+<tr>
+<td>Karpenter</td>
+<td>2</td>
+<td>512 Mi</td>
+</tr>
+<tr>
+<td>metrics-server</td>
+<td>1</td>
+<td>200 Mi</td>
+</tr>
+<tr>
+<td>Strimzi cluster operator</td>
+<td>1</td>
+<td>384 Mi</td>
+</tr>
+<tr>
+<td>Kafka broker (KRaft, 1 replica)</td>
+<td>1</td>
+<td>1.5 Gi</td>
+</tr>
+<tr>
+<td>Strimzi entity operator</td>
+<td>1</td>
+<td>256 Mi</td>
+</tr>
+<tr>
+<td>MediaMTX</td>
+<td>1</td>
+<td>256 Mi</td>
+</tr>
+<tr>
+<td><code class="inline">web</code>, <code class="inline">upload-api</code>, <code class="inline">ingest-webhook</code></td>
+<td>2 each</td>
+<td>256 Mi</td>
+</tr>
+<tr>
+<td><code class="inline">analytics-worker</code></td>
+<td>1</td>
+<td>128 Mi</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">That is roughly <strong>6.5 GiB of requests against about 7 GiB allocatable</strong> (8 GiB total minus what the kubelet and system reserve). It fits, barely, and you should design around that rather than be surprised by it:</p>
+<ul>
+<li>If you hit memory pressure, run <strong>one</strong> replica of the LB Controller, the ESO webhook and Karpenter. A brief control-plane gap during a rolling update is a better trade than not fitting.</li>
+<li><code class="inline">maxSize: 4</code> is set, but there is <strong>no Cluster Autoscaler in this design</strong> &#8212; Karpenter handles burst capacity for transcoding on its own NodePools, and this group is fixed. When it's genuinely full you bump it by hand with <code class="inline">eksctl scale nodegroup --cluster streaming --name system --nodes 3</code>. That's honest and it's cheap.</li>
+<li>Recall from <a href="part-1-foundations.html#m02">Module 2</a> that a <code class="inline">t3.medium</code> tops out at <strong>17 pods</strong> for IP reasons, well above the ~9 per node here. Memory is the binding constraint, not addresses.</li>
+</ul>
+<p class="step-p">The node group is deliberately <strong>not tainted</strong>. Karpenter, CoreDNS, the LB controller, ESO, Strimzi and every stateless app pod live here, so a taint would mean adding a matching toleration to every chart and every manifest &#8212; churn with no benefit at this size. Taints start earning their keep in <a href="part-2-platform.html#m06">Module 6</a>, on the transcode NodePools.</p>
+<p class="step-p"><strong>Graviton is a ~30% saving you cannot take yet.</strong> A <code class="inline">t4g.medium</code> is $0.0336/hour against <code class="inline">t3.medium</code> at $0.0416. But <code class="inline">.github/workflows/ci.yml</code> uses <code class="inline">docker/build-push-action@v6</code> with no <code class="inline">platforms:</code> key, so it produces <strong>amd64-only images</strong>, and an arm64 node would fail every pod with <code class="inline">exec format error</code>. To take the saving you'd add <code class="inline">platforms: linux/amd64,linux/arm64</code> to the build step &#8212; <code class="inline">confluent-kafka</code> has arm64 wheels and ffmpeg installs from Debian arm64, so it should work. Follow-up, not a day-one task.</p>
+</div>
+<h3 id="m03-do-it">Do it</h3>
+<h4 id="m03-31-write-the-config-file">3.1 &#8212; Write the config file</h4>
+<p class="step-p"><code class="inline">infra/eks/cluster.yaml</code> is in this repo. Read it end to end before you apply it &#8212; every stanza is explained above, and applying a cluster config you haven't read is how you end up with a cluster you can't reason about.</p>
+<pre><code>apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: streaming
+  region: us-east-1
+  version: "1.35"
+  tags:
+    Project: streaming
+
+<span class="c"># EKS Access Entries, not the legacy aws-auth ConfigMap.</span>
+accessConfig:
+  authenticationMode: API
+  bootstrapClusterCreatorAdminPermissions: true
+  accessEntries:
+    - principalARN: arn:aws:iam::<span class="ph">&lt;accountid&gt;</span>:role/aws-reserved/sso.amazonaws.com/us-east-1/AWSReservedSSO_<span class="ph">&lt;SSO_ROLE_SUFFIX&gt;</span>
+      accessPolicies:
+        - policyARN: arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy
+          accessScope:
+            type: cluster
+
+vpc:
+  cidr: 10.42.0.0/16
+  nat:
+    gateway: Single
+  clusterEndpoints:
+    publicAccess: true
+    privateAccess: true
+  publicAccessCIDRs:
+    - 0.0.0.0/0
+
+iam:
+  withOIDC: true
+
+managedNodeGroups:
+  - name: system
+    instanceType: t3.medium
+    amiFamily: AmazonLinux2023
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 4
+    volumeSize: 40
+    volumeType: gp3
+    volumeEncrypted: true
+    privateNetworking: true
+    availabilityZones: [us-east-1a, us-east-1b]
+    labels:
+      workload: system
+    tags:
+      Project: streaming
+      karpenter.sh/discovery: ""
+
+cloudWatch:
+  clusterLogging:
+    enableTypes: ["api", "audit", "authenticator"]
+    logRetentionInDays: 7
+
+addons:
+  - name: vpc-cni
+    version: latest
+    configurationValues: |-
+      {"env":{"ENABLE_PREFIX_DELEGATION":"false","WARM_ENI_TARGET":"1"}}
+  - name: coredns
+    version: latest
+  - name: kube-proxy
+    version: latest
+  - name: eks-pod-identity-agent
+    version: latest
+  - name: aws-ebs-csi-driver
+    version: latest
+    podIdentityAssociations:
+      - namespace: kube-system
+        serviceAccountName: ebs-csi-controller-sa
+        permissionPolicyARNs: ["arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"]</code></pre>
+<p class="step-p">Two things to substitute before you apply:</p>
+<pre><code>export AWS_PROFILE=linkify-streaming
+export AWS_REGION=us-east-1
+
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+SSO_ROLE_ARN=$(aws iam list-roles --path-prefix /aws-reserved/sso.amazonaws.com/ \
+  --query 'Roles[?starts_with(RoleName, `AWSReservedSSO_AdministratorAccess`)].Arn' --output text)
+
+echo "$ACCOUNT_ID"
+echo "$SSO_ROLE_ARN"</code></pre>
+<p class="step-p">Put <code class="inline">$SSO_ROLE_ARN</code> into <code class="inline">principalARN</code> verbatim and <code class="inline">$ACCOUNT_ID</code> wherever <code class="inline">&lt;accountid&gt;</code> appears. Confirm the file parses before you spend 20 minutes on it:</p>
+<pre><code>eksctl create cluster -f infra/eks/cluster.yaml --dry-run &gt; /dev/null &amp;&amp; echo "config OK"</code></pre>
+<p class="step-p">A note on <code class="inline">addons[].podIdentityAssociations</code>: this field needs a recent eksctl (the &#8805;0.200 pinned in <a href="part-1-foundations.html#m01">Module 1</a>). If <code class="inline">--dry-run</code> rejects it, check <code class="inline">eksctl version</code> before you assume the field is wrong &#8212; and check the eksctl schema docs for the current spelling rather than guessing at an alternative.</p>
+<h4 id="m03-32-create-the-cluster">3.2 &#8212; Create the cluster</h4>
+<pre><code>eksctl create cluster -f infra/eks/cluster.yaml</code></pre>
+<p class="step-p"><strong>This takes 15&#8211;20 minutes.</strong> Leave it running; do not interrupt it. What it is doing, in order:</p>
+<ol>
+<li><strong>CloudFormation stack <code class="inline">eksctl-streaming-cluster</code></strong> &#8212; the VPC, an internet gateway, six subnets across three AZs, one NAT gateway, route tables, the cluster security group, and the IAM role the control plane assumes. Roughly 4 minutes.</li>
+<li><strong>The EKS control plane itself</strong> &#8212; AWS provisions API server and etcd instances across multiple AZs in their own account. This is the slow part, 8&#8211;10 minutes, and there is nothing to watch.</li>
+<li><strong>The OIDC provider</strong> &#8212; registered with IAM from the cluster's issuer URL.</li>
+<li><strong>CloudFormation stack <code class="inline">eksctl-streaming-nodegroup-system</code></strong> &#8212; the node IAM role, launch template and an EC2 Auto Scaling group. The two instances boot the AL2023 EKS-optimised AMI, whose bootstrap script joins them to the cluster. 3&#8211;5 minutes.</li>
+<li><strong>Add-ons</strong> &#8212; <code class="inline">vpc-cni</code>, <code class="inline">coredns</code>, <code class="inline">kube-proxy</code>, <code class="inline">eks-pod-identity-agent</code>, <code class="inline">aws-ebs-csi-driver</code>, plus the EBS CSI driver's Pod Identity association.</li>
+<li><strong>Kubeconfig</strong> &#8212; eksctl writes a context into <code class="inline">~/.kube/config</code> and makes it current.</li>
+</ol>
+<p class="step-p">The output is verbose and mostly reassuring. The lines worth reading are anything containing <code class="inline">waiting for CloudFormation stack</code> (normal), and anything containing <code class="inline">error</code> (not).</p>
+<p class="step-p">If you want to watch progress rather than stare at scrolling text, the CloudFormation console shows stack events live, and that is also where a failure will explain itself.</p>
+<h4 id="m03-33-point-kubectl-at-it">3.3 &#8212; Point kubectl at it</h4>
+<p class="step-p">eksctl does this for you, but do it explicitly so you know the command:</p>
+<pre><code>aws eks update-kubeconfig --name streaming --region us-east-1
+kubectl config current-context</code></pre>
+<pre class="out"><code>arn:aws:eks:us-east-1:123456789012:cluster/streaming</code></pre>
+<h4 id="m03-34-immediately-the-module-2-post-creation-steps">3.4 &#8212; Immediately: the Module 2 post-creation steps</h4>
+<p class="step-p">The S3 Gateway endpoint and the <code class="inline">karpenter.sh/discovery</code> tags belong to the VPC design and are documented in <a href="part-1-foundations.html#m02-do-it">Module 2</a>. Run them now, before anything writes to S3. The endpoint is the difference between $0 and $0.19/hour per live stream.</p>
+<div class="confirm section">
+<h3 id="m03-verify">Verify</h3>
+<p class="step-p">Both checks must pass before <a href="part-2-platform.html#m04">Module 4</a>.</p>
+<p class="step-p"><strong>1. Two nodes, both <code class="inline">Ready</code>.</strong></p>
+<pre><code>kubectl get nodes -o wide</code></pre>
+<pre class="out"><code>NAME                          STATUS   ROLES    AGE   VERSION               INTERNAL-IP    EXTERNAL-IP   OS-IMAGE                       KERNEL-VERSION                    CONTAINER-RUNTIME
+ip-10-42-45-183.ec2.internal  Ready    &lt;none&gt;   3m    v1.35.7-eks-a1b2c3d   10.42.45.183   &lt;none&gt;        Amazon Linux 2023.9.20260715   6.1.134-152.225.amzn2023.x86_64   containerd://2.0.5
+ip-10-42-77-9.ec2.internal    Ready    &lt;none&gt;   3m    v1.35.7-eks-a1b2c3d   10.42.77.9     &lt;none&gt;        Amazon Linux 2023.9.20260715   6.1.134-152.225.amzn2023.x86_64   containerd://2.0.5</code></pre>
+<p class="step-p">Four things in that output, not just <code class="inline">Ready</code>:</p>
+<ul>
+<li><strong>Two nodes.</strong> One means the second AZ's instance failed to join.</li>
+<li><strong><code class="inline">EXTERNAL-IP</code> is <code class="inline">&lt;none&gt;</code></strong> on both. <code class="inline">privateNetworking: true</code> worked; the nodes are not internet-addressable.</li>
+<li><strong><code class="inline">INTERNAL-IP</code> in <code class="inline">10.42.x.x</code></strong>, in two different /19 ranges &#8212; one node per AZ.</li>
+<li><strong><code class="inline">VERSION</code> is <code class="inline">v1.35.x</code></strong>, and within one minor of your <code class="inline">kubectl version --client</code>.</li>
+</ul>
+<p class="step-p">Confirm the AZ spread explicitly:</p>
+<pre><code>kubectl get nodes -L topology.kubernetes.io/zone</code></pre>
+<pre class="out"><code>NAME                           STATUS   ROLES    AGE   VERSION               ZONE
+ip-10-42-45-183.ec2.internal   Ready    &lt;none&gt;   3m    v1.35.7-eks-a1b2c3d   us-east-1a
+ip-10-42-77-9.ec2.internal     Ready    &lt;none&gt;   3m    v1.35.7-eks-a1b2c3d   us-east-1b</code></pre>
+<p class="step-p"><strong>2. The core system pods are running.</strong></p>
+<pre><code>kubectl get pods -A</code></pre>
+<pre class="out"><code>NAMESPACE     NAME                                       READY   STATUS    RESTARTS   AGE
+kube-system   aws-node-6kx4t                             2/2     Running   0          3m
+kube-system   aws-node-p9wzs                             2/2     Running   0          3m
+kube-system   coredns-7c9d8f6b5-2xqvn                    1/1     Running   0          6m
+kube-system   coredns-7c9d8f6b5-h4mkd                    1/1     Running   0          6m
+kube-system   ebs-csi-controller-6b7f9c4d8-fk2wl         5/5     Running   0          2m
+kube-system   ebs-csi-controller-6b7f9c4d8-tn8qz         5/5     Running   0          2m
+kube-system   ebs-csi-node-4vzjl                         3/3     Running   0          2m
+kube-system   ebs-csi-node-9dnrx                         3/3     Running   0          2m
+kube-system   eks-pod-identity-agent-lp2mn               1/1     Running   0          3m
+kube-system   eks-pod-identity-agent-wq7dv               1/1     Running   0          3m
+kube-system   kube-proxy-nb8rk                           1/1     Running   0          3m
+kube-system   kube-proxy-x5c2f                           1/1     Running   0          3m</code></pre>
+<p class="step-p">What matters: <strong><code class="inline">aws-node</code></strong> (the VPC CNI &#8212; without it nothing gets an IP), <strong><code class="inline">coredns</code></strong> (2/2 Running; if they're <code class="inline">Pending</code> the nodes joined after CoreDNS was scheduled and it will resolve itself, but check), and <strong><code class="inline">kube-proxy</code></strong>. Two of each DaemonSet pod, one per node. Names and hashes will differ; counts and <code class="inline">Running</code> should not.</p>
+<p class="step-p">Nothing outside <code class="inline">kube-system</code>. Everything else in this course you install yourself.</p>
+<p class="step-p"><strong>3. The add-ons and the OIDC provider registered.</strong></p>
+<pre><code>eksctl get addon --cluster streaming
+aws eks describe-cluster --name streaming --query cluster.identity.oidc.issuer --output text</code></pre>
+<pre class="out"><code>https://oidc.eks.us-east-1.amazonaws.com/id/A1B2C3D4E5F67890ABCDEF1234567890</code></pre>
+<p class="step-p">An empty result for the OIDC issuer means <code class="inline">withOIDC</code> did not take effect, and the AWS Load Balancer Controller in <a href="part-2-platform.html#m05">Module 5</a> will fail to get credentials.</p>
+<p class="step-p"><strong>4. Access entries, not aws-auth.</strong></p>
+<pre><code>aws eks list-access-entries --cluster-name streaming --output table
+aws eks describe-cluster --name streaming --query cluster.accessConfig.authenticationMode --output text</code></pre>
+<pre class="out"><code>API</code></pre>
+<p class="step-p">You should see two principal ARNs &#8212; the bootstrap entry for the creating principal, and the explicit SSO role entry from the config. And confirm the ConfigMap that every old tutorial talks about genuinely is not there:</p>
+<pre><code>kubectl -n kube-system get configmap aws-auth</code></pre>
+<pre class="out"><code>Error from server (NotFound): configmaps "aws-auth" not found</code></pre>
+<p class="step-p">That <code class="inline">NotFound</code> is the correct answer.</p>
+</div>
+<div class="gotcha section">
+<h3 id="m03-what-breaks">What breaks</h3>
+<p class="step-p"><strong><code class="inline">kubectl</code> returns <code class="inline">error: You must be logged in to the server (Unauthorized)</code>.</strong> Overwhelmingly the most common failure after cluster creation, and it has two distinct causes.</p>
+<p class="step-p">First, the boring one &#8212; your SSO session expired:</p>
+<pre><code>aws sts get-caller-identity      <span class="c"># if this fails, it's the session</span>
+aws sso login</code></pre>
+<p class="step-p">Second, the interesting one &#8212; your current principal has no access entry. This happens when you create the cluster as one principal and come back as another (a different SSO role, or a colleague).</p>
+<pre><code>aws eks list-access-entries --cluster-name streaming
+aws sts get-caller-identity --query Arn --output text</code></pre>
+<p class="step-p">Compare them. Remember the ARN shapes differ: <code class="inline">get-caller-identity</code> returns the <code class="inline">sts::...:assumed-role/...</code> session form, and the access entry holds the <code class="inline">iam::...:role/aws-reserved/sso.amazonaws.com/...</code> form. Adding yourself:</p>
+<pre><code>aws eks create-access-entry --cluster-name streaming --principal-arn "$SSO_ROLE_ARN" --type STANDARD
+aws eks associate-access-policy --cluster-name streaming --principal-arn "$SSO_ROLE_ARN" \
+  --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
+  --access-scope type=cluster</code></pre>
+<p class="step-p">That command working from outside the cluster, when you have no access <em>inside</em> the cluster, is the entire argument for <code class="inline">authenticationMode: API</code>.</p>
+<p class="step-p"><strong><code class="inline">eksctl create cluster</code> fails partway and rolls back.</strong> Read the CloudFormation stack events; the message is specific.</p>
+<pre><code>aws cloudformation describe-stack-events --stack-name eksctl-streaming-cluster \
+  --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`].[LogicalResourceId,ResourceStatusReason]' \
+  --output table</code></pre>
+<p class="step-p">The two you're most likely to hit: an <strong>EIP limit</strong> (<code class="inline">The maximum number of addresses has been reached</code>) &#8212; NAT gateways need an Elastic IP, and new accounts have a low regional quota, so release unused EIPs or request an increase &#8212; and <strong><code class="inline">AccessDenied</code></strong> on an IAM action, which means the permission set is narrower than <code class="inline">AdministratorAccess</code>.</p>
+<p class="step-p">Clean up before retrying, or the next run collides with half-created resources:</p>
+<pre><code>eksctl delete cluster -f infra/eks/cluster.yaml --disable-nodegroup-eviction</code></pre>
+<p class="step-p"><strong>Nodes never appear, or appear as <code class="inline">NotReady</code>.</strong> The control plane came up but the node group did not join.</p>
+<pre><code>eksctl get nodegroup --cluster streaming
+aws cloudformation describe-stack-events --stack-name eksctl-streaming-nodegroup-system \
+  --query 'StackEvents[?ResourceStatus==`CREATE_FAILED`].[LogicalResourceId,ResourceStatusReason]' --output table
+kubectl describe node <span class="ph">&lt;name&gt;</span>       <span class="c"># Conditions, then Events</span></code></pre>
+<p class="step-p"><code class="inline">NotReady</code> with <code class="inline">container runtime network not ready</code> means the CNI hasn't initialised &#8212; check <code class="inline">kubectl logs -n kube-system ds/aws-node</code>. Nodes that never appear at all usually failed to reach the EKS API endpoint or the EC2 instances failed to launch (capacity, or a missing route to the NAT gateway).</p>
+<p class="step-p"><strong><code class="inline">coredns</code> pods stuck <code class="inline">Pending</code>.</strong> CoreDNS is scheduled before the node group exists during creation, so it sits <code class="inline">Pending</code> until nodes join and then schedules on its own. If it's still <code class="inline">Pending</code> several minutes after the nodes are <code class="inline">Ready</code>:</p>
+<pre><code>kubectl -n kube-system describe pod -l k8s-app=kube-dns    <span class="c"># Events explain the refusal</span>
+kubectl describe nodes | grep -A5 'Allocated resources'</code></pre>
+<p class="step-p">Usually insufficient memory, which on a 2 &#215; <code class="inline">t3.medium</code> cluster is a real possibility &#8212; see the sizing table above.</p>
+<p class="step-p"><strong><code class="inline">--dry-run</code> rejects a field in <code class="inline">cluster.yaml</code>.</strong> Almost always an eksctl version older than the schema you've written against &#8212; <code class="inline">podIdentityAssociations</code> under an add-on is the most likely offender.</p>
+<pre><code>eksctl version    <span class="c"># want &gt;= 0.200</span></code></pre>
+<p class="step-p">Check the field name against the eksctl schema documentation for your version rather than substituting a guess; a silently-ignored field is worse than a rejected one.</p>
+<p class="step-p"><strong>The bill starts and you weren't ready.</strong> The control plane bills from the moment it's <code class="inline">ACTIVE</code>, at $73/month, and it does not stop when you scale nodes to zero. If you're pausing for more than a few days, <a href="part-5-elastic.html#m16">Module 16</a> covers teardown properly. If you're pausing overnight, scaling the node group to zero is the cheap habit:</p>
+<pre><code>eksctl scale nodegroup --cluster streaming --name system --nodes 0 --nodes-min 0
+eksctl scale nodegroup --cluster streaming --name system --nodes 2 --nodes-min 2</code></pre>
+<p class="step-p">Next: <a href="part-2-platform.html#m04">Module 4 &#8212; Add-ons and the storage blocker</a>.</p>
+</div>
+</section>
+
+<footer class="finish">
+  <span class="eyebrow">End of Part I</span>
+  <p>You have code that can run on AWS, an account with a budget alarm, a VPC you can defend, and <code class="inline">kubectl get nodes</code> returning nodes. Next is the platform layer that makes the cluster able to run things.</p>
+</footer>
+<div class="pager"><a href="index.html">&larr; Course index</a><a href="part-2-platform.html">Part II &mdash; Platform &rarr;</a></div>
+</main>
+</div>

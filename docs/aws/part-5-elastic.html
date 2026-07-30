@@ -1,0 +1,2139 @@
+<title>AWS/EKS &mdash; Part V: Elastic and automated</title>
+<style>
+  :root {
+    --paper: #eef1f4;
+    --surface: #ffffff;
+    --surface-dim: #e4e8ec;
+    --ink: #1b232c;
+    --ink-dim: #57626d;
+    --line: #ccd3d9;
+    --amber: #a35f22;
+    --amber-ink: #7c4718;
+    --teal: #2d5f74;
+    --teal-bg: #dfe9ec;
+    --ok: #2f6b3e;
+    --ok-bg: #dfeee2;
+    --warn: #9a3d3d;
+    --warn-bg: #f2e0e0;
+    --code-bg: #1b232c;
+    --code-ink: #e7ebee;
+    --code-dim: #93a1ac;
+    --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+      --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+      --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+      --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+      --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+    --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+    --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+    --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+    --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1f4; --surface: #ffffff; --surface-dim: #e4e8ec;
+    --ink: #1b232c; --ink-dim: #57626d; --line: #ccd3d9;
+    --amber: #a35f22; --amber-ink: #7c4718; --teal: #2d5f74; --teal-bg: #dfe9ec;
+    --ok: #2f6b3e; --ok-bg: #dfeee2; --warn: #9a3d3d; --warn-bg: #f2e0e0;
+    --code-bg: #1b232c; --code-ink: #e7ebee; --code-dim: #93a1ac; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6; font-size: 16px;
+  }
+  ::selection { background: var(--amber); color: #fff; }
+  a { color: var(--amber-ink); }
+  code, pre, kbd {
+    font-family: "Cascadia Code", "Cascadia Mono", ui-monospace, "SF Mono", Consolas,
+      "Liberation Mono", monospace;
+  }
+
+  .topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .topbar-inner { max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 1.75rem; }
+  .eyebrow {
+    display: inline-block; font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--amber-ink); background: color-mix(in srgb, var(--amber) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    padding: 0.2rem 0.55rem; border-radius: 3px;
+  }
+  h1 {
+    margin: 0.65rem 0 0.35rem; font-size: 1.95rem; font-weight: 700;
+    letter-spacing: -0.015em; text-wrap: balance;
+  }
+  .subtitle {
+    margin: 0 0 1rem; color: var(--ink-dim); font-size: 1.02rem;
+    max-width: 64ch; text-wrap: pretty;
+  }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem;
+    font-size: 0.85rem; color: var(--ink-dim);
+  }
+  .meta-row strong { color: var(--ink); font-weight: 600; }
+
+  .layout {
+    max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 5rem;
+    display: grid; grid-template-columns: 210px minmax(0, 1fr);
+    gap: 2.5rem; align-items: start;
+  }
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+    .rail { display: none; }
+  }
+
+  .rail {
+    position: sticky; top: 1.5rem; display: flex; flex-direction: column;
+    gap: 0.1rem; max-height: calc(100vh - 3rem); overflow-y: auto;
+    padding-right: 0.4rem;
+  }
+  .rail-label {
+    font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 0.45rem;
+  }
+  .rail-label + .rail-label, .rail a + .rail-label { margin-top: 1.1rem; }
+  .rail a {
+    display: flex; gap: 0.5rem; align-items: baseline;
+    padding: 0.3rem 0 0.3rem 0.7rem; font-size: 0.85rem;
+    color: var(--ink-dim); text-decoration: none;
+    border-left: 2px solid var(--line); margin-left: -1px;
+  }
+  .rail a:hover { color: var(--ink); border-left-color: var(--amber); }
+  .rail a .n {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber-ink); font-size: 0.78rem; flex-shrink: 0;
+  }
+
+  main { min-width: 0; }
+
+  .intro { color: var(--ink-dim); max-width: 68ch; margin: 0 0 2rem; }
+  .intro strong { color: var(--ink); }
+  .intro p { margin: 0 0 0.9rem; text-wrap: pretty; }
+
+  .step {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.5rem 1.6rem 1.7rem;
+    margin-bottom: 1.5rem; box-shadow: var(--shadow); scroll-margin-top: 1.5rem;
+  }
+  .step-head {
+    display: flex; align-items: baseline; gap: 0.85rem;
+    margin-bottom: 0.9rem; flex-wrap: wrap;
+  }
+  .step-num {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber); font-size: 1.05rem; font-weight: 600;
+  }
+  .step h2 { margin: 0; font-size: 1.2rem; font-weight: 650; letter-spacing: -0.008em; }
+  .step h3 {
+    margin: 1.6rem 0 0.6rem; font-size: 0.99rem; font-weight: 650;
+    letter-spacing: -0.005em;
+  }
+  .step h3:first-child { margin-top: 0; }
+  .step h4 {
+    margin: 1.1rem 0 0.4rem; font-size: 0.9rem; font-weight: 650;
+    color: var(--ink-dim); letter-spacing: 0.01em;
+  }
+  .context-chip {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--teal); background: var(--teal-bg);
+    border-radius: 999px; padding: 0.18rem 0.65rem; white-space: nowrap;
+  }
+
+  .why, .confirm, .gotcha {
+    display: flex; gap: 0.7rem; border-radius: 0 6px 6px 0;
+    padding: 0.8rem 0.95rem; margin: 0 0 1rem;
+    font-size: 0.92rem; text-wrap: pretty;
+  }
+  .why { background: var(--teal-bg); border-left: 3px solid var(--teal); }
+  .why b { color: var(--teal); font-weight: 700; }
+  .confirm { background: var(--ok-bg); border-left: 3px solid var(--ok); }
+  .confirm b { color: var(--ok); font-weight: 700; }
+  .gotcha { background: var(--warn-bg); border-left: 3px solid var(--warn); }
+  .gotcha b { color: var(--warn); font-weight: 700; }
+
+  p.step-p { margin: 0 0 1rem; text-wrap: pretty; }
+  p.step-p:last-child { margin-bottom: 0; }
+  .step ul, .step ol { margin: 0 0 1rem; padding-left: 1.35rem; }
+  .step li { margin-bottom: 0.45rem; text-wrap: pretty; }
+  .step li:last-child { margin-bottom: 0; }
+  .step ul ul, .step ol ol, .step ul ol { margin: 0.4rem 0 0; }
+
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+    padding: 0.85rem 1rem; margin: 0 0 1rem; overflow-x: auto;
+    font-size: 0.85rem; line-height: 1.6;
+  }
+  pre code { color: inherit; }
+  pre .c { color: var(--code-dim); }
+  pre .ph { color: var(--code-key); }
+  pre.out {
+    background: var(--surface-dim); color: var(--ink); border: 1px solid var(--line);
+  }
+  pre.out .c { color: var(--ink-dim); }
+  code.inline {
+    background: var(--surface-dim); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.87em; word-break: break-word;
+  }
+
+  .tbl-wrap { overflow-x: auto; margin: 0 0 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 460px; }
+  th, td {
+    text-align: left; padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  th {
+    font-size: 0.73rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-dim); font-weight: 600;
+  }
+  td code { font-size: 0.85em; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .diagram {
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.1rem; margin: 0 0 1.2rem;
+  }
+  .dlayer {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 0.75rem 0.85rem; margin-bottom: 0.55rem;
+  }
+  .dlayer:last-child { margin-bottom: 0; }
+  .dlayer-title {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--amber-ink); margin-bottom: 0.5rem;
+  }
+  .dboxes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .dbox {
+    border: 1px solid var(--line); border-radius: 5px;
+    padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--paper);
+  }
+  .dbox b { display: block; font-weight: 650; font-size: 0.82rem; }
+  .dbox span {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; color: var(--ink-dim);
+  }
+  .dbox.accent {
+    border-color: var(--amber);
+    background: color-mix(in srgb, var(--amber) 8%, var(--paper));
+  }
+  .dbox.teal { border-color: var(--teal); background: var(--teal-bg); }
+  .darrow {
+    text-align: center; color: var(--ink-dim); font-size: 0.88rem;
+    margin: 0.15rem 0; font-family: "Cascadia Code", ui-monospace, monospace;
+  }
+
+  /* numbered end-to-end trace */
+  .trace { margin: 0 0 1.2rem; counter-reset: tr; }
+  .trace-item {
+    display: grid; grid-template-columns: 1.7rem minmax(0, 1fr);
+    gap: 0.85rem; padding-bottom: 1rem; position: relative;
+  }
+  .trace-item::before {
+    counter-increment: tr; content: counter(tr);
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.75rem; font-weight: 600; color: var(--amber-ink);
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 50%; width: 1.7rem; height: 1.7rem;
+    display: grid; place-items: center;
+  }
+  .trace-item:not(:last-child)::after {
+    content: ""; position: absolute; left: 0.85rem; top: 1.85rem; bottom: 0.1rem;
+    width: 1px; background: var(--line);
+  }
+  .trace-item > div { padding-top: 0.1rem; font-size: 0.92rem; }
+  .trace-item b { font-weight: 650; }
+  .trace-item .who {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.74rem; color: var(--teal); display: block; margin-bottom: 0.1rem;
+  }
+
+  .glossary { font-size: 0.9rem; }
+  .glossary dt {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-weight: 600; color: var(--amber-ink); margin-top: 0.8rem; font-size: 0.85rem;
+  }
+  .glossary dt:first-child { margin-top: 0; }
+  .glossary dd { margin: 0.15rem 0 0; color: var(--ink); text-wrap: pretty; }
+
+  footer.finish {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--amber); border-radius: 0 10px 10px 0;
+    padding: 1.3rem 1.5rem; box-shadow: var(--shadow); font-size: 0.97rem;
+  }
+  footer.finish .eyebrow { margin-bottom: 0.6rem; }
+  footer.finish p { margin: 0 0 0.8rem; text-wrap: pretty; }
+  footer.finish p:last-child { margin-bottom: 0; }
+
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  /* ---- additions for the AWS course ---------------------------------- */
+
+  /* Section-level variants of the three callouts: they hold whole sections
+     (headings, tables, code) rather than a single sentence. */
+  .why.section, .confirm.section, .gotcha.section {
+    display: block; border-radius: 0 8px 8px 0;
+    padding: 1.15rem 1.3rem 1.25rem; margin: 0 0 1.4rem; font-size: 1rem;
+  }
+  .why.section { background: color-mix(in srgb, var(--teal-bg) 60%, var(--surface)); }
+  .confirm.section { background: color-mix(in srgb, var(--ok-bg) 55%, var(--surface)); }
+  .gotcha.section { background: color-mix(in srgb, var(--warn-bg) 55%, var(--surface)); }
+  .section > h3:first-child { margin-top: 0; }
+  .why.section > h3:first-child { color: var(--teal); }
+  .confirm.section > h3:first-child { color: var(--ok); }
+  .gotcha.section > h3:first-child { color: var(--warn); }
+  .section > *:last-child { margin-bottom: 0; }
+  .section pre.out { background: var(--surface); }
+
+  .step h4 { color: var(--ink); font-size: 0.95rem; }
+
+  .modnav {
+    font-size: 0.85rem; color: var(--ink-dim); margin: 0 0 1.2rem;
+    padding-bottom: 0.8rem; border-bottom: 1px solid var(--line);
+  }
+
+  blockquote {
+    margin: 0 0 1rem; padding: 0.1rem 0 0.1rem 1rem;
+    border-left: 3px solid var(--line); color: var(--ink-dim);
+  }
+  blockquote p.step-p:last-child { margin-bottom: 0; }
+
+  .step li > pre, .step li > .tbl-wrap { margin-top: 0.5rem; }
+
+  .pager {
+    display: flex; flex-wrap: wrap; gap: 0.75rem 1rem;
+    justify-content: space-between; margin-top: 1.5rem;
+    font-size: 0.9rem;
+  }
+  .pager a { text-decoration: none; }
+  .pager a:hover { text-decoration: underline; }
+
+  .rail a.home { border-left-color: var(--amber); color: var(--ink); }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="eyebrow">AWS &middot; EKS course &middot; Part V</span>
+    <h1>Elastic and automated</h1>
+    <p class="subtitle">One transcode Job per stream with KEDA and Karpenter, pull-based deploys with ArgoCD, then monitoring, cost levers, and teardown.</p>
+    <div class="meta-row">
+      <span><strong>Modules:</strong> 14&ndash;16</span>
+      <span><strong>Region:</strong> us-east-1</span>
+      <span><strong>Cluster:</strong> streaming</span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+<nav class="rail">
+  <div class="rail-label">Part V &mdash; Elastic and automated</div>
+  <a href="#m14"><span class="n">14</span> Transcoding that scales</a>
+  <a href="#m15"><span class="n">15</span> GitOps with ArgoCD</a>
+  <a href="#m16"><span class="n">16</span> Monitoring, cost, and teardown</a>
+  <div class="rail-label">Course</div>
+  <a href="index.html" class="home"><span class="n">&#8617;</span> Course index</a>
+  <a href="part-1-foundations.html"><span class="n">I</span> Foundations</a>
+  <a href="part-2-platform.html"><span class="n">II</span> Platform</a>
+  <a href="part-3-data-layer.html"><span class="n">III</span> Data layer</a>
+  <a href="part-4-application.html"><span class="n">IV</span> The application</a>
+</nav>
+
+<main>
+<section class="step" id="m14">
+  <div class="step-head">
+    <span class="step-num">14</span>
+    <h2>Transcoding that scales</h2>
+  </div>
+<p class="modnav">Prerequisite: <a href="part-4-application.html#m13">Module 13</a> passed. You have watched a stream end to end. If you haven't, stop &#8212; this module changes the component you'd be debugging. ---</p>
+<h3 id="m14-what-youre-building">What you're building</h3>
+<p class="step-p">Today <code class="inline">transcode-worker</code> is one long-running container. It has a <code class="inline">while True</code> Kafka consumer at the bottom of <code class="inline">main.py</code>, and every stream and every uploaded video is handled by a thread inside that one process, sharing one node's cores. Concurrency is capped by whatever that pod's CPU request happens to be, and if the pod dies, everything it was doing dies with it.</p>
+<p class="step-p">By the end of this module, each unit of work is its own Kubernetes Job. A stream starts, KEDA notices a Kafka message, KEDA creates a Job, the Job is unschedulable, Karpenter provisions a node for it, the pod transcodes exactly that one stream, the stream ends, the pod exits, the Job completes, Karpenter consolidates the node away. Zero pods and zero transcode nodes when nobody is streaming.</p>
+<p class="step-p">You will also do the piece nobody warns you about: <strong>KEDA does not tell the pod what to work on.</strong> Most of this module is designing that handoff so you don't lose work or do it twice.</p>
+<div class="why section">
+<h3 id="m14-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m14-keda-is-a-counter-not-a-dispatcher">KEDA is a counter, not a dispatcher</h4>
+<p class="step-p">This is the single most important sentence in the module, so read it twice.</p>
+<p class="step-p">KEDA's Kafka scaler computes <code class="inline">latest_offset &#8722; committed_offset</code> for a <code class="inline">(consumerGroup, topic)</code> pair, divides by <code class="inline">lagThreshold</code>, and creates that many Jobs from a <strong>fixed, static template</strong>. There is no message body in the pod's environment. No key. No partition. No offset. Nothing.</p>
+<p class="step-p">This surprises people because every other queue-worker system they've used hands the message to the worker. Lambda does. SQS-triggered ECS tasks do. KEDA does not, and it can't: the pod is created from YAML you wrote before the message existed.</p>
+<p class="step-p">So the spawned pod has to go and get its own work:</p>
+<pre class="out"><code>ingest-webhook  --produce--&gt;  stream.start.requests   (8 partitions)
+                                        |
+                    KEDA polls lag for group "transcode-live" every 5s
+                                        |
+                        lag = 1  -&gt;  create 1 Job  -&gt;  1 pod
+                                        |
+       pod joins group "transcode-live", polls ONE message, learns stream_id + path
+                                        |
+            pod atomically claims the stream in Postgres, THEN commits the offset
+                                        |
+                              lag drops to 0, KEDA goes quiet</code></pre>
+<p class="step-p">Two things must line up for that loop to close, and both are easy to get wrong.</p>
+<p class="step-p"><strong>The consumer group name in the pod's config must be byte-identical to the ScaledJob trigger's <code class="inline">consumerGroup</code>.</strong> If they differ by so much as a hyphen, KEDA measures lag on a group nobody ever commits to. Lag grows monotonically forever. KEDA spawns Jobs at <code class="inline">maxReplicaCount</code>, continuously, until you notice &#8212; and because each of those pods loses its claim and exits 0, nothing looks like it's failing. It is a very expensive, very quiet incident. That's why the value appears as an env var in the pod spec <em>and</em> in the trigger metadata in the same file, with a comment on each pointing at the other.</p>
+<p class="step-p"><strong><code class="inline">offsetResetPolicy</code> on the trigger must match <code class="inline">auto.offset.reset</code> in the pod's consumer.</strong> If the trigger says <code class="inline">latest</code> and the pod says <code class="inline">earliest</code>, the first pod to ever join replays the entire topic history and starts a transcode for every stream that has ever existed.</p>
+<h4 id="m14-offset-commit-timing-the-decision-that-makes-or-breaks-it">Offset commit timing &#8212; the decision that makes or breaks it</h4>
+<p class="step-p">There are two candidate points to commit the offset, and one of them will burn money for hours before you spot it.</p>
+<p class="step-p"><strong>Wrong: commit after the work completes.</strong> This is the reflex &#8212; it's textbook at-least-once, and for a 200ms HTTP handler it's correct. Here a VOD transcode takes 10&#8211;30 minutes and a live stream takes hours. The offset stays uncommitted that whole time, so KEDA sees lag &#8805; 1 continuously and creates a fresh Job <strong>every <code class="inline">pollingInterval</code></strong> for the entire duration, up to <code class="inline">maxReplicaCount</code>. Each new pod reads the same message, loses the claim, exits. That's a pod-churn treadmill for hours, with Karpenter provisioning and deprovisioning nodes underneath it.</p>
+<p class="step-p"><strong>Right: commit as soon as the work is durably claimed.</strong> The offset commit's job here is to say <em>"this message has an owner"</em>, not <em>"this message is finished"</em>. What makes the ownership durable is the Postgres claim, not the commit. So:</p>
+<pre class="out"><code>poll one message
+  -&gt; atomic DB claim   (UPDATE ... WHERE &lt;still unclaimed&gt; RETURNING id)
+  -&gt; commit the offset (ALWAYS &#8212; whether the claim won or lost)
+  -&gt; claim won:  do the work
+     claim lost: exit 0, someone else has it</code></pre>
+<p class="step-p"><strong>Commit even when the claim loses.</strong> This one feels wrong and isn't. If you skip the commit on a lost claim, that message is redelivered forever, KEDA never stops spawning pods for it, and every one of those pods loses the claim too. A lost claim means the message is definitively handled by <em>somebody</em> &#8212; that's a reason to commit, not a reason to retry.</p>
+<h4 id="m14-what-a-crash-costs-you-and-how-idempotency-absorbs-it">What a crash costs you, and how idempotency absorbs it</h4>
+<p class="step-p">Committing at claim time trades one failure mode for another, and you should be able to state the trade out loud.</p>
+<p class="step-p">A pod that crashes <strong>before</strong> the commit: Kafka redelivers, a new pod claims it, work proceeds. Fine.</p>
+<p class="step-p">A pod that crashes <strong>after</strong> the commit but before finishing: Kafka will never redeliver that message. The row stays claimed with nothing working on it. The stream is dead, or the video is stuck at <code class="inline">transcoding</code>, permanently.</p>
+<p class="step-p">That hole already exists in the code you have. <code class="inline">_claim_video</code> does <code class="inline">UPDATE videos SET status='transcoding' WHERE id=%s AND status='uploaded'</code>, and its own comment admits a crash leaves the row stuck forever because a redelivered event won't match that <code class="inline">WHERE</code> clause. On the dev box that was theoretical &#8212; the container ran for weeks. In the pod-per-job model it becomes routine: spot reclaim, node consolidation, OOMKill, an ephemeral-storage eviction. Every one of those ends a pod mid-work with no warning.</p>
+<p class="step-p">Note what the redelivery semantics buy you and what they don't. At-least-once redelivery plus the atomic claim gives you exactly-once <em>starting</em>: two pods can read the same message and only one will ever begin ffmpeg, because the claim is a single-row conditional <code class="inline">UPDATE</code> and Postgres serializes it. What it does not give you is exactly-once <em>completion</em>. That gap is what the sweeper fills.</p>
+<h4 id="m14-why-activestreams-stops-working">Why <code class="inline">active_streams</code> stops working</h4>
+<p class="step-p"><code class="inline">transcode-worker</code> keeps a module-level dict guarded by a lock:</p>
+<pre><code>active_streams: dict[str, dict | None] = {}
+active_streams_lock = threading.Lock()</code></pre>
+<p class="step-p">It does two different jobs, and they have different answers now.</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>What it does today</th>
+<th>Why it stops working</th>
+<th>What replaces it</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Dedupes a redelivered <code class="inline">started</code> event (<code class="inline">if path in active_streams: return</code>)</td>
+<td>The dict is per-process. Every stream is now its own pod with its own empty dict. Two pods for the same stream would each see an empty dict, both start ffmpeg against the same RTMP path, MediaMTX would serve both, and you'd get two encoders fighting over one source and two writers racing on the same S3 prefix.</td>
+<td>A claim column on <code class="inline">streams</code> in Postgres, mirroring what <code class="inline">_claim_video</code> already does for videos &#8212; plus a heartbeat, so a dead claim is detectable.</td>
+</tr>
+<tr>
+<td>Routes an <code class="inline">ended</code> event to the right ffmpeg (<code class="inline">active_streams[path]["stop_event"].set()</code>)</td>
+<td>&#8212;</td>
+<td><strong>Nothing.</strong> It disappears. Each pod owns exactly one stream, so "which ffmpeg does this event belong to?" collapses to <code class="inline">if data["path"] == MY_PATH</code>.</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">That second row is the good news buried in this design: the routing table you had to maintain in memory, with a lock, with a <code class="inline">None</code> placeholder to close a race &#8212; all of it deletes. One pod, one stream, no table.</p>
+<p class="step-p">The first row is the work. The dict was doing something a dict genuinely can't do across processes, and the replacement has to be a shared, atomic, durable thing. Postgres already is one.</p>
+<p class="step-p"><strong>Why a heartbeat and not just a status column.</strong> A status column tells you a claim exists. It cannot tell you whether the claimer is still alive. A live pod writes <code class="inline">transcode_heartbeat = now()</code> every 15 seconds; a claim whose heartbeat is two minutes stale is a claim whose owner is gone. That's a lease, and it's the minimum you need to safely recover work you can't re-derive from Kafka.</p>
+<p class="step-p"><strong>Why a sweeper CronJob and not in-pod recovery.</strong> The pod that needs recovering is, by definition, not running. Something outside it has to notice. A CronJob every two minutes is the cheapest possible watcher and it costs about $0.</p>
+<h4 id="m14-how-the-live-pod-knows-when-its-stream-ended">How the live pod knows when its stream ended</h4>
+<p class="step-p"><code class="inline">stream.lifecycle</code> carries both <code class="inline">started</code> and <code class="inline">ended</code> events. The KEDA trigger can't point at it &#8212; the scaler has no idea what's in a message, so an <code class="inline">ended</code> event would spawn a transcode Job just as readily as a <code class="inline">started</code> one. That's why <code class="inline">stream.start.requests</code> exists as a separate, <code class="inline">started</code>-only topic.</p>
+<p class="step-p">But the pod still needs the <code class="inline">ended</code> event, so it consumes <code class="inline">stream.lifecycle</code> itself and filters for its own path. When it matches, it sets a stop event, ffmpeg gets SIGTERM, finalizes the playlist, and the process exits. <strong>Job completion is the teardown.</strong> Nothing external tracks or kills the pod.</p>
+<p class="step-p">The watcher uses <code class="inline">assign()</code>, not <code class="inline">subscribe()</code>, and that distinction matters. With <code class="inline">subscribe()</code> and a shared group, partitions get split across pods &#8212; a pod might be assigned partitions that never carry its own stream's event, and it would wait forever. It would also trigger a consumer-group rebalance every single time a live Job starts or stops. <code class="inline">assign()</code> bypasses group coordination entirely: this pod reads every partition of <code class="inline">stream.lifecycle</code>, filters in Python, commits nothing, and disturbs no other consumer.</p>
+<p class="step-p">Teardown is layered, and you should know the order because you'll debug it:</p>
+<ol>
+<li><strong>ffmpeg exits on its own.</strong> OBS disconnects, MediaMTX tears down the path, ffmpeg's RTMP read hits EOF. This already works today and is the normal case.</li>
+<li><strong>The <code class="inline">ended</code> event sets <code class="inline">stop_event</code>.</strong> Its real job is not killing ffmpeg &#8212; case 1 does that &#8212; but stopping the <em>retry loop</em> from restarting ffmpeg into a path that no longer exists. Look at <code class="inline">start_live_transcode</code>: on a detected stall it loops and starts a new ffmpeg. Without the <code class="inline">ended</code> signal, a stream that ended during a stall retries until <code class="inline">activeDeadlineSeconds</code>.</li>
+<li><strong>A DB poll every 15 seconds</strong> on the heartbeat thread (<code class="inline">SELECT status FROM streams WHERE id = %s</code>). Covers a missed Kafka event &#8212; a broker restart mid-stream, an <code class="inline">offsets_for_times</code> edge case.</li>
+<li><strong><code class="inline">activeDeadlineSeconds: 21600</code>.</strong> A pod that survives all three is wedged. The Job controller kills it at six hours, which also puts a hard ceiling on what one bad pod can cost you.</li>
+</ol>
+</div>
+<h3 id="m14-do-it">Do it</h3>
+<h4 id="m14-1-install-keda">1. Install KEDA</h4>
+<p class="step-p">For now, by hand. Module 15 moves it into ArgoCD and you'll delete nothing &#8212; Argo adopts the existing release.</p>
+<pre><code>helm repo add kedacore https://kedacore.github.io/charts
+helm repo update
+helm upgrade --install keda kedacore/keda \
+  --namespace keda --create-namespace \
+  --version 2.19.0 \
+  --set operator.replicaCount=1 \
+  --set metricsServer.replicaCount=1</code></pre>
+<pre><code>kubectl get pods -n keda</code></pre>
+<pre class="out"><code>NAME                                      READY   STATUS    RESTARTS   AGE
+keda-admission-webhooks-6c9d8f7b4-2xk7p   1/1     Running   0          58s
+keda-operator-7d5b9c8f66-lq4wn            1/1     Running   0          58s
+keda-operator-metrics-apiserver-...-vt8ck 1/1     Running   0          58s</code></pre>
+<p class="step-p">The Argo Application version is already written for you at <code class="inline">k8s/platform/keda.yaml</code>; Module 15 wires it in.</p>
+<p class="step-p"><strong>Which Kafka listener KEDA authenticates against: the plain internal listener on port 9092, no TLS, no SCRAM.</strong> Strimzi's convention is a <code class="inline">plain</code> internal listener on 9092 and a <code class="inline">tls</code> one on 9093. The trigger points at <code class="inline">streaming-kafka-bootstrap.kafka.svc.cluster.local:9092</code> and needs no <code class="inline">TriggerAuthentication</code> at all.</p>
+<p class="step-p">Somebody will call that insecure, so have the reasoning ready:</p>
+<ul>
+<li><strong>TLS costs work in five places.</strong> Every Python service would need <code class="inline">security.protocol=SSL</code> plus the cluster CA mounted from Strimzi's auto-generated <code class="inline">streaming-cluster-ca-cert</code> Secret. KEDA would need a <code class="inline">TriggerAuthentication</code> with a <code class="inline">ca</code> parameter pointing at a copy of that Secret <strong>in the <code class="inline">keda</code> namespace</strong> &#8212; Secrets don't cross namespaces, so that's a second ExternalSecret or a replicator existing purely for this. Strimzi rotates that CA on a schedule, and a stale copy breaks KEDA silently.</li>
+<li><strong>SCRAM costs more.</strong> <code class="inline">KafkaUser</code> CRs per client, generated password Secrets, <code class="inline">sasl.mechanism</code> config in five services, and an <code class="inline">authorization: type: simple</code> block with per-topic ACLs or nothing is actually protected.</li>
+<li><strong>It buys close to nothing here.</strong> The traffic is pod-to-pod inside one VPC, one cluster, one team. The threat TLS addresses &#8212; a passive observer on the wire between broker and client &#8212; is not present. If your worry is a compromised pod in another namespace, the NetworkPolicy in <code class="inline">k8s/infra/kafka/</code> is the control that helps, and it's one file.</li>
+</ul>
+<p class="step-p">Write the upgrade path down so it's a decision and not an omission: add a second listener <code class="inline">{name: tls, port: 9093, type: internal, tls: true}</code> alongside the plain one &#8212; they coexist &#8212; migrate clients one at a time, then delete the plain listener. Do that when a second team shows up or Kafka gets exposed outside the cluster. Not before.</p>
+<p class="step-p"><strong>No IRSA or Pod Identity for KEDA.</strong> The Kafka scaler opens a plain TCP connection to an in-cluster Service and makes zero AWS API calls. KEDA needs an AWS identity only for AWS-flavoured scalers &#8212; SQS, CloudWatch, DynamoDB, or MSK with IAM auth. This is a real, concrete argument for having kept Kafka in-cluster on Strimzi.</p>
+<p class="step-p">The transcode <strong>Job pods</strong> do need AWS credentials, for S3. They keep using the <code class="inline">transcode-worker</code> ServiceAccount that <a href="part-4-application.html#m11">Module 11</a> already created at <code class="inline">k8s/apps/base/transcode-worker/serviceaccount.yaml</code>, bound to an IAM role by the EKS Pod Identity association from <a href="part-2-platform.html#m07">Module 7</a>. <strong>Do not create a new ServiceAccount for this</strong> &#8212; reusing the existing one means the Pod Identity association and any imagePullSecret carry over untouched. You delete the Deployment next to it, not the ServiceAccount.</p>
+<h4 id="m14-2-confirm-the-trigger-topic-exists">2. Confirm the trigger topic exists</h4>
+<p class="step-p"><code class="inline">stream.start.requests</code> needs 8 partitions. <a href="part-3-data-layer.html#m10">Module 10</a> should already have created it:</p>
+<pre><code>kubectl get kafkatopic -n kafka</code></pre>
+<pre class="out"><code>NAME                    CLUSTER     PARTITIONS   REPLICATION FACTOR   READY
+stream.lifecycle        streaming   8            1                    True
+stream.start.requests   streaming   8            1                    True
+transcode.status        streaming   3            1                    True
+upload.events           streaming   8            1                    True
+viewer.analytics        streaming   3            1                    True</code></pre>
+<p class="step-p">If it isn't there, add it to <code class="inline">k8s/infra/kafka/topics.yaml</code>:</p>
+<pre><code>apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: stream.start.requests
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: streaming
+spec:
+  <span class="c"># 8 partitions is the hard ceiling on live transcode concurrency &#8212;</span>
+  <span class="c"># allowIdleConsumers: false caps KEDA replicas at the partition count.</span>
+  <span class="c"># Partitions can only ever go up, so this is headroom, not a target.</span>
+  partitions: 8
+  replicas: 1
+  config:
+    retention.ms: 604800000 <span class="c"># 7 days</span></code></pre>
+<h4 id="m14-3-the-schema-change">3. The schema change</h4>
+<p class="step-p"><code class="inline">postgres/migrations/002_transcode_claim.sql</code>:</p>
+<pre><code>ALTER TABLE streams
+  ADD COLUMN IF NOT EXISTS transcode_status TEXT NOT NULL DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS transcode_heartbeat TIMESTAMPTZ;
+
+ALTER TABLE videos
+  ADD COLUMN IF NOT EXISTS transcode_heartbeat TIMESTAMPTZ;
+
+-- ingest-webhook runs COUNT(*) WHERE status='live' on every publish attempt.
+-- Without this it's a sequential scan over a table that grows one row per
+-- broadcast forever. With it, a sub-millisecond index-only scan.
+CREATE INDEX IF NOT EXISTS streams_live_idx ON streams (status) WHERE status = 'live';</code></pre>
+<p class="step-p">Apply it with the migration Job from <a href="part-3-data-layer.html#m08">Module 8</a>. If you haven't built that yet, <code class="inline">psql</code> it in once and come back &#8212; but don't let that become the habit.</p>
+<h4 id="m14-4-the-code-changes-in-transcode-worker">4. The code changes in <code class="inline">transcode-worker</code></h4>
+<p class="step-p">You are rewriting the <em>process model</em>, not the encoding. <code class="inline">build_ffmpeg_command</code>, <code class="inline">RENDITIONS</code>, <code class="inline">_make_rendition_dirs</code>, <code class="inline">upload_loop</code>, <code class="inline">_upload_pass</code>, <code class="inline">_s3_extra_args</code>, <code class="inline">_watch_for_stall</code>, <code class="inline">_claim_video</code>, <code class="inline">set_video_status</code> and <code class="inline">emit_status</code> all stay exactly as they are. What goes is <code class="inline">main()</code>'s <code class="inline">while True</code>, <code class="inline">active_streams</code>, <code class="inline">active_streams_lock</code>, <code class="inline">handle_stream_lifecycle</code>, <code class="inline">handle_upload_event</code> and <code class="inline">stop_live_transcode</code>.</p>
+<p class="step-p"><strong>Configuration.</strong> Same image, both modes, <code class="inline">TRANSCODE_MODE</code> selects:</p>
+<pre><code>BOOTSTRAP = os.environ["KAFKA_BOOTSTRAP_SERVERS"]
+MODE      = os.environ["TRANSCODE_MODE"]              <span class="c"># "live" | "vod"</span>
+GROUP     = os.environ["TRANSCODE_CONSUMER_GROUP"]    <span class="c"># MUST match the ScaledJob trigger</span>
+TOPIC     = os.environ["TRANSCODE_TRIGGER_TOPIC"]
+POD_NAME  = os.environ["POD_NAME"]
+CLAIM_DEADLINE_S = int(os.environ.get("CLAIM_DEADLINE_SECONDS", "120"))
+HEARTBEAT_S      = 15</code></pre>
+<p class="step-p"><strong>Getting the work.</strong> This is the function that implements the commit rule:</p>
+<pre><code>def claim_one(topic: str, group: str, try_claim) -&gt; dict | None:
+    """Consume until one message is successfully claimed, or the deadline expires.
+
+    Returns the claimed payload, or None meaning "there is nothing here for me"
+    &#8212; which is a normal, successful outcome, not an error.
+    """
+    c = Consumer({
+        "bootstrap.servers": BOOTSTRAP,
+        "group.id": group,
+        <span class="c"># MUST match the ScaledJob trigger's offsetResetPolicy. If this says</span>
+        <span class="c"># "earliest" and the group has no committed offset, the first pod ever</span>
+        <span class="c"># to run replays the whole topic and starts a transcode for every</span>
+        <span class="c"># stream that has ever existed.</span>
+        "auto.offset.reset": "latest",
+        <span class="c"># Auto-commit would fire on a 5s timer regardless of whether we claimed</span>
+        <span class="c"># anything, silently dropping work when the pod exits before claiming.</span>
+        "enable.auto.commit": False,
+        "partition.assignment.strategy": "cooperative-sticky",
+        "session.timeout.ms": 45000,
+    })
+    c.subscribe([topic])
+    deadline = time.monotonic() + CLAIM_DEADLINE_S
+    try:
+        while time.monotonic() &lt; deadline:
+            msg = c.poll(1.0)
+            if msg is None or msg.error():
+                continue
+            try:
+                data = json.loads(msg.value())
+            except (json.JSONDecodeError, TypeError):
+                log.error("unparseable message on %s: %r", topic, msg.value())
+                c.commit(message=msg, asynchronous=False)  <span class="c"># poison pill: skip it</span>
+                continue
+
+            won = try_claim(data)
+            <span class="c"># Commit EITHER WAY. A lost claim still means the message has an</span>
+            <span class="c"># owner. Not committing means infinite redelivery and infinite</span>
+            <span class="c"># Job creation.</span>
+            c.commit(message=msg, asynchronous=False)
+            if won:
+                return data
+            log.info("lost claim for %s, looking for other work", data)
+        return None
+    finally:
+        c.close()</code></pre>
+<p class="step-p">Two things to be deliberate about here.</p>
+<p class="step-p"><strong><code class="inline">subscribe()</code> rather than manual <code class="inline">assign()</code>.</strong> With <code class="inline">subscribe()</code> the group coordinator assigns partitions. With 8 partitions and 4 concurrent pods, a pod can be assigned partitions that hold nothing pending while the message sits on a partition owned by a pod that already took other work. That pod polls, finds nothing, hits the deadline and exits 0. KEDA still sees lag, spawns another, and it converges within a poll cycle or two. Churny but correct &#8212; and the alternative (<code class="inline">AdminClient.list_consumer_group_offsets()</code> plus <code class="inline">get_watermark_offsets()</code> to find a lagging partition, then <code class="inline">assign()</code> and <code class="inline">seek()</code>) still lets two pods pick the same partition, so you'd still need the DB claim as the arbiter. Since the claim is doing the real work either way, take the simpler consumer.</p>
+<p class="step-p">The model to internalize: <strong>the Kafka read is best-effort dispatch; the Postgres claim is the correctness boundary.</strong></p>
+<p class="step-p"><strong>Exit code discipline.</strong> "No message for me" is <code class="inline">exit 0</code>. With <code class="inline">backoffLimit: 0</code>, a non-zero exit marks the Job Failed, fills <code class="inline">failedJobsHistoryLimit</code> with non-failures, and makes your Grafana "failed transcodes" panel meaningless. Reserve non-zero for "I claimed work and could not do it."</p>
+<p class="step-p"><strong>Claiming a stream.</strong> The live twin of <code class="inline">_claim_video</code>:</p>
+<pre><code>def _claim_stream(stream_id: str) -&gt; str | None:
+    """Atomically claim a live stream. Returns its path, or None if lost."""
+    with pg_connect() as conn:
+        row = conn.execute(
+            """
+            UPDATE streams
+               SET transcode_status = 'claimed', transcode_heartbeat = now()
+             WHERE id = %s AND transcode_status = 'pending' AND status = 'live'
+            RETURNING path
+            """,
+            (stream_id,),
+        ).fetchone()
+        conn.commit()
+    return row[0] if row else None</code></pre>
+<p class="step-p"><code class="inline">AND status = 'live'</code> is not decoration. It fixes the Karpenter cold-start case for free: if the node took 90 seconds to provision and the streamer gave up in the meantime, the stream is already <code class="inline">ended</code> by the time this pod claims, the claim returns nothing, the pod exits 0, and no ffmpeg is launched against a dead path. Drop that clause and you get a pod starting an encoder for a stream that no longer exists, retrying into "connection refused" until <code class="inline">activeDeadlineSeconds</code>.</p>
+<p class="step-p"><code class="inline">_claim_video</code> needs <strong>no change at all</strong>. Its <code class="inline">WHERE id = %s AND status = 'uploaded'</code> was already exactly this pattern. The comment in the current code calling the claim "backed by Postgres rather than the in-memory <code class="inline">active_streams</code>-style tracking" was incidentally right and is now load-bearing.</p>
+<p class="step-p"><strong>The heartbeat and the DB-poll fallback,</strong> one thread doing both:</p>
+<pre><code>def heartbeat_thread(table: str, row_id: str, stop_event: threading.Event) -&gt; None:
+    """Renew the claim lease every 15s, and notice if the stream ended.
+
+    The lease is what the sweeper reads. If this thread stops (pod killed,
+    node reclaimed), the heartbeat goes stale and the sweeper re-queues the
+    work. That is the entire recovery mechanism for a crash after commit.
+    """
+    while not stop_event.wait(HEARTBEAT_S):
+        try:
+            with pg_connect() as conn:
+                conn.execute(
+                    f"UPDATE {table} SET transcode_heartbeat = now() WHERE id = %s",
+                    (row_id,),
+                )
+                if table == "streams":
+                    <span class="c"># Tertiary teardown path: covers an 'ended' event we never</span>
+                    <span class="c"># saw on Kafka (broker restart mid-stream).</span>
+                    status = conn.execute(
+                        "SELECT status FROM streams WHERE id = %s", (row_id,)
+                    ).fetchone()
+                    if status and status[0] != "live":
+                        log.info("stream %s is no longer live in the DB, stopping", row_id)
+                        stop_event.set()
+                conn.commit()
+        except Exception:
+            <span class="c"># A transient RDS blip must not kill the transcode. Missing one</span>
+            <span class="c"># beat is fine &#8212; the sweeper's threshold is eight beats wide.</span>
+            log.exception("heartbeat failed for %s=%s", table, row_id)</code></pre>
+<p class="step-p"><code class="inline">f"UPDATE {table}"</code> is safe here only because <code class="inline">table</code> is one of two literals chosen by this module, never by input. Keep it that way.</p>
+<p class="step-p"><strong>Watching for the end of your own stream:</strong></p>
+<pre><code>def watch_for_end(path: str, stop_event: threading.Event, started_at: float) -&gt; None:
+    c = Consumer({
+        "bootstrap.servers": BOOTSTRAP,
+        <span class="c"># Throwaway and unique per pod. confluent-kafka requires group.id to be</span>
+        <span class="c"># set, but we never commit and never join a group &#8212; see assign() below.</span>
+        "group.id": f"live-watch-{POD_NAME}",
+        "enable.auto.commit": False,
+    })
+    md = c.list_topics("stream.lifecycle", timeout=10)
+    parts = list(md.topics["stream.lifecycle"].partitions)
+
+    <span class="c"># Start ~60s before this Job began, not at the tail. For a very short</span>
+    <span class="c"># stream the 'ended' event can land while this pod is still pulling its</span>
+    <span class="c"># image, and OFFSET_END would miss it forever.</span>
+    since_ms = int((started_at - 60) * 1000)
+    tps = c.offsets_for_times(
+        [TopicPartition("stream.lifecycle", p, since_ms) for p in parts], timeout=10
+    )
+    for tp in tps:
+        if tp.offset &lt; 0:            <span class="c"># no message at or after that timestamp</span>
+            tp.offset = OFFSET_END
+    c.assign(tps)                    <span class="c"># NOT subscribe() &#8212; see below</span>
+
+    try:
+        while not stop_event.is_set():
+            msg = c.poll(1.0)
+            if msg is None or msg.error():
+                continue
+            try:
+                d = json.loads(msg.value())
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if d.get("path") == path and d.get("event") == "ended":
+                log.info("received 'ended' for path=%s, stopping", path)
+                stop_event.set()
+                return
+    finally:
+        c.close()</code></pre>
+<p class="step-p"><code class="inline">assign()</code> and not <code class="inline">subscribe()</code>, for three reasons: this pod must see <em>every</em> partition so it can't miss its own stream's event; it must not cause a rebalance every time a live Job starts or stops; and it must not interfere with <code class="inline">analytics-worker</code>'s consumer group on the same topic. <code class="inline">assign()</code> stores no offsets and joins no group.</p>
+<p class="step-p"><strong>The entrypoint.</strong> <code class="inline">main()</code> becomes a dispatcher with no loop:</p>
+<pre><code>def main() -&gt; None:
+    started_at = time.time()
+
+    if MODE == "live":
+        claimed = {}
+        def try_claim(data: dict) -&gt; bool:
+            stream_id = data.get("stream_id")
+            if not stream_id:
+                log.error("no stream_id in %s, skipping", data)
+                return False
+            path = _claim_stream(stream_id)
+            if path is None:
+                return False
+            claimed.update(stream_id=stream_id, path=path)
+            return True
+
+        if claim_one(TOPIC, GROUP, try_claim) is None:
+            log.info("no live work available within the deadline, exiting cleanly")
+            return                                    <span class="c"># exit 0, NOT an error</span>
+
+        stop_event = threading.Event()
+        threading.Thread(target=watch_for_end,
+                         args=(claimed["path"], stop_event, started_at),
+                         daemon=True).start()
+        threading.Thread(target=heartbeat_thread,
+                         args=("streams", claimed["stream_id"], stop_event),
+                         daemon=True).start()
+        <span class="c"># start_live_transcode keeps its retry/stall/upload logic verbatim;</span>
+        <span class="c"># it now takes stop_event from the caller instead of creating it, and</span>
+        <span class="c"># it no longer touches active_streams.</span>
+        start_live_transcode(claimed["path"], claimed["stream_id"], stop_event)
+
+    elif MODE == "vod":
+        claimed = {}
+        def try_claim(data: dict) -&gt; bool:
+            if data.get("event") != "uploaded":
+                return False                          <span class="c"># committed, then skipped</span>
+            if not _claim_video(data["video_id"]):
+                return False
+            claimed.update(video_id=data["video_id"], object_key=data["object_key"])
+            return True
+
+        if claim_one(TOPIC, GROUP, try_claim) is None:
+            log.info("no VOD work available within the deadline, exiting cleanly")
+            return
+
+        stop_event = threading.Event()
+        threading.Thread(target=heartbeat_thread,
+                         args=("videos", claimed["video_id"], stop_event),
+                         daemon=True).start()
+        try:
+            transcode_video(claimed["video_id"], claimed["object_key"])
+        finally:
+            stop_event.set()
+
+    else:
+        raise SystemExit(f"unknown TRANSCODE_MODE {MODE!r}")</code></pre>
+<p class="step-p">Note the VOD <code class="inline">try_claim</code> returning <code class="inline">False</code> for a non-<code class="inline">uploaded</code> event. That still commits &#8212; which is correct, because <code class="inline">upload.events</code> may carry other event types later and none of them should be redelivered forever.</p>
+<p class="step-p"><strong>The sweeper</strong>, <code class="inline">services/transcode-worker/sweeper.py</code>, about 50 lines reusing the existing producer:</p>
+<pre><code>def sweep() -&gt; None:
+    with pg_connect() as conn:
+        <span class="c"># Live: claimed, still live, but nothing has heartbeated in 2 minutes.</span>
+        stuck_live = conn.execute(
+            """
+            UPDATE streams SET transcode_status = 'pending'
+             WHERE status = 'live'
+               AND transcode_status = 'claimed'
+               AND transcode_heartbeat &lt; now() - %s::interval
+            RETURNING id, path
+            """,
+            (os.environ["LIVE_STALE_AFTER"],),
+        ).fetchall()
+
+        <span class="c"># VOD: stuck at 'transcoding' with a stale heartbeat.</span>
+        stuck_vod = conn.execute(
+            """
+            UPDATE videos SET status = 'uploaded'
+             WHERE status = 'transcoding'
+               AND transcode_heartbeat &lt; now() - %s::interval
+            RETURNING id, raw_object_key
+            """,
+            (os.environ["VOD_STALE_AFTER"],),
+        ).fetchall()
+        conn.commit()
+
+    for stream_id, path in stuck_live:
+        log.warning("re-queueing abandoned live stream %s (path=%s)", stream_id, path)
+        producer.produce("stream.start.requests", key=path, value=json.dumps(
+            {"event": "started", "path": path,
+             "stream_id": str(stream_id), "ts": time.time()}))
+    for video_id, object_key in stuck_vod:
+        log.warning("re-queueing abandoned VOD transcode %s", video_id)
+        producer.produce("upload.events", key=str(video_id), value=json.dumps(
+            {"event": "uploaded", "video_id": str(video_id),
+             "object_key": object_key, "ts": time.time()}))
+    producer.flush()</code></pre>
+<p class="step-p">The <code class="inline">UPDATE ... RETURNING</code> runs before the produce on purpose. If the produce fails, the row is back to <code class="inline">pending</code> and the <em>next</em> sweep two minutes later re-emits it. The other order &#8212; produce first, then un-claim &#8212; can emit the same work twice.</p>
+<h4 id="m14-5-the-two-scaledjobs">5. The two ScaledJobs</h4>
+<p class="step-p">Written for you at <code class="inline">k8s/apps/base/transcode/scaledjob-live.yaml</code> and <code class="inline">scaledjob-vod.yaml</code>. Read them; the comments carry the reasoning. Here's the live one:</p>
+<pre><code>apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: transcode-live
+  namespace: streaming
+spec:
+  pollingInterval: 5
+  minReplicaCount: 0
+  maxReplicaCount: 8              <span class="c"># KEEP IN SYNC with MAX_CONCURRENT_LIVE_STREAMS</span>
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 20
+  rollout:
+    strategy: gradual
+  scalingStrategy:
+    strategy: accurate
+  jobTargetRef:
+    parallelism: 1
+    completions: 1
+    backoffLimit: 0
+    activeDeadlineSeconds: 21600
+    ttlSecondsAfterFinished: 3600
+    template:
+      metadata:
+        labels: {app: transcode, mode: live}
+        annotations:
+          karpenter.sh/do-not-disrupt: "true"
+      spec:
+        restartPolicy: Never
+        serviceAccountName: transcode-worker   <span class="c"># the SA from Module 11, reused</span>
+        terminationGracePeriodSeconds: 60
+        nodeSelector: {workload: transcode, transcode-mode: live}
+        tolerations:
+          - {key: workload, operator: Equal, value: transcode, effect: NoSchedule}
+        containers:
+          - name: transcode
+            image: ghcr.io/linkify-solutions-inc/kubernetes-streaming-transcode-worker:latest
+            env:
+              - {name: TRANSCODE_MODE, value: "live"}
+              - {name: TRANSCODE_CONSUMER_GROUP, value: "transcode-live"}
+              - {name: TRANSCODE_TRIGGER_TOPIC, value: "stream.start.requests"}
+              - {name: TMPDIR, value: /scratch}
+              <span class="c"># ...POD_NAME via fieldRef, POSTGRES_DSN via secretKeyRef,</span>
+              <span class="c">#    KAFKA_BOOTSTRAP_SERVERS / MEDIAMTX_RTMP_URL / S3_BUCKET</span>
+              <span class="c">#    via configMapKeyRef</span>
+            resources:
+              requests:
+                cpu: "2500m"
+                memory: 2Gi
+                ephemeral-storage: 5Gi
+              limits:
+                memory: 2Gi              <span class="c"># == request  -&gt; Guaranteed QoS</span>
+                ephemeral-storage: 8Gi
+                <span class="c"># deliberately NO cpu limit</span>
+            volumeMounts: [{name: scratch, mountPath: /scratch}]
+        volumes:
+          - name: scratch
+            emptyDir: {sizeLimit: 8Gi}
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: streaming-kafka-bootstrap.kafka.svc.cluster.local:9092
+        consumerGroup: transcode-live        <span class="c"># == TRANSCODE_CONSUMER_GROUP above</span>
+        topic: stream.start.requests
+        lagThreshold: "1"
+        activationLagThreshold: "0"
+        offsetResetPolicy: latest            <span class="c"># == auto.offset.reset in main.py</span>
+        allowIdleConsumers: "false"
+        excludePersistentLag: "false"
+        scaleToZeroOnInvalidOffset: "true"</code></pre>
+<p class="step-p">Field by field, the ones that bite:</p>
+<ul>
+<li><strong><code class="inline">rollout.strategy: gradual</code></strong> is the most important line in the file. The default strategy <strong>terminates every running Job when the ScaledJob spec changes</strong> &#8212; and from Module 15 onward, CI changes this spec on every <code class="inline">transcode-worker</code> push. The default therefore means <em>every deploy kills every live stream on the platform</em>. <code class="inline">gradual</code> leaves running Jobs alone; only new Jobs use the new spec.</li>
+<li><strong><code class="inline">scalingStrategy.strategy: accurate</code>.</strong> The <code class="inline">default</code> strategy computes <code class="inline">maxScale &#8722; runningJobCount</code>. Because you commit at claim time, there's a 60&#8211;100 second window on a cold Karpenter node where the Job is Pending, the offset is not yet committed, and lag is still &#8805; 1 &#8212; <code class="inline">default</code> counts nothing running and over-spawns through that whole window. <code class="inline">accurate</code> counts pending Jobs. The extra pods aren't wrong (they lose the claim, exit 0) but each one may provision an EC2 instance.</li>
+<li><strong><code class="inline">allowIdleConsumers: "false"</code> caps replicas at the partition count.</strong> <code class="inline">maxReplicaCount: 8</code> only works because <code class="inline">stream.start.requests</code> has 8 partitions. Set it to 12 and KEDA silently gives you 8, and someone loses a day to it. Partition count and concurrency ceiling are one conversation.</li>
+<li><strong>No CPU limit, on purpose.</strong> A CPU limit means CFS throttling: the cgroup burns its quota inside the 100 ms period and is hard-stopped until the next one. For x264 that's dropped frames and a visibly stuttering stream on a node with idle cores. <code class="inline">requests: 2500m</code> guarantees the floor and is what the scheduler and Karpenter size against; no limit lets it burst into whatever's spare. Memory <code class="inline">request == limit</code> makes the pod Guaranteed so it won't be evicted under node pressure.</li>
+<li><strong>Resources come from the benchmark, plus headroom.</strong> SPEC.md measures one live transcode at <strong>~2.3 cores / ~1 GB</strong> for a 3-rendition ABR encode at <code class="inline">veryfast</code>. Requesting <code class="inline">2500m</code>/<code class="inline">2Gi</code> leaves room for the boto3 upload threads and the stall watchdog, and it's the number <a href="part-2-platform.html#m06">Module 6</a>'s NodePool sizing assumes. Don't request exactly the measured value &#8212; a Guaranteed pod whose limit equals its measured peak gets OOMKilled by the first allocation spike.</li>
+<li><p class="step-p"><strong><code class="inline">ephemeral-storage</code> is mandatory, and VOD's number is large.</strong> Python's <code class="inline">tempfile</code> writes to <code class="inline">TMPDIR</code>, which without a request lands on the node's root volume via the container's writable layer. Exceed the <em>limit</em> and the kubelet evicts the pod with <strong>no grace period</strong> &#8212; mid-encode. Live keeps a 30-segment sliding window across 3 renditions, roughly 140 MB steady state, so <code class="inline">5Gi</code> request / <code class="inline">8Gi</code> limit is generous. VOD downloads the entire source (up to <code class="inline">MAX_UPLOAD_BYTES</code>, which every <code class="inline">config.env</code> sets to 2 GiB) <em>and</em> writes the full ladder into the same scratch dir. The output tracks duration, not source size &#8212; about 4 GB per hour of encode &#8212; and 2 GiB of source can be three hours of video, so the worst case is roughly 2 GiB in and 12 GB out. Hence <code class="inline">40Gi</code> request / <code class="inline">50Gi</code> limit, with the <code class="inline">emptyDir</code> <code class="inline">sizeLimit</code> matching the limit in both cases. Those five numbers are what is in the manifests; if you change one, change its <code class="inline">sizeLimit</code> with it.</p>
+<p class="step-p">Then confirm the node can actually hold it. <a href="part-2-platform.html#m06">Module 6</a> already sized <code class="inline">k8s/infra/karpenter/ec2nodeclass.yaml</code> at <code class="inline">volumeSize: 200Gi</code> for exactly this &#8212; two 50Gi VOD pods plus AL2023 (~3 GiB) and the ffmpeg image (~1.5 GiB). Nothing to change here; just check it is still 200Gi, because the EKS AMI's own default is 20 GiB and the scheduler will happily place a 40Gi-ephemeral pod on a 20 GiB node.</p></li>
+<li><strong><code class="inline">backoffLimit: 0</code> on both.</strong> With <code class="inline">restartPolicy: Never</code> and <code class="inline">backoffLimit &gt; 0</code>, a failed pod gets a replacement pod &#8212; which loses the claim (the row is already <code class="inline">claimed</code>/<code class="inline">transcoding</code>) and exits, burning a retry for nothing. Retries are the sweeper's job.</li>
+<li><strong><code class="inline">ttlSecondsAfterFinished: 3600</code>.</strong> <code class="inline">successfulJobsHistoryLimit</code> is KEDA's own cleanup and mostly overlaps, but the TTL controller is what actually reaps Job objects out of etcd if KEDA is down.</li>
+</ul>
+<p class="step-p">VOD differs on: <code class="inline">pollingInterval: 15</code> (nobody watches a VOD transcode in real time), <code class="inline">maxReplicaCount: 4</code> (a pure cost cap &#8212; excess uploads queue in Kafka, which is fine), <code class="inline">activeDeadlineSeconds: 7200</code>, no <code class="inline">karpenter.sh/do-not-disrupt</code> annotation (it's interruptible, which is why it can run on spot), <code class="inline">nodeSelector: transcode-mode: vod</code>, <code class="inline">cpu: 4000m</code> (the <code class="inline">medium</code> preset eats more than <code class="inline">veryfast</code>, and requesting 4 cores caps a <code class="inline">c6i.2xlarge</code> at two VOD jobs, which is what keeps 2 &#215; 50Gi of scratch inside the node's root volume), and <code class="inline">ephemeral-storage: 40Gi/50Gi</code>.</p>
+<h4 id="m14-6-bootstrap-the-consumer-groups-or-your-first-stream-wont-trigger">6. Bootstrap the consumer groups &#8212; or your first stream won't trigger</h4>
+<p class="step-p">With <code class="inline">offsetResetPolicy: latest</code>, if consumer group <code class="inline">transcode-live</code> has <em>never committed an offset</em> for a partition, KEDA has nothing to subtract and treats the lag as 0. <strong>The very first stream after a fresh deploy never creates a Job.</strong> Somebody will lose an afternoon to this.</p>
+<p class="step-p">Create the groups at the end of the topics before anything runs. <code class="inline">k8s/infra/kafka/consumer-group-bootstrap-job.yaml</code>:</p>
+<pre><code>apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-consumer-group-bootstrap
+  namespace: kafka
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: bootstrap
+          image: quay.io/strimzi/kafka:0.49.0-kafka-3.9.0
+          command: [/bin/sh, -c]
+          args:
+            - |
+              set -eu
+              B=streaming-kafka-bootstrap.kafka.svc.cluster.local:9092
+              for pair in "transcode-live stream.start.requests" "transcode-vod upload.events"; do
+                set -- $pair
+                bin/kafka-consumer-groups.sh --bootstrap-server "$B" \
+                  --group "$1" --topic "$2" --reset-offsets --to-latest --execute
+              done</code></pre>
+<p class="step-p">The alternative is <code class="inline">scaleToZeroOnInvalidOffset: "false"</code>, which keeps one replica alive on an invalid offset so that pod self-bootstraps the group. It works, and it also spawns a pointless pod at every idle moment something goes wrong with offsets. Prefer the explicit Job.</p>
+<h4 id="m14-7-ingest-webhook-produce-the-trigger-and-gate-admission">7. <code class="inline">ingest-webhook</code>: produce the trigger, and gate admission</h4>
+<p class="step-p"><strong>Produce to <code class="inline">stream.start.requests</code>.</strong> In <code class="inline">on_publish</code>, after the <code class="inline">streams</code> INSERT, alongside the existing <code class="inline">stream.lifecycle</code> event:</p>
+<pre><code>producer.produce(
+    "stream.start.requests",
+    key=path,
+    value=json.dumps({"event": "started", "path": path,
+                      "stream_id": str(stream_id), "ts": time.time()}),
+)
+producer.flush()</code></pre>
+<p class="step-p">Keep emitting <code class="inline">started</code> on <code class="inline">stream.lifecycle</code> too. That topic is the event log, <code class="inline">analytics-worker</code> reads it, and the live pod's <code class="inline">ended</code> watcher needs it populated. <code class="inline">stream.start.requests</code> is a <em>KEDA trigger topic</em>, not a source of truth. Same key (<code class="inline">path</code>) so per-stream ordering holds.</p>
+<p class="step-p">Also add producer timeouts while you're in this file &#8212; <code class="inline">message.timeout.ms: 10000</code>. Without it, a Kafka outage makes <code class="inline">producer.flush()</code> block for the 300-second default, holding a uvicorn worker and hanging MediaMTX's webhook call, which stalls the publish. That's a stream failure caused by a <em>monitoring</em> dependency being down.</p>
+<p class="step-p"><strong>Admission control in <code class="inline">/hooks/auth</code>:</strong></p>
+<pre><code>MAX_CONCURRENT_LIVE = int(os.environ["MAX_CONCURRENT_LIVE_STREAMS"])
+
+
+@app.post("/hooks/auth")
+def on_auth(req: MediaMTXAuthRequest, response: Response):
+    if req.action != "publish":
+        return {"ok": True}
+    with pg_connect() as conn:
+        row = conn.execute(
+            "SELECT id FROM streamers WHERE stream_key = %s", (req.path,)
+        ).fetchone()
+        if row is None:
+            log.info("rejected publish: unknown stream key")
+            response.status_code = 401
+            return {"ok": False}
+        live = conn.execute(
+            "SELECT COUNT(*) FROM streams WHERE status = 'live'"
+        ).fetchone()[0]
+    if live &gt;= MAX_CONCURRENT_LIVE:
+        log.warning("rejected publish: at capacity (%d/%d live)", live, MAX_CONCURRENT_LIVE)
+        response.status_code = 503
+        return {"ok": False}
+    return {"ok": True}</code></pre>
+<p class="step-p">Why this exists at all: if <code class="inline">maxReplicaCount</code> is hit, KEDA does not reject the excess <code class="inline">started</code> events &#8212; it leaves them lagging until a slot frees. For live that means OBS is accepted and pushing bytes into MediaMTX with <strong>nothing consuming them</strong>, which is the "connected but stuck" symptom, not a clean failure. The check has to happen at <code class="inline">/hooks/auth</code>, before MediaMTX ever accepts the publish, so the streamer gets an immediate connection failure instead of a silent hang.</p>
+<p class="step-p">Three notes:</p>
+<ul>
+<li><strong>503, not 401.</strong> MediaMTX rejects on any non-2xx so OBS can't tell the difference, but <em>you</em> can: "at capacity" becomes trivially distinguishable from "bad key" in logs and in a Grafana panel. That's the alert you actually want.</li>
+<li><strong>The race is real and can't be closed here.</strong> <code class="inline">/hooks/auth</code> fires at connection time; the <code class="inline">streams</code> row is only INSERTed at <code class="inline">runOnReady</code> (<code class="inline">/hooks/publish</code>), which is later. Two OBS clients connecting inside that window both see the same count and both pass. <code class="inline">maxReplicaCount</code> is the backstop for exactly that window. Put that in a comment so nobody "fixes" it with a lock.</li>
+<li><strong>The <code class="inline">COUNT(*)</code> runs on every publish attempt.</strong> With <code class="inline">streams_live_idx</code> from step 3 it's a sub-millisecond index-only scan. Without it, a sequential scan over a table that grows one row per broadcast forever.</li>
+</ul>
+<h4 id="m14-8-where-the-ceiling-lives-and-what-it-should-be">8. Where the ceiling lives, and what it should be</h4>
+<p class="step-p"><strong>Put it in the ConfigMap</strong> &#8212; <code class="inline">k8s/apps/base/config.env</code> &#8212; not a code constant and not a default baked into the Deployment.</p>
+<p class="step-p">The justification is specific: this is <em>the</em> value an operator will want to change without touching code or rebuilding an image ("there's an event tonight, take it to 12"). In the ConfigMap it's a one-line git diff that Argo syncs in under a minute and that shows up in <code class="inline">git log</code>. Read it with <code class="inline">os.environ["MAX_CONCURRENT_LIVE_STREAMS"]</code> and no default, so a missing value is a loud <code class="inline">CreateContainerConfigError</code> rather than a silent fallback to a number nobody chose.</p>
+<p class="step-p">The ugly part, stated honestly: <code class="inline">maxReplicaCount</code> is an integer field inside a CRD, so Kustomize can't source it from the same ConfigMap literal (a <code class="inline">replacements:</code> block writes a string into an int field and fails CRD validation). The two values have to be kept in sync by hand. Mitigate with a comment on each pointing at the other, and a CI assertion &#8212; <code class="inline">scripts/check_ceiling_sync.sh</code>:</p>
+<pre><code><span class="c">#!/bin/sh</span>
+set -eu
+RENDERED="${1:?usage: check_ceiling_sync.sh <span class="ph">&lt;rendered.yaml&gt;</span>}"
+CM=$(yq 'select(.kind=="ConfigMap" and (.metadata.name|test("^streaming-config")))
+         | .data.MAX_CONCURRENT_LIVE_STREAMS' "$RENDERED" | grep -v '^null$' | head -1)
+SJ=$(yq 'select(.kind=="ScaledJob" and .metadata.name=="transcode-live")
+         | .spec.maxReplicaCount' "$RENDERED" | grep -v '^null$' | head -1)
+[ "$CM" = "$SJ" ] || { echo "ceiling drift: config=$CM scaledjob=$SJ"; exit 1; }
+echo "ceiling in sync at $CM"</code></pre>
+<p class="step-p"><strong>What the number should be now that Karpenter exists. Set it to 8.</strong></p>
+<p class="step-p">This is the part worth thinking about, because the ceiling has changed <em>category</em>. On the kubeadm box it was a physics limit: 12 cores &#247; 2.3 &#8776; 4 concurrent streams, and exceeding it meant oversubscription and visible stutter for everyone already streaming. Karpenter deletes that constraint entirely &#8212; it will provision a <code class="inline">c6i.2xlarge</code> for the fifth stream and a third node for the ninth.</p>
+<p class="step-p">So the ceiling is no longer protecting node capacity. What it protects now:</p>
+<ol>
+<li><strong>Your bill.</strong> 8 &#215; 2.5 vCPU &#8776; 20 vCPU &#8776; three <code class="inline">c6i.2xlarge</code> on-demand &#8776; <strong>$1.02/hour, about $735/month if pinned at capacity</strong>. That is a sentence you can say to whoever pays. If that's too much, lower the ConfigMap value &#8212; not the partition count, because partitions only go up and you'd be permanently capping your own headroom.</li>
+<li><strong>Blast radius.</strong> A bug that emits duplicate <code class="inline">started</code> events, or a compromised stream key being shared around, can now spend money at Karpenter's speed rather than being naturally throttled by a fixed box. The ceiling is the circuit breaker.</li>
+<li><strong>The gap between "accepted" and "encoding".</strong> Admission control is what turns "queued behind capacity" into an immediate, unambiguous rejection.</li>
+</ol>
+<p class="step-p">And 8 specifically because <code class="inline">allowIdleConsumers: false</code> makes the partition count the real hard ceiling anyway. Configuring 12 would be a lie: the system silently caps at 8, and someone spends a day discovering that.</p>
+<p class="step-p"><strong>Flag the thing Karpenter doesn't fix: cold start.</strong> A node takes 40&#8211;60 seconds to provision, and the transcode image (python:3.12-slim plus ffmpeg, ~500 MB) pulls in another 20&#8211;40. So the first stream after an idle period sits for <strong>60&#8211;100 seconds with OBS connected and pushing bytes into MediaMTX while nothing pulls them.</strong> Admission control does not prevent this &#8212; admission passed, capacity is coming, it's just slow. Options, most valuable first:</p>
+<ol>
+<li><strong>An over-provisioning placeholder.</strong> A 1-replica Deployment running <code class="inline">registry.k8s.io/pause</code> with <code class="inline">requests: {cpu: 2500m, memory: 2Gi}</code>, the transcode nodeSelector and toleration, and a <code class="inline">PriorityClass</code> with <code class="inline">value: -1</code> and <code class="inline">globalDefault: false</code>. It holds one transcode-sized node warm; when a real Job (priority 0) needs the space the scheduler preempts the placeholder and the real pod starts immediately on a running node with the image already pulled. Costs one <code class="inline">c6i.2xlarge</code> running 24/7, roughly $250/month. Worth it if people actually watch live streams; skip it for a demo.</li>
+<li>Slim the image. Halving 500 MB saves about 20 seconds.</li>
+<li>Accept 60&#8211;100 seconds and say so in the UI.</li>
+</ol>
+<h4 id="m14-9-every-file-that-changes">9. Every file that changes</h4>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>File</th>
+<th>Change</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">services/transcode-worker/main.py</code></td>
+<td>The rewrite. Delete <code class="inline">main()</code>'s <code class="inline">while True</code>, <code class="inline">active_streams</code>, <code class="inline">active_streams_lock</code>, <code class="inline">handle_stream_lifecycle</code>, <code class="inline">handle_upload_event</code>, <code class="inline">stop_live_transcode</code>. Add <code class="inline">TRANSCODE_MODE</code> dispatch, <code class="inline">claim_one</code>, <code class="inline">_claim_stream</code>, <code class="inline">watch_for_end</code>, <code class="inline">heartbeat_thread</code>. <code class="inline">start_live_transcode</code> now takes <code class="inline">stop_event</code> from its caller. Keep <code class="inline">build_ffmpeg_command</code>, <code class="inline">RENDITIONS</code>, <code class="inline">_make_rendition_dirs</code>, <code class="inline">upload_loop</code>, <code class="inline">_upload_pass</code>, <code class="inline">_s3_extra_args</code>, <code class="inline">_watch_for_stall</code>, <code class="inline">_claim_video</code>, <code class="inline">set_video_status</code>, <code class="inline">emit_status</code> verbatim. Replace <code class="inline">BUCKET = "media"</code> with <code class="inline">os.environ["S3_BUCKET"]</code>.</td>
+</tr>
+<tr>
+<td><code class="inline">services/transcode-worker/sweeper.py</code></td>
+<td>New, ~50 lines. Un-claims stale leases and re-emits their trigger messages.</td>
+</tr>
+<tr>
+<td><code class="inline">services/transcode-worker/test_main.py</code></td>
+<td>Add: <code class="inline">claim_one</code> commits when the claim <em>loses</em>; <code class="inline">claim_one</code> returns <code class="inline">None</code> at deadline; <code class="inline">watch_for_end</code> matches only its own <code class="inline">path</code>; <code class="inline">_claim_stream</code> is a no-op on a second call. Add the four new env vars to the module's env stubs.</td>
+</tr>
+<tr>
+<td><code class="inline">services/transcode-worker/Dockerfile</code></td>
+<td>No functional change. Add <code class="inline">USER 10001</code> to satisfy <code class="inline">runAsNonRoot</code>.</td>
+</tr>
+<tr>
+<td><code class="inline">services/ingest-webhook/main.py</code></td>
+<td>Produce to <code class="inline">stream.start.requests</code> in <code class="inline">on_publish</code>. Add the <code class="inline">MAX_CONCURRENT_LIVE_STREAMS</code> check to <code class="inline">/hooks/auth</code> returning 503. Add <code class="inline">message.timeout.ms: 10000</code> to the producer.</td>
+</tr>
+<tr>
+<td><code class="inline">services/ingest-webhook/test_main.py</code></td>
+<td>Add: accepted at <code class="inline">live == ceiling &#8722; 1</code>; 503 at <code class="inline">live == ceiling</code>; unknown key still 401 and short-circuits before the count query; <code class="inline">/hooks/publish</code> produces to both topics.</td>
+</tr>
+<tr>
+<td><code class="inline">postgres/migrations/002_transcode_claim.sql</code></td>
+<td>New. <code class="inline">transcode_status</code> and <code class="inline">transcode_heartbeat</code> columns, plus the partial index on <code class="inline">streams (status)</code>.</td>
+</tr>
+<tr>
+<td><code class="inline">k8s/platform/keda.yaml</code></td>
+<td>New. KEDA 2.19.0 as an Argo Application, sync-wave 0.</td>
+</tr>
+<tr>
+<td><code class="inline">k8s/apps/base/transcode/scaledjob-live.yaml</code></td>
+<td>New. Live ScaledJob off <code class="inline">stream.start.requests</code>.</td>
+</tr>
+<tr>
+<td><code class="inline">k8s/apps/base/transcode/scaledjob-vod.yaml</code></td>
+<td>New. VOD ScaledJob off <code class="inline">upload.events</code>.</td>
+</tr>
+<tr>
+<td><code class="inline">k8s/apps/base/transcode/sweeper-cronjob.yaml</code></td>
+<td>New. Every 2 minutes, <code class="inline">concurrencyPolicy: Forbid</code>.</td>
+</tr>
+<tr>
+<td><code class="inline">k8s/apps/base/transcode/kustomization.yaml</code></td>
+<td>New. Ties the three together. Note the absence of a Deployment, and that it does not redefine the ServiceAccount.</td>
+</tr>
+<tr>
+<td><code class="inline">k8s/apps/base/transcode-worker/deployment.yaml</code></td>
+<td><strong>Deleted.</strong> This is the long-running Deployment that ScaledJobs replace.</td>
+</tr>
+<tr>
+<td><code class="inline">k8s/apps/base/transcode-worker/serviceaccount.yaml</code></td>
+<td><strong>Unchanged and kept.</strong> The ScaledJob pods reuse it, so the Pod Identity association survives.</td>
+</tr>
+<tr>
+<td><code class="inline">k8s/apps/base/kustomization.yaml</code></td>
+<td>Drop <code class="inline">transcode-worker/deployment.yaml</code> from <code class="inline">resources</code>, keep <code class="inline">transcode-worker/serviceaccount.yaml</code>, add <code class="inline">transcode/</code>.</td>
+</tr>
+<tr>
+<td><code class="inline">k8s/apps/base/config.env</code></td>
+<td><code class="inline">MAX_CONCURRENT_LIVE_STREAMS=8</code> &#8212; already present from Module 11, now actually read by <code class="inline">ingest-webhook</code>.</td>
+</tr>
+<tr>
+<td><code class="inline">k8s/infra/kafka/topics.yaml</code></td>
+<td>Confirm <code class="inline">stream.start.requests</code> exists at 8 partitions (Module 10 should have created it).</td>
+</tr>
+<tr>
+<td><code class="inline">k8s/infra/kafka/consumer-group-bootstrap-job.yaml</code></td>
+<td>New. Seeds both consumer-group offsets so the first stream triggers.</td>
+</tr>
+<tr>
+<td><code class="inline">k8s/infra/karpenter/ec2nodeclass.yaml</code></td>
+<td>Confirm <code class="inline">blockDeviceMappings[0].ebs.volumeSize</code> is 200Gi so two 50Gi-ephemeral VOD pods fit alongside the OS and image.</td>
+</tr>
+<tr>
+<td><code class="inline">scripts/check_ceiling_sync.sh</code></td>
+<td>New. Asserts ConfigMap ceiling == ScaledJob <code class="inline">maxReplicaCount</code>.</td>
+</tr>
+<tr>
+<td><code class="inline">kafka/init-topics.sh</code></td>
+<td>Add <code class="inline">stream.start.requests</code> at 8 partitions; drop <code class="inline">transcode.jobs</code>. Compose/dev only.</td>
+</tr>
+<tr>
+<td><code class="inline">docker-compose.yml</code></td>
+<td>Replace the single <code class="inline">transcode-worker</code> with <code class="inline">transcode-worker-live</code> and <code class="inline">transcode-worker-vod</code>, each with its <code class="inline">TRANSCODE_MODE</code> and <code class="inline">restart: always</code>. A one-shot process that exits and gets restarted is a passable poor-man's ScaledJob locally, and it keeps dev exercising the exact same code path.</td>
+</tr>
+<tr>
+<td><code class="inline">SPEC.md</code></td>
+<td>Mark the Phase 3 transcode-scaling decision as implemented.</td>
+</tr>
+</tbody></table></div>
+<div class="confirm section">
+<h3 id="m14-verify">Verify</h3>
+<p class="step-p">Apply everything and watch one stream go through the whole loop.</p>
+<pre><code>kubectl apply -k k8s/apps/base/transcode
+kubectl get scaledjob -n streaming</code></pre>
+<pre class="out"><code>NAME             MIN   MAX   TRIGGERS   AUTHENTICATION   READY   ACTIVE   AGE
+transcode-live   0     8     kafka                       True    False    12s
+transcode-vod    0     4     kafka                       True    False    12s</code></pre>
+<p class="step-p"><code class="inline">READY=True</code> means KEDA connected to Kafka and read the group's offsets. If it's <code class="inline">False</code>, <code class="inline">kubectl describe scaledjob transcode-live -n streaming</code> puts the Kafka connection error in the condition message verbatim.</p>
+<p class="step-p">Confirm KEDA is measuring the group you think it is:</p>
+<pre><code>kubectl -n kafka run kt --rm -it --restart=Never \
+  --image=quay.io/strimzi/kafka:0.49.0-kafka-3.9.0 -- \
+  bin/kafka-consumer-groups.sh \
+    --bootstrap-server streaming-kafka-bootstrap.kafka.svc.cluster.local:9092 \
+    --describe --group transcode-live</code></pre>
+<pre class="out"><code>GROUP           TOPIC                  PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG
+transcode-live  stream.start.requests  0          0               0               0
+transcode-live  stream.start.requests  1          0               0               0
+...</code></pre>
+<p class="step-p">Eight rows, <code class="inline">CURRENT-OFFSET</code> not <code class="inline">-</code>. A <code class="inline">-</code> means the bootstrap Job didn't run and your first stream won't trigger.</p>
+<p class="step-p">Now open four terminals and run the checkpoint.</p>
+<p class="step-p"><strong>Terminal 1 &#8212; Jobs:</strong></p>
+<pre><code>kubectl get jobs -n streaming -w</code></pre>
+<p class="step-p"><strong>Terminal 2 &#8212; nodes:</strong></p>
+<pre><code>kubectl get nodes -L karpenter.sh/nodepool,karpenter.sh/capacity-type -w</code></pre>
+<p class="step-p"><strong>Terminal 3 &#8212; Karpenter:</strong></p>
+<pre><code>kubectl logs -n karpenter deploy/karpenter -f</code></pre>
+<p class="step-p"><strong>Terminal 4 &#8212; start streaming.</strong> Point OBS at <code class="inline">rtmp://rtmp.k8s.linkifysolutions.com/&lt;your-stream-key&gt;</code> and hit Start Streaming.</p>
+<p class="step-p">Within about 5 seconds, terminal 1:</p>
+<pre class="out"><code>NAME                        STATUS    COMPLETIONS   DURATION   AGE
+transcode-live-vx8q2        Running   0/1                      0s</code></pre>
+<p class="step-p">Terminal 3, within another 15:</p>
+<pre class="out"><code>{"level":"INFO","message":"found provisionable pod(s)","Pods":"streaming/transcode-live-vx8q2-hd4kf","duration":"32ms"}
+{"level":"INFO","message":"computed new nodeclaim(s) to fit pod(s)","nodeclaims":1,"pods":1}
+{"level":"INFO","message":"created nodeclaim","NodePool":{"name":"transcode-live"},"instance-types":"c6i.xlarge, c6i.2xlarge, c6a.xlarge, ..."}
+{"level":"INFO","message":"launched nodeclaim","provider-id":"aws:///us-east-1a/i-0a1b2c3d4e5f6a7b8","instance-type":"c6i.xlarge","capacity-type":"on-demand"}</code></pre>
+<p class="step-p">Terminal 2, at roughly 45&#8211;60 seconds:</p>
+<pre class="out"><code>NAME                          STATUS   ROLES    AGE   VERSION   NODEPOOL         CAPACITY-TYPE
+ip-10-0-1-83.ec2.internal     Ready    &lt;none&gt;   3d    v1.33.x
+ip-10-0-2-19.ec2.internal     Ready    &lt;none&gt;   3d    v1.33.x
+ip-10-0-1-204.ec2.internal    Ready    &lt;none&gt;   8s    v1.33.x   transcode-live   on-demand</code></pre>
+<p class="step-p">Confirm the pod actually claimed something:</p>
+<pre><code>kubectl logs -n streaming -l app=transcode,mode=live --tail=20</code></pre>
+<pre class="out"><code>INFO:transcode-worker:live transcode starting (attempt 1): path=... stream_id=8f2c... cmd=ffmpeg -y -i rtmp://mediamtx:1935/...</code></pre>
+<p class="step-p">And that the lease is being renewed:</p>
+<pre><code>psql "$POSTGRES_DSN" -c \
+  "SELECT id, transcode_status, now() - transcode_heartbeat AS beat_age
+     FROM streams WHERE status = 'live'"</code></pre>
+<pre class="out"><code>                  id                  | transcode_status |    beat_age
+--------------------------------------+------------------+-----------------
+ 8f2c1d5a-4e6b-47a9-b2f1-9c0d3e7a1b45 | claimed          | 00:00:07.412009</code></pre>
+<p class="step-p"><code class="inline">beat_age</code> under 15 seconds. If it climbs past two minutes, the sweeper will re-queue the stream and you'll see a second Job appear.</p>
+<p class="step-p"><strong>Now stop the stream.</strong> Hit Stop Streaming in OBS.</p>
+<p class="step-p">Terminal 4:</p>
+<pre><code>kubectl logs -n streaming -l app=transcode,mode=live --tail=5</code></pre>
+<pre class="out"><code>INFO:transcode-worker:received 'ended' for path=..., stopping
+INFO:transcode-worker:live_transcode_stopped</code></pre>
+<p class="step-p">Terminal 1:</p>
+<pre class="out"><code>transcode-live-vx8q2        Complete   1/1           4m12s      4m12s</code></pre>
+<p class="step-p">Terminal 3, two minutes later (<code class="inline">consolidateAfter: 2m</code> on the live pool):</p>
+<pre class="out"><code>{"level":"INFO","message":"disrupting nodeclaim(s) via delete, terminating 1 nodes","reason":"emptiness"}</code></pre>
+<p class="step-p">Terminal 2:</p>
+<pre class="out"><code>ip-10-0-1-204.ec2.internal    NotReady   &lt;none&gt;   6m    v1.33.x   transcode-live   on-demand
+ip-10-0-1-204.ec2.internal    deleted</code></pre>
+<p class="step-p">Back to two nodes. <strong>That's the checkpoint: a Job appeared from a Kafka message, a node appeared for the Job, the Job completed when the stream ended, and the node went away.</strong> Zero transcode cost while idle.</p>
+</div>
+<div class="gotcha section">
+<h3 id="m14-what-breaks">What breaks</h3>
+<p class="step-p">Ordered by how often it actually happens.</p>
+<p class="step-p"><strong>Jobs spawn continuously and never stop, even with nothing streaming.</strong> The consumer group in the pod env doesn't match the trigger's <code class="inline">consumerGroup</code>, so nothing ever commits to the group KEDA is watching. Diagnose:</p>
+<pre><code>kubectl get scaledjob transcode-live -n streaming \
+  -o jsonpath='{.spec.triggers[0].metadata.consumerGroup}{"\n"}'
+kubectl get scaledjob transcode-live -n streaming \
+  -o jsonpath='{range .spec.jobTargetRef.template.spec.containers[0].env[?(@.name=="TRANSCODE_CONSUMER_GROUP")]}{.value}{"\n"}{end}'</code></pre>
+<p class="step-p">Those two strings must be identical. Scale the damage down immediately with <code class="inline">kubectl patch scaledjob transcode-live -n streaming --type merge -p '{"spec":{"maxReplicaCount":0}}'</code> before you fix it.</p>
+<p class="step-p"><strong>The first stream after a fresh deploy never creates a Job.</strong> The consumer group has no committed offset, so KEDA computes lag 0. Run the bootstrap Job from step 6. Confirm with the <code class="inline">--describe</code> command above: <code class="inline">CURRENT-OFFSET</code> must not be <code class="inline">-</code>.</p>
+<p class="step-p"><strong>A Job is created but stays Pending forever.</strong></p>
+<pre><code>kubectl describe pod -n streaming -l app=transcode | tail -30</code></pre>
+<p class="step-p"><code class="inline">0/2 nodes are available: 2 node(s) had untolerated taint</code> and no Karpenter activity means the pod's <code class="inline">nodeSelector</code>/<code class="inline">tolerations</code> don't match any NodePool's labels and taints. Compare against <a href="part-2-platform.html#m06">Module 6</a> &#8212; the labels are <code class="inline">workload: transcode</code> plus <code class="inline">transcode-mode: live|vod</code>, and the taint is <code class="inline">workload=transcode:NoSchedule</code>. <code class="inline">did not have enough resource: ephemeral-storage</code> means the NodePool's instance types are too small or the <code class="inline">EC2NodeClass</code> root volume is smaller than the pod's request.</p>
+<p class="step-p"><strong>The pod starts, logs "lost claim", and exits 0 &#8212; every time.</strong> The row is stuck in a claimed state from an earlier crashed pod and the sweeper isn't running or isn't finding it. Check:</p>
+<pre><code>kubectl get cronjob transcode-sweeper -n streaming
+kubectl logs -n streaming -l app=transcode-sweeper --tail=20
+psql "$POSTGRES_DSN" -c \
+  "SELECT id, status, transcode_status, transcode_heartbeat FROM streams
+    WHERE transcode_status = 'claimed' ORDER BY transcode_heartbeat"</code></pre>
+<p class="step-p">A <code class="inline">transcode_heartbeat</code> of <code class="inline">NULL</code> on a claimed row is the giveaway that a pod claimed and died before its first beat &#8212; <code class="inline">_claim_stream</code> sets <code class="inline">transcode_heartbeat = now()</code> in the same statement precisely so this can't happen; if you see NULL, that's the bug.</p>
+<p class="step-p"><strong>Every live stream drops the moment you deploy.</strong> <code class="inline">rollout.strategy</code> is missing or set to <code class="inline">default</code> on the ScaledJob. Add <code class="inline">rollout: {strategy: gradual}</code>. This will not show up until the first deploy that happens while someone is streaming, which is why it's worth checking now rather than discovering later:</p>
+<pre><code>kubectl get scaledjob -n streaming -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.rollout.strategy}{"\n"}{end}'</code></pre>
+<p class="step-p"><strong>The stream plays for a minute and then freezes; the pod is still Running.</strong> This is the pre-existing wedged-ffmpeg case (MediaMTX drops the RTMP read for "reader is too slow", ffmpeg goes idle at ~0% CPU and never recovers). <code class="inline">_watch_for_stall</code> should catch it and restart within 20 seconds &#8212; look for <code class="inline">ffmpeg wedged (no new segment for 20s)</code> in the pod logs. If it <em>doesn't</em> restart, <code class="inline">stop_event</code> was set by the <code class="inline">ended</code> watcher first, meaning the pod thinks the stream ended. Check what's actually on <code class="inline">stream.lifecycle</code>.</p>
+<p class="step-p"><strong>A VOD video sits at <code class="inline">transcoding</code> forever.</strong> Its pod was killed on a spot reclaim. Confirm, then wait for the sweeper:</p>
+<pre><code>kubectl get events -n streaming --field-selector reason=Killing --sort-by=.lastTimestamp | tail
+psql "$POSTGRES_DSN" -c \
+  "SELECT id, status, now() - transcode_heartbeat FROM videos WHERE status = 'transcoding'"</code></pre>
+<p class="step-p">If the heartbeat is older than <code class="inline">VOD_STALE_AFTER</code> and nothing has happened, the sweeper is down.</p>
+<p class="step-p"><strong>Pods get OOMKilled or evicted mid-encode.</strong> <code class="inline">kubectl get pod &lt;name&gt; -n streaming -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'</code>. <code class="inline">OOMKilled</code> means raise the memory request <em>and</em> limit together &#8212; keep them equal so QoS stays Guaranteed. <code class="inline">Evicted</code> with a message about ephemeral storage means the encode exceeded the <code class="inline">ephemeral-storage</code> limit; the kubelet gives no grace period for that, so the fix is a bigger limit and a bigger <code class="inline">emptyDir</code> <code class="inline">sizeLimit</code>, not a retry.</p>
+<p class="step-p"><strong>A publish is rejected with 503 when nothing is streaming.</strong> Stale <code class="inline">streams</code> rows stuck at <code class="inline">status='live'</code> &#8212; <code class="inline">/hooks/unpublish</code> never fired, usually because MediaMTX was restarted. <code class="inline">SELECT count(*) FROM streams WHERE status='live'</code> will show the phantom rows. Longer term that wants a reaper of its own; short term, close them by hand.</p>
+<p class="step-p">Next: <a href="part-5-elastic.html#m15">Module 15 &#8212; GitOps with ArgoCD</a>, which is where the ScaledJob image tag starts updating itself.</p>
+</div>
+</section>
+
+<section class="step" id="m15">
+  <div class="step-head">
+    <span class="step-num">15</span>
+    <h2>GitOps with ArgoCD</h2>
+  </div>
+<p class="modnav">Prerequisite: <a href="part-5-elastic.html#m14">Module 14</a>. Everything in the cluster is currently there because you ran <code class="inline">kubectl apply</code> at some point. This module makes that untrue. ---</p>
+<h3 id="m15-what-youre-building">What you're building</h3>
+<p class="step-p">A cluster whose state is a function of a git branch. You install ArgoCD, apply exactly one manifest by hand, and from then on every change to the platform &#8212; a new operator, a config value, a new image &#8212; is a commit. <code class="inline">kubectl</code> becomes a read-only debugging tool.</p>
+<p class="step-p">You'll also delete the <code class="inline">deploy</code> job in <code class="inline">.github/workflows/ci.yml</code> and the self-hosted runner it runs on. Right now, deploying means a GitHub Actions runner installed on the dev box runs <code class="inline">docker compose pull &amp;&amp; docker compose up -d</code> against the Compose stack on that same box. That box is not in the picture anymore. What replaces it is: CI builds the image, CI commits the new tag into the prod overlay, ArgoCD notices the commit and syncs it. CI never touches the cluster, never holds a kubeconfig, and never needs network access to EKS.</p>
+<div class="why section">
+<h3 id="m15-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m15-pull-not-push">Pull, not push</h4>
+<p class="step-p">The <code class="inline">deploy</code> job you have today is push-based: CI has credentials and reaches into the environment to change it. That model has three properties you stop wanting the moment the environment is an EKS cluster in a private VPC.</p>
+<p class="step-p">It needs <strong>inbound access</strong> &#8212; CI must be able to reach the API server, which means either a public endpoint or a runner inside the VPC. It needs <strong>long-lived credentials</strong> in GitHub that can do anything to your cluster. And it has <strong>no reconciliation</strong>: if someone <code class="inline">kubectl edit</code>s a Deployment at 2am, nothing ever notices or puts it back.</p>
+<p class="step-p">Pull-based inverts all three. A controller inside the cluster watches git and reconciles toward it. There is no inbound path, no credential outside the cluster, and drift is corrected automatically because reconciling is the only thing the controller does.</p>
+<h4 id="m15-app-of-apps-and-why-not-just-apply-seven-applications">App-of-apps, and why not just apply seven Applications</h4>
+<p class="step-p">The naive version is seven <code class="inline">Application</code> manifests, applied by hand. It works, and it decays: the first time someone adds a component with <code class="inline">kubectl apply</code> "just for now", the cluster and git have diverged and nobody knows it.</p>
+<p class="step-p">App-of-apps means one <code class="inline">Application</code> whose source is a <em>directory of Applications</em>. Adding a component becomes a PR that adds a file. That's the whole point of GitOps and it's the part that erodes first if you skip it.</p>
+<p class="step-p">There's a second, more mechanical benefit. Argo has a built-in health assessment for the <code class="inline">Application</code> kind: an Application is Healthy when it is Synced <strong>and</strong> all of its resources are Healthy. Since sync waves apply to Applications too, wave N+1's Application does not begin syncing until wave N's Application reports Healthy. That is how you get "Strimzi's CRDs exist before the Kafka CR" without hand-sequencing anything.</p>
+<p class="step-p">The cost is one layer of indirection and eight rows in <code class="inline">kubectl get app</code> instead of seven.</p>
+<h4 id="m15-sync-waves-and-what-goes-wrong-without-them">Sync waves, and what goes wrong without them</h4>
+<p class="step-p">A sync wave is an integer annotation. Argo groups resources by wave, applies the lowest wave, waits for everything in it to be Healthy, then moves on.</p>
+<p class="step-p">Without waves, Argo applies everything at once and you get failures that look like bugs but are ordering problems:</p>
+<ul>
+<li><strong>ESO before ExternalSecrets.</strong> Apply an <code class="inline">ExternalSecret</code> before the External Secrets Operator's CRDs exist and you get <code class="inline">no matches for kind "ExternalSecret"</code>. Retry and it eventually succeeds &#8212; but in the meantime the pods that mount <code class="inline">streaming-db</code> are in <code class="inline">CreateContainerConfigError</code> because the Secret doesn't exist, and a Deployment that has been failing to start for five minutes has already backed off its restarts.</li>
+<li><strong>Strimzi before Kafka CRs.</strong> Same shape, worse consequence. <code class="inline">no matches for kind "Kafka"</code>, and once the operator does arrive the <code class="inline">Kafka</code> CR is applied but the <code class="inline">KafkaTopic</code>s were rejected in the same failed sync, so you have a broker with no topics and every service crash-looping on an unknown topic.</li>
+<li><strong>KEDA before ScaledJobs.</strong> <code class="inline">no matches for kind "ScaledJob"</code>, and &#8212; this is the one that hurts &#8212; your transcode pipeline is silently absent. Nothing crash-loops. Nothing is red. Streams just never transcode, and you go looking at ffmpeg.</li>
+</ul>
+<p class="step-p">Now the part people miss: <strong>sync waves alone do not solve this.</strong> Within a single Application, Argo dry-runs <em>every</em> manifest before applying <em>any</em> of them. A <code class="inline">ScaledJob</code> sitting in the same Application as the KEDA Helm chart fails the whole sync at dry-run, before wave ordering ever runs. There are two fixes, and you want both:</p>
+<ol>
+<li><strong>Put the operators in a separate, earlier Application.</strong> That's what <code class="inline">00-platform.yaml</code> is. Application-level separation works because Argo evaluates each Application independently, and wave 10 doesn't start until wave 0 is Healthy.</li>
+<li><p class="step-p"><strong>Annotate any CR whose CRD might not exist yet:</strong></p>
+<pre><code>argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true</code></pre>
+<p class="step-p">This is the escape hatch for the case where a CRD and its CR genuinely have to share an Application.</p></li>
+</ol>
+<p class="step-p">The wave layout:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Wave</th>
+<th>Application</th>
+<th>Contents</th>
+<th>Waits for</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>0</td>
+<td><code class="inline">platform</code></td>
+<td>ESO, Strimzi operator, KEDA, AWS Load Balancer Controller, Karpenter, kube-prometheus-stack &#8212; each a Helm chart</td>
+<td>&#8212;</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code class="inline">secrets</code></td>
+<td><code class="inline">ClusterSecretStore</code>, <code class="inline">ExternalSecret</code>s</td>
+<td>ESO CRDs</td>
+</tr>
+<tr>
+<td>10</td>
+<td><code class="inline">karpenter-pools</code></td>
+<td><code class="inline">EC2NodeClass</code>, <code class="inline">NodePool</code>s, warm-pool placeholder</td>
+<td>Karpenter CRDs</td>
+</tr>
+<tr>
+<td>20</td>
+<td><code class="inline">kafka</code></td>
+<td>Namespace, <code class="inline">KafkaNodePool</code>, <code class="inline">Kafka</code>, <code class="inline">KafkaTopic</code>s, NetworkPolicy, consumer-group bootstrap Job</td>
+<td>Strimzi CRDs, gp3 StorageClass</td>
+</tr>
+<tr>
+<td>25</td>
+<td><code class="inline">db-migrate</code></td>
+<td>The schema Job and its generated SQL ConfigMap</td>
+<td><code class="inline">streaming-db</code> exists</td>
+</tr>
+<tr>
+<td>30</td>
+<td><code class="inline">streaming</code></td>
+<td>The five services, ScaledJobs, sweeper, Ingress</td>
+<td>Schema applied, Kafka Ready, KEDA CRDs</td>
+</tr>
+<tr>
+<td>40</td>
+<td><code class="inline">mediamtx</code></td>
+<td><code class="inline">k8s/apps/mediamtx/overlays/aws</code>: Deployment, ClusterIP Service, <code class="inline">mediamtx.yml</code> ConfigMap, PDB, and the public RTMP NLB Service &#8212; <strong>manual sync</strong></td>
+<td><code class="inline">streaming</code></td>
+</tr>
+</tbody></table></div>
+<p class="step-p"><strong>The waves go up in tens, and the annotation matches the filename.</strong> <code class="inline">20-kafka.yaml</code> carries <code class="inline">sync-wave: "20"</code>. Argo only cares that the numbers sort; the gaps are so you can insert a stage between two existing ones without renumbering everything downstream &#8212; which is exactly what wave 25 is. Both wave-10 Applications run concurrently; they don't depend on each other.</p>
+<p class="step-p"><strong>Why the migration is its own Application rather than a <code class="inline">PreSync</code> hook.</strong> The obvious design is a hook inside <code class="inline">streaming</code>, and it is wrong here for a mechanical reason. <code class="inline">k8s/apps/base/db-migrate/</code> builds its ConfigMap from <code class="inline">postgres/migrations/*.sql</code> &#8212; outside its own kustomization root, so that the schema has one copy shared with the Compose path. Kustomize needs <code class="inline">--load-restrictor LoadRestrictionsNone</code> for that (<a href="part-3-data-layer.html#m08">Module 8</a>, "What breaks" #1). Put that directory inside <code class="inline">apps/base</code> or <code class="inline">overlays/prod</code> and the requirement spreads to those roots, so every plain <code class="inline">kubectl apply -k</code> in Modules 8 and 11 starts failing with <code class="inline">security; file ... is not in or below ...</code>. A separate Application keeps the relaxed restrictor confined to the one directory that needs it &#8212; ArgoCD's <code class="inline">kustomize.buildOptions</code> is global, so the repo-server can build it either way, but nothing else has to live with the consequence. The wave does what the hook would have done, and the Job stays a normal tracked resource you can <code class="inline">kubectl logs</code> afterwards instead of one that is deleted and recreated on every sync.</p>
+<p class="step-p">Inside the <code class="inline">streaming</code> Application there's a second, resource-level ordering: Deployments and Services are wave 0; ScaledJobs and the sweeper are wave 1 (so KEDA doesn't spawn a transcode pod before mediamtx and RDS are reachable); the Ingress is wave 2.</p>
+<p class="step-p"><strong>Why MediaMTX is manual.</strong> Rolling the mediamtx pod tears down every in-flight RTMP connection on the platform. Every live stream drops, and OBS does not silently reconnect. Automated sync means a config typo committed at 4pm ends everyone's stream at 4pm. Argo still shows it OutOfSync so you always know a change is waiting; you choose when.</p>
+<h4 id="m15-eso-and-the-argo-sees-drift-and-reverts-it-problem">ESO and the "Argo sees drift and reverts it" problem</h4>
+<p class="step-p">This problem is entirely self-inflicted and entirely avoidable. Two controllers both believe they own the contents of a <code class="inline">Secret</code>: ESO syncs it from AWS Secrets Manager, Argo reconciles it toward git. If both actually manage it, they fight &#8212; Argo writes git's version, ESO writes AWS's version, Argo calls that drift and writes git's version again. With <code class="inline">selfHeal: true</code> this is a loop that flaps the Secret and restarts every pod mounting it.</p>
+<p class="step-p">The fix is one rule: <strong>commit the <code class="inline">ExternalSecret</code>, never commit a <code class="inline">Secret</code>.</strong> Not even an empty placeholder, not even with a comment saying it gets overwritten. The instant a <code class="inline">Secret</code> is in git, Argo tracks it and the fight starts.</p>
+<p class="step-p">With that rule and <code class="inline">creationPolicy: Owner</code>, the mechanics work out cleanly:</p>
+<ul>
+<li>ESO creates the Secret with an <code class="inline">ownerReference</code> pointing at the <code class="inline">ExternalSecret</code>, and <strong>without</strong> Argo's tracking label (<code class="inline">app.kubernetes.io/instance</code>).</li>
+<li>Argo therefore sees an object that is neither part of desired state nor tracked by it. Not drift. And crucially <strong>not pruned</strong> by <code class="inline">automated.prune: true</code> &#8212; untracked resources are left alone.</li>
+<li>Deleting the <code class="inline">ExternalSecret</code> cascades to the Secret through the owner reference, so cleanup still works.</li>
+</ul>
+<p class="step-p">One residual annoyance: the <code class="inline">ExternalSecret</code>'s own <code class="inline">.status</code> block is rewritten on every refresh, which Argo can read as drift on the <code class="inline">ExternalSecret</code> itself. That's what the <code class="inline">ignoreDifferences</code> block in <code class="inline">k8s/argocd/apps/10-secrets.yaml</code> handles.</p>
+<p class="step-p">And one behaviour to know rather than be surprised by: <code class="inline">refreshInterval: 1h</code> means a rotated secret reaches the cluster within an hour but <strong>does not restart pods</strong>. Env vars are read once at container start. If you rotate <code class="inline">POSTGRES_DSN</code>, you must also <code class="inline">kubectl rollout restart</code> the Deployments. Accept the manual roll for now, or add Reloader later &#8212; just don't assume rotation is end-to-end automatic.</p>
+<h4 id="m15-image-tags-ci-writes-them-into-kustomize-not-argo-image-updater">Image tags: CI writes them into kustomize, not Argo Image Updater</h4>
+<p class="step-p">Argo Image Updater is the tool people reach for. Don't. The reasoning:</p>
+<ul>
+<li><strong>Git should be the deployment audit log.</strong> <code class="inline">git log -p k8s/apps/overlays/prod/kustomization.yaml</code> is a complete, timestamped, attributed history of every version that was ever deployed, and rollback is <code class="inline">git revert</code>. Image Updater's default write-back mode stores the running version in a cluster annotation, so git stops describing the cluster &#8212; which is the one property you installed ArgoCD to get.</li>
+<li><strong>Image Updater's git write-back mode does exactly what CI would do,</strong> but from inside the cluster, needing a git write credential <em>and</em> a registry credential in the cluster. Same work, two more secrets, one more thing that can be down.</li>
+<li><strong>CI already has the information.</strong> It computes <code class="inline">sha-&lt;short&gt;</code> and already knows which services changed via <code class="inline">paths-filter</code>. The bump is three lines of shell.</li>
+<li><strong>Semver/regex tracking is for upstream releases.</strong> That's not what this is. This is "deploy the artifact I just built", and the tag is already known at build time.</li>
+</ul>
+<p class="step-p">The one thing you give up is auto-deploying an image built somewhere other than CI. You don't want that.</p>
+</div>
+<h3 id="m15-do-it">Do it</h3>
+<h4 id="m15-1-install-argocd">1. Install ArgoCD</h4>
+<p class="step-p">ArgoCD is the one thing installed by hand, because it can't bootstrap itself.</p>
+<pre><code>helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update
+helm upgrade --install argocd argo/argo-cd \
+  --namespace argocd --create-namespace \
+  --version 8.5.8 \
+  --set configs.params."server\.insecure"=true</code></pre>
+<p class="step-p"><code class="inline">server.insecure=true</code> because the ALB from <a href="part-4-application.html#m12">Module 12</a> terminates TLS. Without it, the ALB speaks HTTP to a pod expecting HTTPS and you get a redirect loop that looks like a broken ingress.</p>
+<p class="step-p"><strong>Then one setting, before you point Argo at the repo.</strong> The repo-server runs <code class="inline">kustomize build</code> itself, with the default load restrictor, and exactly one directory in this repo needs it relaxed: <code class="inline">k8s/apps/base/db-migrate/</code> reads the SQL from <code class="inline">postgres/migrations/</code>, outside its own kustomization root, which <a href="part-3-data-layer.html#m08">Module 8</a> covers under "What breaks". Every other root builds fine either way. Skip this and the wave-25 <code class="inline">db-migrate</code> Application never syncs &#8212; it reports a repo error rather than anything mentioning SQL, wave 30 never starts because Argo will not advance past an unhealthy wave, and the symptom you actually see is "the whole platform stopped deploying":</p>
+<pre><code>kubectl -n argocd patch cm argocd-cm --type merge \
+  -p '{"data":{"kustomize.buildOptions":"--load-restrictor LoadRestrictionsNone"}}'
+
+<span class="c"># The repo-server reads this at build time, but restart it so you are not</span>
+<span class="c"># debugging a stale cache later.</span>
+kubectl -n argocd rollout restart deploy/argocd-repo-server
+kubectl -n argocd rollout status  deploy/argocd-repo-server</code></pre>
+<p class="step-p">It is a global setting, which is the honest cost: every kustomization Argo builds may now read outside its root, not just the one that needs to. The alternative is to give up on <code class="inline">postgres/migrations/</code> being the single copy shared with the Compose path and keep a duplicate under <code class="inline">k8s/</code>. One relaxed flag beats two copies of the schema that will drift.</p>
+<pre><code>kubectl get pods -n argocd</code></pre>
+<pre class="out"><code>NAME                                               READY   STATUS    RESTARTS   AGE
+argocd-application-controller-0                    1/1     Running   0          92s
+argocd-applicationset-controller-6b7c4d9f8-x2mrt   1/1     Running   0          92s
+argocd-dex-server-7f8b95c6d-9nq4l                  1/1     Running   0          92s
+argocd-notifications-controller-5d8f7b64c-tk8vz    1/1     Running   0          92s
+argocd-redis-6c9b5d8f74-hs2wl                      1/1     Running   0          92s
+argocd-repo-server-79d6c854b-4pxjn                 1/1     Running   0          92s
+argocd-server-5b8f9c6d4-qw7rz                      1/1     Running   0          92s</code></pre>
+<p class="step-p">Get the admin password:</p>
+<pre><code>kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d; echo</code></pre>
+<p class="step-p">Reach the UI. Port-forward is fine for now:</p>
+<pre><code>kubectl port-forward -n argocd svc/argocd-server 8080:80
+<span class="c"># http://localhost:8080  &#8212; user: admin</span></code></pre>
+<p class="step-p">Exposing it through the ALB is a Module 12 concern &#8212; a path rule for <code class="inline">/argocd</code> on the existing Ingress. Do that once you're tired of port-forwarding; there's nothing new in it.</p>
+<h4 id="m15-2-apply-the-root-application-the-last-kubectl-apply">2. Apply the root Application &#8212; the last <code class="inline">kubectl apply</code></h4>
+<pre><code>kubectl apply -f k8s/bootstrap/root-app.yaml</code></pre>
+<p class="step-p">That's it. That is the only manifest a human applies from here on.</p>
+<pre><code>kubectl get app -n argocd</code></pre>
+<pre class="out"><code>NAME              SYNC STATUS   HEALTH STATUS
+root              Synced        Healthy
+platform          Synced        Healthy
+secrets           Synced        Healthy
+karpenter-pools   Synced        Healthy
+kafka             Synced        Healthy
+db-migrate        Synced        Healthy
+streaming         Synced        Healthy
+mediamtx          OutOfSync     Healthy</code></pre>
+<p class="step-p"><code class="inline">mediamtx</code> sitting OutOfSync is correct and expected &#8212; it's the manual-sync Application. Everything else should converge within a few minutes as the waves progress.</p>
+<p class="step-p"><strong>Argo adopts what's already there.</strong> Every one of these components is already installed from earlier modules. Argo doesn't reinstall or duplicate them; it compares the live objects against git and, if they match, reports Synced. If they <em>don't</em> match, it overwrites the live object with git's version &#8212; which is the point, and also why you want to read <code class="inline">kubectl get app -n argocd</code> output carefully the first time rather than walking away.</p>
+<h4 id="m15-3-replace-the-deploy-job-in-ci">3. Replace the <code class="inline">deploy</code> job in CI</h4>
+<p class="step-p">Delete the entire <code class="inline">deploy</code> job from <code class="inline">.github/workflows/ci.yml</code>. It looks like this today:</p>
+<pre><code>  deploy:
+    needs: [changes, build]
+    if: needs.changes.outputs.services != '[]' &amp;&amp; ...
+    runs-on: [self-hosted]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy changed services via docker compose
+        run: |
+          ln -sf /home/gha-runner/streaming-project.env .env
+          export IMAGE_TAG=sha-$(git rev-parse --short=7 HEAD)
+          docker compose pull $SERVICE_LIST
+          docker compose up -d $SERVICE_LIST</code></pre>
+<p class="step-p">Everything about that job is now wrong. It runs on <code class="inline">[self-hosted]</code>, meaning the runner installed on the dev box. It symlinks a real secrets file from that box's filesystem. It runs <code class="inline">docker compose</code>, which has nothing to do with the cluster. <strong>The runner and this job both go away entirely.</strong> Stop and disable the runner's systemd unit, or keep it if you still want the Compose stack for local dev &#8212; but it is out of the deploy path either way, and leaving it registered while it no longer deploys anything is how you end up with a job silently succeeding against the wrong environment.</p>
+<p class="step-p">Replace it with:</p>
+<pre><code>  bump-manifests:
+    needs: [changes, build]
+    if: needs.changes.outputs.services != '[]' &amp;&amp; github.event_name == 'push' &amp;&amp; github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest        <span class="c"># no longer self-hosted; the dev box is out of the loop</span>
+    permissions:
+      contents: write             <span class="c"># to push the manifest commit</span>
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tags in the prod overlay
+        run: |
+          set -eu
+          SHA_SHORT=$(git rev-parse --short=7 HEAD)
+          REPO_LC=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          cd k8s/apps/overlays/prod
+          for svc in $(echo '${{ needs.changes.outputs.services }}' | jq -r '.[]'); do
+            IMG="ghcr.io/${REPO_LC}-${svc}"
+            kustomize edit set image "${IMG}=${IMG}:sha-${SHA_SHORT}"
+          done
+
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add k8s/apps/overlays/prod/kustomization.yaml
+          git diff --staged --quiet || git commit -m "deploy: sha-$(git rev-parse --short=7 HEAD)"
+          git push</code></pre>
+<p class="step-p"><code class="inline">kustomize edit set image</code> writes into the overlay's <code class="inline">images:</code> block:</p>
+<pre><code>images:
+  - name: ghcr.io/linkify-solutions-inc/kubernetes-streaming-transcode-worker
+    newTag: sha-a3f91c2
+  - name: ghcr.io/linkify-solutions-inc/kubernetes-streaming-web
+    newTag: sha-9d4e0b1</code></pre>
+<p class="step-p">That single field rewrites the image on every resource in the overlay that references it &#8212; Deployments <em>and</em> both ScaledJob templates. Nothing enumerates the ScaledJobs by hand.</p>
+<p class="step-p"><strong>The infinite-loop gotcha, and why the fix isn't what you'd guess.</strong> Pushing to <code class="inline">master</code> from a workflow triggered by a push to <code class="inline">master</code> would normally re-trigger the workflow forever. The fix is that <strong>commits pushed using the default <code class="inline">GITHUB_TOKEN</code> do not trigger new workflow runs.</strong> That's deliberate GitHub behaviour and exactly the right mechanism here. So: do <em>not</em> swap in a PAT for this step &#8212; a PAT-authored push <em>does</em> re-trigger, and you get the loop. If you ever need a PAT for some other reason, fall back to <code class="inline">[skip ci]</code> in the commit message plus an <code class="inline">if: !contains(github.event.head_commit.message, '[skip ci]')</code> guard on the workflow.</p>
+<p class="step-p">While you're in this file, add the manifest validation job. It runs on every PR and catches the class of problem that otherwise only shows up as a failed sync:</p>
+<pre><code>  manifest-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: kustomize build k8s/apps/overlays/prod &gt; /tmp/prod.yaml
+      - run: kustomize build k8s/apps/mediamtx/overlays/aws &gt; /tmp/mediamtx.yaml
+      <span class="c"># The db-migrate root reads SQL from postgres/migrations/, outside its own</span>
+      <span class="c"># tree, so it needs the same relaxed restrictor ArgoCD is given below.</span>
+      - run: kustomize build --load-restrictor LoadRestrictionsNone k8s/apps/base/db-migrate &gt; /tmp/migrate.yaml
+      - run: |
+          kubeconform -strict -summary -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            /tmp/prod.yaml /tmp/mediamtx.yaml /tmp/migrate.yaml
+      - run: scripts/check_ceiling_sync.sh /tmp/prod.yaml   <span class="c"># Module 14</span></code></pre>
+<p class="step-p">The second <code class="inline">-schema-location</code> is what lets kubeconform validate <code class="inline">ScaledJob</code> and the other CRDs. Without it, <code class="inline">-strict</code> skips anything it has no schema for, which is precisely the resources most likely to have a typo.</p>
+<p class="step-p">Build all three roots, not just the prod overlay. <code class="inline">k8s/apps/mediamtx/overlays/aws/</code> is a separate Application (step 4 below) and would otherwise never be validated, and <code class="inline">k8s/apps/base/db-migrate/</code> is the one directory in the repo that needs <code class="inline">--load-restrictor LoadRestrictionsNone</code> &#8212; a CI job that never exercises it will not catch the failure that setting exists to prevent.</p>
+<h4 id="m15-4-understand-why-mediamtx-is-a-separate-application-then-prove-the-split-holds">4. Understand why MediaMTX is a separate Application, then prove the split holds</h4>
+<p class="step-p">There is nothing to move here &#8212; the repo already has this layout, and <a href="part-4-application.html#m11">Module 11</a> has had you applying two roots since you first deployed. This step is about knowing <em>why</em>, because it is the one piece of the directory structure that exists for an operational reason rather than a tidiness one.</p>
+<p class="step-p"><strong>MediaMTX holds long-lived connections.</strong> Every other pod on the platform serves short requests: restart <code class="inline">web</code> and a viewer's next page load lands on the new pod and nobody notices. MediaMTX holds an open RTMP session for the entire duration of a broadcast &#8212; hours, sometimes. Restarting it does not drop a request, it drops <em>every live stream on the platform at once</em>, and OBS does not silently reconnect; the streamer sees the disconnect and has to press Start Streaming again. That is why <code class="inline">40-mediamtx.yaml</code> has <code class="inline">syncPolicy: {}</code> and no <code class="inline">automated</code> block: with auto-sync, a config typo merged at 4pm ends everyone's broadcast at 4pm. Manual sync means you pick the moment.</p>
+<p class="step-p"><strong>A manual gate is worthless if something else can sync the same objects.</strong> Argo Applications own objects, and two of them cannot own the same one. If the MediaMTX Deployment were still listed in <code class="inline">k8s/apps/base/kustomization.yaml</code>, the auto-synced wave-3 <code class="inline">streaming</code> Application would render it too &#8212; and would push the held-back change within 30 seconds anyway. You would have a manual-sync Application that gates nothing, which is worse than not having one, because you would believe you were protected.</p>
+<p class="step-p">So MediaMTX is its own kustomize root at <code class="inline">k8s/apps/mediamtx/</code>, split the ordinary way into a portable half and an AWS half:</p>
+<pre class="out"><code>k8s/apps/mediamtx/
+&#9500;&#9472;&#9472; base/                             # cloud-neutral
+&#9474;   &#9500;&#9472;&#9472; kustomization.yaml            # its own configMapGenerator for mediamtx.yml
+&#9474;   &#9500;&#9472;&#9472; deployment.yaml
+&#9474;   &#9500;&#9472;&#9472; service.yaml                  # the in-cluster ClusterIP
+&#9474;   &#9500;&#9472;&#9472; pdb.yaml
+&#9474;   &#9492;&#9472;&#9472; mediamtx.yml
+&#9492;&#9472;&#9472; overlays/
+    &#9492;&#9472;&#9472; aws/                          # &lt;- 40-mediamtx.yaml points HERE
+        &#9500;&#9472;&#9472; kustomization.yaml
+        &#9500;&#9472;&#9472; service-rtmp-nlb.yaml     # the public NLB &#8212; Module 12
+        &#9492;&#9472;&#9472; patches/mediamtx-placement.yaml</code></pre>
+<p class="step-p">Three of those placements are worth naming.</p>
+<p class="step-p"><strong>The NLB Service is in the overlay, not in <code class="inline">apps/overlays/prod/</code>,</strong> because its target group is populated from the endpoints of the pods its selector matches &#8212; the load balancer and the Deployment behind it have to move as one unit, under one gate.</p>
+<p class="step-p"><strong>The <code class="inline">mediamtx.yml</code> <code class="inline">configMapGenerator</code> is duplicated here rather than shared with <code class="inline">apps/base</code>,</strong> because the generated ConfigMap's name hash is precisely what rolls the pod; if <code class="inline">apps/base</code> produced it, editing the config would restart MediaMTX through the auto-synced Application and walk straight around the gate.</p>
+<p class="step-p"><strong><code class="inline">base/</code> is cloud-neutral so the dev overlay can use it.</strong> <code class="inline">k8s/apps/overlays/dev/</code> lists <code class="inline">../../mediamtx/base</code> alongside <code class="inline">../../base</code>, which is how the kubeadm box still gets MediaMTX &#8212; it has no NLB to create and no node labelled <code class="inline">workload: system</code>, so it takes the portable half and none of the AWS half. Note also that <code class="inline">overlays/aws</code> is a <em>sibling</em> of <code class="inline">base</code>, not a child of the root it extends: kustomize rejects a root that references its own parent with <code class="inline">cycle detected</code>, so <code class="inline">mediamtx/overlays/aws</code> could not have pointed at <code class="inline">mediamtx/</code> itself.</p>
+<p class="step-p">Confirm the split is clean &#8212; no object rendered by both roots:</p>
+<pre><code>ids() { kubectl kustomize "$1" | awk '/^kind:/{k=$2} /^  name:/{if(!n){n=$2; print k"/"n}} /^---$/{n=""}' | sort -u; }
+comm -12 &lt;(ids k8s/apps/overlays/prod) &lt;(ids k8s/apps/mediamtx/overlays/aws)   <span class="c"># expect NO output</span>
+kubectl kustomize k8s/apps/mediamtx/overlays/aws | grep -c "kind: Deployment"  <span class="c"># expect 1</span></code></pre>
+<p class="step-p">A plain <code class="inline">grep -c mediamtx</code> on the prod build is <em>not</em> the check, and it is the mistake to avoid: <code class="inline">MEDIAMTX_RTMP_URL</code> is a key in <code class="inline">streaming-config</code>, so the string legitimately appears in the prod output forever. Compare object identities, not text.</p>
+<p class="step-p">If you'd rather not run MediaMTX under a separate Application, the honest alternative is to delete <code class="inline">k8s/argocd/apps/40-mediamtx.yaml</code>, remove it from that directory's <code class="inline">kustomization.yaml</code>, and fold <code class="inline">k8s/apps/mediamtx/base</code> back into the prod overlay's <code class="inline">resources</code>. MediaMTX then syncs with everything else &#8212; which works, and means a bad MediaMTX commit drops every live stream the moment it merges. Make that a decision, not an accident.</p>
+<h4 id="m15-5-ghcrio-image-pull">5. ghcr.io image pull</h4>
+<p class="step-p">ghcr packages inherit repository visibility, so <code class="inline">kubernetes-streaming-*</code> are <strong>private</strong> unless you change that. A private package with no credential in the cluster produces <code class="inline">ImagePullBackOff: unauthorized</code>, which looks identical to a wrong tag and wastes an hour.</p>
+<p class="step-p"><strong>Option A &#8212; make the five packages public. This is the recommendation.</strong></p>
+<p class="step-p">Repository &#8594; Packages &#8594; each package &#8594; Package settings &#8594; Change visibility &#8594; Public.</p>
+<p class="step-p">Zero cluster configuration, no credential to rotate, nothing to replicate into namespaces. The images contain Python source that already lives in a repo you could make public and an apt-installed ffmpeg. Verify before you do it &#8212; nothing in the Dockerfiles copies <code class="inline">.env</code>, and <code class="inline">COPY . .</code> copies the service directory, which has no secrets in it. For a learning project the operational simplicity is worth more than the obscurity, and obscurity is all you're giving up.</p>
+<p class="step-p"><strong>Option B &#8212; an imagePullSecret.</strong> Fully specified, because you may not have the authority to flip visibility.</p>
+<p class="step-p">Create a PAT with <code class="inline">read:packages</code> and nothing else, store it in Secrets Manager alongside your other values, and let ESO template a <code class="inline">dockerconfigjson</code>:</p>
+<pre><code>apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: ghcr-pull
+  namespace: streaming
+spec:
+  secretStoreRef: {name: aws-secretsmanager, kind: ClusterSecretStore}
+  refreshInterval: 1h
+  target:
+    name: ghcr-pull
+    creationPolicy: Owner
+    template:
+      type: kubernetes.io/dockerconfigjson
+      data:
+        .dockerconfigjson: |
+          {"auths":{"ghcr.io":{"username":"{{ .username }}","password":"{{ .token }}","auth":"{{ printf "%s:%s" .username .token | b64enc }}"}}}
+  data:
+    - {secretKey: username, remoteRef: {key: streaming/prod, property: GHCR_USER}}
+    - {secretKey: token,    remoteRef: {key: streaming/prod, property: GHCR_TOKEN}}</code></pre>
+<p class="step-p">Attach it on the <strong>ServiceAccount</strong>, not per-pod:</p>
+<pre><code>apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: transcode
+  namespace: streaming
+imagePullSecrets:
+  - name: ghcr-pull</code></pre>
+<p class="step-p">Doing it on the ServiceAccount is what makes KEDA-spawned Job pods inherit it without the ScaledJob template listing it &#8212; and the ScaledJob template is generated YAML you'd rather not have to remember to edit.</p>
+<p class="step-p"><strong>Gotcha either way:</strong> <code class="inline">imagePullSecrets</code> are namespace-scoped. Every namespace that pulls these images needs its own copy, which means its own <code class="inline">ExternalSecret</code>. That's a second reason to prefer Option A.</p>
+<div class="confirm section">
+<h3 id="m15-verify">Verify</h3>
+<p class="step-p">The checkpoint is a full round trip with no <code class="inline">kubectl</code> from you at any point.</p>
+<p class="step-p">Make a trivial, visible change to one service &#8212; a log line is ideal:</p>
+<pre><code>cd /path/to/kubernetes-streaming
+git checkout -b gitops-checkpoint
+<span class="c"># edit services/web/main.py, e.g. add:</span>
+<span class="c">#   log.info("gitops checkpoint build")</span>
+git commit -am "web: gitops checkpoint log line"
+git push -u origin gitops-checkpoint
+<span class="c"># open the PR, watch manifest-check pass, merge to master</span></code></pre>
+<p class="step-p"><strong>Watch CI.</strong> On master, the <code class="inline">build</code> job pushes <code class="inline">ghcr.io/linkify-solutions-inc/kubernetes-streaming-web:sha-&lt;short&gt;</code>, then <code class="inline">bump-manifests</code> runs:</p>
+<pre class="out"><code>Run kustomize edit set image ...
+[master a3f91c2] deploy: sha-a3f91c2
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+To https://github.com/Linkify-Solutions-Inc/kubernetes-streaming.git
+   9d4e0b1..a3f91c2  master -&gt; master</code></pre>
+<p class="step-p">Confirm the bot commit exists and did <strong>not</strong> start another run:</p>
+<pre><code>git fetch origin master &amp;&amp; git log --oneline -3 origin/master</code></pre>
+<pre class="out"><code>a3f91c2 deploy: sha-a3f91c2
+9d4e0b1 web: gitops checkpoint log line
+7c2b8e4 Add self-hosted runner setup documentation</code></pre>
+<p class="step-p"><strong>Watch ArgoCD pick it up.</strong> Default polling is every 3 minutes.</p>
+<pre><code>kubectl get app streaming -n argocd -w</code></pre>
+<pre class="out"><code>NAME        SYNC STATUS   HEALTH STATUS
+streaming   Synced        Healthy
+streaming   OutOfSync     Healthy
+streaming   OutOfSync     Progressing
+streaming   Synced        Progressing
+streaming   Synced        Healthy</code></pre>
+<p class="step-p"><strong>Confirm the rollout.</strong> Note that you are <em>reading</em> here, not applying:</p>
+<pre><code>kubectl get deploy web -n streaming \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'</code></pre>
+<pre class="out"><code>ghcr.io/linkify-solutions-inc/kubernetes-streaming-web:sha-a3f91c2</code></pre>
+<pre><code>kubectl logs -n streaming deploy/web --tail=5 | grep checkpoint</code></pre>
+<pre class="out"><code>INFO:web:gitops checkpoint build</code></pre>
+<p class="step-p"><strong>That's the checkpoint: a code change reached production and the only commands you ran were <code class="inline">git</code> commands.</strong></p>
+<p class="step-p">If three minutes is too slow, add a GitHub webhook pointing at <code class="inline">https://stream.k8s.linkifysolutions.com/argocd/api/webhook</code> and sync happens in seconds. The polling interval is a floor on how fast a deploy can be, not a limit on correctness.</p>
+</div>
+<div class="gotcha section">
+<h3 id="m15-what-breaks">What breaks</h3>
+<p class="step-p"><strong>An Application sits <code class="inline">OutOfSync</code> forever and re-syncing does nothing.</strong> Almost always a controller writing to a field git doesn't manage. Find the exact field:</p>
+<pre><code>kubectl get app streaming -n argocd -o jsonpath='{.status.conditions}' | jq
+argocd app diff streaming</code></pre>
+<p class="step-p">The fix is an <code class="inline">ignoreDifferences</code> entry for that group/kind/path, not turning off <code class="inline">selfHeal</code>.</p>
+<p class="step-p"><strong>A Secret flaps and pods restart in a loop.</strong> You committed a <code class="inline">Secret</code>. <code class="inline">git grep -l "kind: Secret" k8s/</code> should return nothing except <code class="inline">ExternalSecret</code> definitions. Delete the committed Secret from git; Argo prunes it, ESO recreates it untracked, the loop stops.</p>
+<p class="step-p"><strong><code class="inline">no matches for kind "ScaledJob"</code> / <code class="inline">"Kafka"</code> / <code class="inline">"ExternalSecret"</code>.</strong> A CR is being applied before its CRD exists. Either the operator's Application is in the same wave (it must be earlier), or the CR is in the <em>same Application</em> as the chart that provides its CRD (split them, or annotate the CR with <code class="inline">argocd.argoproj.io/sync-options: SkipDryRunOnMissingResource=true</code>).</p>
+<p class="step-p"><strong><code class="inline">bump-manifests</code> fails with <code class="inline">Permission to ... denied</code>.</strong> The job is missing <code class="inline">permissions: contents: write</code>, or the repository has "Read repository contents permission" set as the default for <code class="inline">GITHUB_TOKEN</code> under Settings &#8594; Actions &#8594; General &#8594; Workflow permissions.</p>
+<p class="step-p"><strong>CI runs forever in a loop.</strong> Someone replaced <code class="inline">GITHUB_TOKEN</code> with a PAT on the push step. Put it back.</p>
+<p class="step-p"><strong>Pods stuck at <code class="inline">ImagePullBackOff</code>.</strong></p>
+<pre><code>kubectl describe pod <span class="ph">&lt;name&gt;</span> -n streaming | grep -A3 Failed</code></pre>
+<p class="step-p"><code class="inline">unauthorized</code> means the package is private and there is no pull secret in <em>that namespace</em>. <code class="inline">manifest unknown</code> means the tag genuinely does not exist &#8212; check that <code class="inline">build</code> actually pushed before <code class="inline">bump-manifests</code> wrote the tag (<code class="inline">needs: [changes, build]</code> guarantees the ordering; if you edited that, you may have broken it).</p>
+<p class="step-p"><strong>Argo overwrote something you'd hand-edited in the cluster.</strong> Working as designed. That's <code class="inline">selfHeal</code>. Commit it, or accept it's gone. If you need a scratch space Argo won't touch, use a namespace no Application targets.</p>
+<p class="step-p"><strong>Deleting the root Application took down the entire cluster.</strong> Also working as designed &#8212; the <code class="inline">resources-finalizer.argocd.argoproj.io</code> finalizer cascades. To detach without deleting, remove the finalizer first and use <code class="inline">--cascade=orphan</code>; the exact commands are in <code class="inline">k8s/bootstrap/README.md</code>.</p>
+<p class="step-p">Next: <a href="part-5-elastic.html#m16">Module 16 &#8212; Monitoring, cost, and teardown</a>.</p>
+</div>
+</section>
+
+<section class="step" id="m16">
+  <div class="step-head">
+    <span class="step-num">16</span>
+    <h2>Monitoring, cost, and teardown</h2>
+  </div>
+<p class="modnav">The last module. Three things: see what the system is doing, decide what you're willing to pay for it, and be able to make the bill go to zero. The teardown section is the one that matters most. Several AWS resources keep billing after the cluster is gone, and they are easy to leave running for months without noticing. ---</p>
+<h3 id="m16-what-youre-building">What you're building</h3>
+<p class="step-p">A Prometheus and Grafana stack that gives you Kafka consumer lag, transcode Job outcomes, node count and RDS connections on one screen; an itemized understanding of the ~$238/month you're spending and which levers actually move it; and a teardown procedure that leaves nothing behind.</p>
+<h2 id="m16-part-1-monitoring">Part 1 &#8212; Monitoring</h2>
+<div class="why section">
+<h3 id="m16-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m16-consumer-lag-is-the-metric-for-this-system">Consumer lag is <em>the</em> metric for this system</h4>
+<p class="step-p">Most systems don't have a single number that tells you whether they're healthy. This one does.</p>
+<p class="step-p">Every unit of work in the platform enters through Kafka. A stream starting is a message on <code class="inline">stream.start.requests</code>. An upload finishing is a message on <code class="inline">upload.events</code>. And since <a href="part-5-elastic.html#m14">Module 14</a>, the thing that decides whether work gets done is <strong>consumer-group lag</strong> &#8212; KEDA reads it, and creates a pod per unit of lag.</p>
+<p class="step-p">So lag is simultaneously:</p>
+<ul>
+<li><strong>the queue depth</strong> &#8212; how much work is waiting,</li>
+<li><strong>the input to the autoscaler</strong> &#8212; literally the number KEDA divides by <code class="inline">lagThreshold</code>,</li>
+<li><strong>the health signal</strong> &#8212; lag that isn't draining means pods aren't claiming, which means something between Kafka and Postgres is broken.</li>
+</ul>
+<p class="step-p">That's an unusual amount of signal in one series. Three distinct failure modes each have a distinct lag shape:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Lag shape</th>
+<th>What it means</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Spikes to 1, drops to 0 within ~30s</td>
+<td>Normal. A stream started, a pod claimed it.</td>
+</tr>
+<tr>
+<td>Sits at a constant N for minutes</td>
+<td>Pods are being created but not claiming &#8212; DB unreachable, or the pods are Pending because Karpenter can't provision.</td>
+</tr>
+<tr>
+<td>Climbs monotonically forever while Jobs churn</td>
+<td>The consumer group name in the pod doesn't match the trigger's. The expensive one from Module 14.</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">Watch that one panel and you'll catch most of what goes wrong.</p>
+<h4 id="m16-why-kube-prometheus-stack-and-why-kafka-dashboards-are-nearly-free">Why kube-prometheus-stack, and why Kafka dashboards are nearly free</h4>
+<p class="step-p"><code class="inline">kube-prometheus-stack</code> is one Helm chart containing the Prometheus operator, Prometheus, Alertmanager, Grafana, node-exporter and kube-state-metrics, pre-wired. It gives you <code class="inline">ServiceMonitor</code> and <code class="inline">PodMonitor</code> CRDs, which turn "scrape this thing" into a small YAML file rather than editing a Prometheus config and reloading it.</p>
+<p class="step-p">The Kafka half comes almost for free because of a decision made back in <a href="part-3-data-layer.html#m10">Module 10</a>. Strimzi ships a <strong>built-in JMX Prometheus exporter</strong>: you add a <code class="inline">metricsConfig</code> block to the <code class="inline">Kafka</code> CR referencing a ConfigMap of JMX rules, and the broker exposes Prometheus metrics on port 9404. Strimzi also publishes ready-made Grafana dashboards that consume exactly those metrics, including a consumer-lag dashboard. You import a JSON file and you're done.</p>
+<p class="step-p">That is a concrete payoff from choosing an operator over a plain Helm chart, and it's worth noticing: you didn't build the Kafka observability, you inherited it.</p>
+</div>
+<h3 id="m16-do-it">Do it</h3>
+<h4 id="m16-1-install-the-stack">1. Install the stack</h4>
+<pre><code>helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+  --namespace monitoring --create-namespace \
+  --version 78.1.0 \
+  --set grafana.adminPassword='<span class="ph">&lt;pick-one&gt;</span>' \
+  --set prometheus.prometheusSpec.retention=7d \
+  --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.storageClassName=gp3 \
+  --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=20Gi \
+  --set prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues=false \
+  --set prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues=false \
+  --set alertmanager.enabled=false</code></pre>
+<p class="step-p">Three of those flags matter:</p>
+<ul>
+<li><strong><code class="inline">serviceMonitorSelectorNilUsesHelmValues=false</code></strong> (and the PodMonitor twin). By default the chart makes Prometheus scrape only ServiceMonitors carrying its own release label. Every <code class="inline">ServiceMonitor</code> you write yourself, and every one Strimzi generates, would be silently ignored. This is the single most common "I installed Prometheus and it scrapes nothing" cause.</li>
+<li><strong><code class="inline">retention=7d</code> on a 20Gi gp3 PVC.</strong> Seven days is enough to answer "what happened yesterday" and costs $1.60/month. Longer retention on a learning cluster is paying to store data you'll never read.</li>
+<li><strong><code class="inline">alertmanager.enabled=false</code>.</strong> You have nowhere to route alerts and nobody on call. Turning it on later is one flag; running an Alertmanager with no receivers just burns memory.</li>
+</ul>
+<p class="step-p">Once Module 15 is in place, move this into <code class="inline">k8s/platform/kube-prometheus-stack.yaml</code> as an Argo Application in sync-wave 0 and delete the manual Helm release from your notes. Argo will adopt the existing release.</p>
+<h4 id="m16-2-turn-on-strimzis-jmx-exporter">2. Turn on Strimzi's JMX exporter</h4>
+<p class="step-p">Add to the <code class="inline">Kafka</code> CR in <code class="inline">k8s/infra/kafka/kafka.yaml</code>, under <code class="inline">spec.kafka</code>:</p>
+<pre><code>    metricsConfig:
+      type: jmxPrometheusExporter
+      valueFrom:
+        configMapKeyRef:
+          name: kafka-metrics
+          key: kafka-metrics-config.yml</code></pre>
+<p class="step-p">The ConfigMap contents come straight from Strimzi's <code class="inline">examples/metrics/kafka-metrics.yaml</code> in the release you pinned &#8212; don't hand-write JMX rules. Then tell Prometheus to scrape it:</p>
+<pre><code>apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: kafka-resources
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      strimzi.io/kind: Kafka
+  namespaceSelector:
+    matchNames: [kafka]
+  podMetricsEndpoints:
+    - path: /metrics
+      port: tcp-prometheus</code></pre>
+<p class="step-p">Restarting the broker to pick up <code class="inline">metricsConfig</code> is a rolling restart Strimzi handles itself, but it does briefly interrupt Kafka. Do it when nobody is streaming.</p>
+<h4 id="m16-3-reach-grafana">3. Reach Grafana</h4>
+<pre><code>kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+<span class="c"># http://localhost:3000  &#8212; admin / &lt;the password you set&gt;</span></code></pre>
+<p class="step-p">Port-forward is genuinely fine here. Grafana behind the public ALB means a public login page for a dashboard only you use &#8212; the tradeoff is bad. If you do want it on the ALB, put it behind the same path-based rule as ArgoCD and set <code class="inline">grafana.grafana\.ini.server.root_url</code> so the asset paths resolve under the subpath.</p>
+<p class="step-p">Import Strimzi's dashboards: Dashboards &#8594; Import &#8594; Upload JSON, using <code class="inline">examples/metrics/grafana-dashboards/strimzi-kafka.json</code> and <code class="inline">strimzi-kafka-exporter.json</code> from the Strimzi release. The kube-prometheus-stack dashboards (node, pod, workload) are already there.</p>
+<h4 id="m16-4-what-to-actually-watch">4. What to actually watch</h4>
+<p class="step-p">Four panels. Not forty.</p>
+<p class="step-p"><strong>1. Kafka consumer lag on the two KEDA topics.</strong> The one that matters.</p>
+<pre><code>sum by (consumergroup, topic) (
+  kafka_consumergroup_lag{consumergroup=~"transcode-live|transcode-vod"}
+)</code></pre>
+<p class="step-p">Read it with the table above. If you add one alert to this entire cluster, make it "lag &gt; 0 for more than 5 minutes" &#8212; that condition means work is waiting and not being picked up, and it fires for all three failure modes.</p>
+<p class="step-p"><strong>2. Transcode Job success and failure.</strong> From kube-state-metrics, which the stack installs:</p>
+<pre><code>sum(kube_job_status_succeeded{namespace="streaming", job_name=~"transcode-.*"})
+sum(kube_job_status_failed{namespace="streaming", job_name=~"transcode-.*"})</code></pre>
+<p class="step-p">Two things to know when reading this. <code class="inline">failedJobsHistoryLimit: 20</code> versus <code class="inline">successfulJobsHistoryLimit: 5</code> means failures stay visible about four times longer than successes &#8212; the asymmetry is deliberate, but it will skew a naive ratio. And because of the exit-code discipline from Module 14, a pod that found no work exits 0 and shows as <em>succeeded</em>. A rising success count with no streams is not a bug; it's KEDA converging.</p>
+<p class="step-p"><strong>3. Node count from Karpenter.</strong> This is your live spend, in a number:</p>
+<pre><code>count(kube_node_info)
+count by (nodepool) (karpenter_nodes_allocatable{resource="cpu"})</code></pre>
+<p class="step-p">The shape you want is a flat 2 with occasional bumps to 3 or 4 that come back down within a few minutes of a stream ending. A step up that never comes back down means consolidation isn't happening &#8212; usually a pod without a controller, or <code class="inline">karpenter.sh/do-not-disrupt</code> left on something that finished.</p>
+<p class="step-p"><strong>4. RDS connections.</strong> Every handler opens its own <code class="inline">psycopg.connect()</code> with no pool, and a <code class="inline">db.t4g.micro</code> allows roughly 85. Eight transcode Jobs plus readiness probes plus the sweeper gets closer to that than you'd expect. There's no in-cluster exporter for this &#8212; read it from CloudWatch:</p>
+<pre><code>aws cloudwatch get-metric-statistics \
+  --namespace AWS/RDS --metric-name DatabaseConnections \
+  --dimensions Name=DBInstanceIdentifier,Value=streaming \
+  --start-time "$(date -u -v-1H +%Y-%m-%dT%H:%M:%SZ)" \
+  --end-time "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --period 300 --statistics Maximum</code></pre>
+<p class="step-p">If you want it in Grafana, add the CloudWatch datasource &#8212; but check the API call cost first; polling CloudWatch aggressively is a line item people are surprised by.</p>
+<p class="step-p"><strong>Not done here: application-level metrics.</strong> None of the five services expose a <code class="inline">/metrics</code> endpoint. There's real value waiting there &#8212; transcode duration by rendition, admission-control 503 rate, upload sizes, viewer counts from <code class="inline">analytics-worker</code> &#8212; and <code class="inline">prometheus-client</code> plus a <code class="inline">PodMonitor</code> per service is maybe an hour of work. It's a follow-up, not part of this module. What you have now is infrastructure-level: Kubernetes knows a Job failed, but only the app can tell you <em>why</em> ffmpeg exited 1.</p>
+<div class="confirm section">
+<h3 id="m16-verify">Verify</h3>
+<pre><code>kubectl get pods -n monitoring
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090</code></pre>
+<p class="step-p">In Prometheus &#8594; Status &#8594; Targets, you want the Kafka target <code class="inline">UP</code>:</p>
+<pre class="out"><code>podMonitor/monitoring/kafka-resources/0 (1/1 up)
+  http://10.0.2.117:9404/metrics    UP    2.1s ago    14.3ms</code></pre>
+<p class="step-p">Then start a stream and watch panel 1 spike to 1 and return to 0 within about 30 seconds. If the lag panel is empty, the JMX exporter isn't wired; if it's populated but flat at 0 while a stream is running, you're querying the wrong consumer group name.</p>
+</div>
+<div class="gotcha section">
+<h3 id="m16-what-breaks">What breaks</h3>
+<ul>
+<li><strong>Prometheus scrapes nothing you added.</strong> The <code class="inline">serviceMonitorSelectorNilUsesHelmValues=false</code> flag is missing. Check <code class="inline">kubectl get prometheus -n monitoring -o yaml | grep -A5 serviceMonitorSelector</code> &#8212; an empty <code class="inline">{}</code> selector is what you want.</li>
+<li><strong>Prometheus pod Pending.</strong> Its PVC has no StorageClass. <code class="inline">kubectl get pvc -n monitoring</code>; the fix is <a href="part-2-platform.html#m04">Module 4</a>'s default gp3 class.</li>
+<li><strong>Grafana dashboards show "No data" everywhere.</strong> Almost always the datasource UID in an imported JSON doesn't match the one the chart created. Re-import and pick the datasource explicitly in the import dialog.</li>
+<li><strong>Prometheus OOMKilled.</strong> 7 days of retention with default scrape intervals on a t3.medium is tight. Raise <code class="inline">scrapeInterval</code> to 60s before you raise the memory limit &#8212; you don't need 30-second resolution here.</li>
+</ul>
+<h2 id="m16-part-2-cost">Part 2 &#8212; Cost</h2>
+</div>
+<h3 id="m16-the-line-items">The line items</h3>
+<p class="step-p">Monthly, <code class="inline">us-east-1</code>, 730 hours, everything running 24/7.</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>#</th>
+<th>Resource</th>
+<th>Spec</th>
+<th>Monthly</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>1</td>
+<td><strong>EKS control plane</strong></td>
+<td>$0.10/hr</td>
+<td><strong>$73.00</strong></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Control-plane logs &#8594; CloudWatch</td>
+<td>api/audit/authenticator, 7d retention</td>
+<td>$1.50</td>
+</tr>
+<tr>
+<td>3</td>
+<td><strong>Managed node group</strong></td>
+<td>2 &#215; t3.medium on-demand</td>
+<td><strong>$60.74</strong></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Node root EBS</td>
+<td>2 &#215; 40 GiB gp3</td>
+<td>$6.40</td>
+</tr>
+<tr>
+<td>5</td>
+<td><strong>NAT Gateway</strong></td>
+<td>1 &#215; $0.045/hr + ~20 GB processed</td>
+<td><strong>$33.75</strong></td>
+</tr>
+<tr>
+<td>6</td>
+<td><strong>ALB</strong></td>
+<td>$0.0225/hr + ~1 LCU</td>
+<td><strong>$17.43</strong></td>
+</tr>
+<tr>
+<td>7</td>
+<td><strong>NLB</strong></td>
+<td>$0.0225/hr + ~2 NLCU</td>
+<td><strong>$18.43</strong></td>
+</tr>
+<tr>
+<td>8</td>
+<td><strong>RDS instance</strong></td>
+<td>db.t4g.micro, single-AZ</td>
+<td><strong>$11.68</strong></td>
+</tr>
+<tr>
+<td>9</td>
+<td>RDS storage</td>
+<td>20 GiB gp3</td>
+<td>$2.30</td>
+</tr>
+<tr>
+<td>10</td>
+<td>RDS backups</td>
+<td>7 days, &#8804;100% of storage</td>
+<td>$0.00</td>
+</tr>
+<tr>
+<td>11</td>
+<td>Kafka PVC</td>
+<td>20 GiB gp3</td>
+<td>$1.60</td>
+</tr>
+<tr>
+<td>12</td>
+<td>S3 storage</td>
+<td>~100 GB Standard</td>
+<td>$2.30</td>
+</tr>
+<tr>
+<td>13</td>
+<td>S3 requests</td>
+<td>PUT-heavy &#8212; live playlists re-uploaded every 2s per stream</td>
+<td>~$1.50</td>
+</tr>
+<tr>
+<td>14</td>
+<td><strong>CloudFront</strong></td>
+<td>&lt;1 TB out, &lt;10M requests &#8212; perpetual free tier</td>
+<td><strong>$0.00</strong></td>
+</tr>
+<tr>
+<td>15</td>
+<td>S3 &#8594; CloudFront origin transfer</td>
+<td>Free by design (OAC, same region)</td>
+<td>$0.00</td>
+</tr>
+<tr>
+<td>16</td>
+<td>Route 53</td>
+<td>1 hosted zone + queries</td>
+<td>$0.60</td>
+</tr>
+<tr>
+<td>17</td>
+<td>ACM</td>
+<td>DNS-validated public certs</td>
+<td>$0.00</td>
+</tr>
+<tr>
+<td>18</td>
+<td>Secrets Manager</td>
+<td>4 secrets + API calls</td>
+<td>$1.65</td>
+</tr>
+<tr>
+<td>19</td>
+<td>S3 Gateway VPC endpoint</td>
+<td>Gateway type is free</td>
+<td>$0.00</td>
+</tr>
+<tr>
+<td>20</td>
+<td><strong>Karpenter transcode nodes</strong></td>
+<td>~20h live on-demand + ~10h VOD spot</td>
+<td><strong>$4.60</strong></td>
+</tr>
+<tr>
+<td>21</td>
+<td>Karpenter node EBS</td>
+<td>transient, ~120 GiB &#215; ~30h</td>
+<td>$0.40</td>
+</tr>
+<tr>
+<td>22</td>
+<td>CloudWatch metrics</td>
+<td>default only, Container Insights <strong>off</strong></td>
+<td>$0.00</td>
+</tr>
+<tr>
+<td></td>
+<td><strong>Total</strong></td>
+<td></td>
+<td><strong>&#8776; $238/mo</strong></td>
+</tr>
+</tbody></table></div>
+<p class="step-p">Two things to sit with.</p>
+<p class="step-p"><strong>The EKS control plane is $73 &#8212; roughly half the budget &#8212; and it is fixed.</strong> There is no smaller tier, no scaling it down, no turning it off overnight. You pay $73/month for an empty cluster with zero nodes. That single number shapes every other decision in this course: it's why there's one NAT gateway instead of three, why Kafka runs in-cluster instead of on MSK (which has a ~$100/month floor of its own), and why the node group is two t3.mediums rather than something comfortable.</p>
+<p class="step-p"><strong>CloudFront is genuinely $0 here,</strong> and that's not a rounding error. The perpetual free tier covers 1 TB out and 10M requests per month, and a learning project with a handful of viewers is nowhere near it. Serving HLS from CloudFront instead of straight from an S3 origin is free <em>and</em> faster.</p>
+<h3 id="m16-the-levers">The levers</h3>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Lever</th>
+<th>Saving</th>
+<th>Verdict</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><strong>A. Node group on spot capacity</strong></td>
+<td>&#8722;$42.50</td>
+<td><strong>Take it.</strong></td>
+</tr>
+<tr>
+<td><strong>B. NAT instance instead of NAT Gateway</strong></td>
+<td>&#8722;$30</td>
+<td><strong>Defer</strong> until everything works.</td>
+</tr>
+<tr>
+<td><strong>C. Scheduled scale-to-zero overnight</strong></td>
+<td>&#8722;$25</td>
+<td><strong>Take it.</strong></td>
+</tr>
+<tr>
+<td><strong>D. Stop RDS when idle</strong></td>
+<td>&#8722;$8</td>
+<td>Only if you'll remember to restart it.</td>
+</tr>
+<tr>
+<td>E. Collapse ALB + NLB onto ingress-nginx</td>
+<td>&#8722;$17</td>
+<td><strong>Reject.</strong></td>
+</tr>
+<tr>
+<td>F. EKS Auto Mode</td>
+<td>+12%</td>
+<td><strong>Reject.</strong></td>
+</tr>
+</tbody></table></div>
+<h4 id="m16-a-node-group-on-spot-take-it">A. Node group on spot &#8212; take it</h4>
+<p class="step-p"><code class="inline">t3.medium</code> on-demand is $0.0416/hr; spot is around $0.0125. Two nodes, 730 hours: <strong>$60.74 &#8594; $18.25</strong>.</p>
+<pre><code>eksctl create nodegroup --cluster streaming --name system-spot \
+  --instance-types t3.medium,t3a.medium,t2.medium \
+  --spot --nodes 2 --nodes-min 2 --nodes-max 3 \
+  --node-volume-size 40 --node-volume-type gp3
+eksctl delete nodegroup --cluster streaming --name system   <span class="c"># after the new one is Ready</span></code></pre>
+<p class="step-p">Multiple instance types is the important part &#8212; a spot pool for one type in one AZ can be genuinely unavailable, and three types across two AZs essentially never are.</p>
+<p class="step-p">What's actually at risk: a spot reclaim gives 2 minutes' notice, the pod gets drained, and it comes back on another node. CoreDNS, the AWS Load Balancer Controller, Karpenter, ArgoCD and the web tier all tolerate that fine. The one to think about is the <strong>Kafka broker</strong> &#8212; its PVC is single-AZ, so the replacement pod must land in the same AZ as its EBS volume, and if there's no spot capacity in that AZ at that moment the broker sits Pending. That means a few minutes with no event bus. On a learning cluster that's an acceptable, instructive outage. In production you'd keep the broker on on-demand.</p>
+<p class="step-p">Note that this does <strong>not</strong> touch the transcode NodePools. Module 6 already put live transcode on on-demand deliberately &#8212; a spot reclaim mid-stream is an unrecoverable blackout for viewers &#8212; and VOD on spot. That split stays.</p>
+<h4 id="m16-c-scheduled-scale-to-zero-overnight-take-it-and-heres-how">C. Scheduled scale-to-zero overnight &#8212; take it, and here's how</h4>
+<p class="step-p">The single highest-leverage habit in this whole course. Twelve hours a day at 0 nodes saves half your EC2 bill: on top of lever A, roughly <strong>&#8722;$25/month</strong>.</p>
+<p class="step-p">The manual version, which you should do the first few times so you can see what happens:</p>
+<pre><code><span class="c"># End of the day</span>
+eksctl scale nodegroup --cluster streaming --name system-spot --nodes 0 --nodes-min 0
+
+<span class="c"># Next morning</span>
+eksctl scale nodegroup --cluster streaming --name system-spot --nodes 2 --nodes-min 2</code></pre>
+<p class="step-p">Automate it with EventBridge Scheduler calling the EKS API directly &#8212; no Lambda needed, since Scheduler's universal targets can invoke any AWS API:</p>
+<pre><code>ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+
+<span class="c"># A role Scheduler can assume, allowed to resize exactly this node group.</span>
+cat &gt; /tmp/trust.json &lt;&lt;'JSON'
+{"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+  "Principal":{"Service":"scheduler.amazonaws.com"},"Action":"sts:AssumeRole"}]}
+JSON
+aws iam create-role --role-name streaming-nodegroup-scheduler \
+  --assume-role-policy-document file:///tmp/trust.json
+
+cat &gt; /tmp/policy.json &lt;&lt;JSON
+{"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+  "Action":["eks:UpdateNodegroupConfig","eks:DescribeNodegroup"],
+  "Resource":"arn:aws:eks:us-east-1:${ACCOUNT}:nodegroup/streaming/system-spot/*"}]}
+JSON
+aws iam put-role-policy --role-name streaming-nodegroup-scheduler \
+  --policy-name resize --policy-document file:///tmp/policy.json
+
+ROLE_ARN="arn:aws:iam::${ACCOUNT}:role/streaming-nodegroup-scheduler"
+
+<span class="c"># Down at 20:00 local, up at 08:00 local, weekdays only.</span>
+aws scheduler create-schedule --name streaming-nodes-down \
+  --schedule-expression 'cron(0 20 ? * MON-FRI *)' \
+  --schedule-expression-timezone 'America/Toronto' \
+  --flexible-time-window '{"Mode":"OFF"}' \
+  --target "{\"Arn\":\"arn:aws:scheduler:::aws-sdk:eks:updateNodegroupConfig\",
+             \"RoleArn\":\"${ROLE_ARN}\",
+             \"Input\":\"{\\\"ClusterName\\\":\\\"streaming\\\",\\\"NodegroupName\\\":\\\"system-spot\\\",\\\"ScalingConfig\\\":{\\\"MinSize\\\":0,\\\"DesiredSize\\\":0,\\\"MaxSize\\\":3}}\"}"
+
+aws scheduler create-schedule --name streaming-nodes-up \
+  --schedule-expression 'cron(0 8 ? * MON-FRI *)' \
+  --schedule-expression-timezone 'America/Toronto' \
+  --flexible-time-window '{"Mode":"OFF"}' \
+  --target "{\"Arn\":\"arn:aws:scheduler:::aws-sdk:eks:updateNodegroupConfig\",
+             \"RoleArn\":\"${ROLE_ARN}\",
+             \"Input\":\"{\\\"ClusterName\\\":\\\"streaming\\\",\\\"NodegroupName\\\":\\\"system-spot\\\",\\\"ScalingConfig\\\":{\\\"MinSize\\\":2,\\\"DesiredSize\\\":2,\\\"MaxSize\\\":3}}\"}"</code></pre>
+<p class="step-p">Know what you're signing up for:</p>
+<ul>
+<li><strong>The control plane, RDS, the load balancers and every EBS volume keep billing.</strong> This saves EC2 hours, nothing else. It's about a third of the total bill, not all of it.</li>
+<li><strong>At 0 nodes, Karpenter is also down</strong>, because Karpenter runs on those nodes. Nothing can provision transcode capacity overnight. That's the intent.</li>
+<li><strong>Morning bring-up takes 5&#8211;10 minutes</strong> for nodes to join, Kafka's broker to reattach its PVC and reach Ready, and Argo to reconcile. Don't schedule the wake-up for the moment you start work; schedule it an hour earlier.</li>
+<li><strong>The Kafka broker's PVC pins it to one AZ.</strong> If the node group brings both nodes up in the other AZ, the broker stays Pending. Keeping <code class="inline">--nodes 2</code> across two AZs makes this a non-issue, but it's the thing to check first if Kafka doesn't come back.</li>
+</ul>
+<h4 id="m16-b-nat-instance-instead-of-nat-gateway-defer">B. NAT instance instead of NAT Gateway &#8212; defer</h4>
+<p class="step-p">A <code class="inline">t4g.nano</code> running the fck-nat AMI does the same job for about $3/month versus $33.75. It's a real saving and a genuinely good thing to learn.</p>
+<p class="step-p"><strong>Do it after everything else works, not before.</strong> The reason isn't technical difficulty, it's diagnostic cost. A NAT instance is a single EC2 instance doing packet forwarding, with a source/dest check you have to disable, a route table entry you have to point at an ENI, and no redundancy. When something in the cluster can't reach the internet &#8212; an image pull, an AWS API call, a Helm repo &#8212; you now have an extra suspect, and "is it my NAT instance?" is a question you'll ask on every network problem for the rest of the project. Managed NAT costs $30/month to never have to ask it.</p>
+<p class="step-p">Swap it in when the platform is boring. Then, if something breaks, you have exactly one recent change to blame.</p>
+<h4 id="m16-d-stop-rds-when-idle-conditional">D. Stop RDS when idle &#8212; conditional</h4>
+<p class="step-p"><code class="inline">aws rds stop-db-instance</code> pauses instance-hour billing (storage bills either way), saving about $8/month.</p>
+<p class="step-p">The catch that makes this a conditional recommendation: <strong>RDS auto-restarts a stopped instance after 7 days.</strong> So it's not "stop it and forget it" &#8212; it's a habit you have to keep, and if you forget, you get a partial saving and an instance you thought was off. Take it only if you're already in the habit of scale-to-zero. If lever C is automated and this isn't, this one will rot.</p>
+<h4 id="m16-e-collapse-the-alb-and-nlb-onto-ingress-nginx-reject">E. Collapse the ALB and NLB onto ingress-nginx &#8212; reject</h4>
+<p class="step-p">Superficially attractive: run ingress-nginx behind one NLB, use its <code class="inline">tcp-services</code> ConfigMap to also proxy RTMP on 1935, and delete the ALB. Saves $17/month.</p>
+<p class="step-p">Reject it for one decisive reason: <strong>ingress-nginx is retired upstream.</strong> The maintainers announced its retirement in favour of Gateway API, so you'd be adopting a component with no future, on a project whose explicit goal is learning things that transfer.</p>
+<p class="step-p">The secondary reasons are real too. You'd trade AWS-native, controller-managed load balancing for a pod you now operate, on a cluster where scale-to-zero means that pod is regularly gone. You'd lose the per-listener tuning from <a href="part-4-application.html#m12">Module 12</a> &#8212; the NLB's idle timeout and deregistration delay were configured specifically because RTMP connections are long-lived, and generic <code class="inline">tcp-services</code> proxying gives you neither knob. And $17/month is not worth operating your own L7 proxy.</p>
+<h4 id="m16-f-eks-auto-mode-reject">F. EKS Auto Mode &#8212; reject</h4>
+<p class="step-p">Auto Mode has AWS manage compute, storage and load balancing for you, adding roughly 12% on top of EC2 costs.</p>
+<p class="step-p">Reject it on both counts. <strong>It costs more, not less</strong> &#8212; the lever is supposed to save money and this one adds to the bill. And <strong>it removes exactly what you came here to learn.</strong> Karpenter's NodePools, the EBS CSI driver and StorageClass, the AWS Load Balancer Controller and its annotations &#8212; Auto Mode hides all of it behind a managed abstraction. Modules 4, 6 and 12 would collapse into a checkbox. That's a reasonable trade for a team shipping a product and a bad one for a course whose entire point is understanding how the pieces fit.</p>
+<h3 id="m16-where-you-land">Where you land</h3>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Configuration</th>
+<th>Monthly</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>As designed</td>
+<td>~$238</td>
+</tr>
+<tr>
+<td>+ A (spot node group)</td>
+<td>~$195</td>
+</tr>
+<tr>
+<td>+ A + C (spot and overnight scale-to-zero)</td>
+<td>~$170</td>
+</tr>
+<tr>
+<td>+ A + B + C (and a NAT instance)</td>
+<td>~$140</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">In budget, with the parts worth keeping intact.</p>
+<div class="confirm section">
+<h3 id="m16-verify-your-spend">Verify your spend</h3>
+<p class="step-p">Set the budget alarm in <a href="part-1-foundations.html#m01">Module 1</a> if you somehow haven't. Then check the shape of the bill weekly:</p>
+<pre><code>aws ce get-cost-and-usage \
+  --time-period Start="$(date -u -v-7d +%Y-%m-%d)",End="$(date -u +%Y-%m-%d)" \
+  --granularity DAILY --metrics UnblendedCost \
+  --group-by Type=DIMENSION,Key=SERVICE \
+  --query 'ResultsByTime[-1].Groups[?Metrics.UnblendedCost.Amount&gt;`0.1`].[Keys[0],Metrics.UnblendedCost.Amount]' \
+  --output table</code></pre>
+<p class="step-p">A daily total in the $6&#8211;8 range is on track for the as-designed number. A day that jumps to $20 is almost always EC2, and almost always a transcode node that never consolidated or a Job loop from a mismatched consumer group.</p>
+<h2 id="m16-part-3-teardown">Part 3 &#8212; Teardown</h2>
+<p class="step-p">This is the part that matters most, and the part people get wrong in one specific way.</p>
+</div>
+<h3 id="m16-why-the-order-matters">Why the order matters</h3>
+<p class="step-p"><strong>Delete the Kubernetes objects that own AWS resources first.</strong></p>
+<p class="step-p">The ALB and the NLB were not created by eksctl or CloudFormation. They were created by the AWS Load Balancer Controller, in response to an Ingress and a Service of type LoadBalancer. eksctl has no idea they exist. Delete the cluster first and those load balancers survive it &#8212; running, billing <strong>$16&#8211;18/month each</strong>, with no Kubernetes object left anywhere that points at them. They'll sit in your account until you happen to look at the EC2 console's load balancer page.</p>
+<p class="step-p">That's the number one forgotten cost in EKS teardown, and it's a direct consequence of a good design: controllers create real infrastructure from Kubernetes objects, so the Kubernetes objects have to go first, while the controllers are still running to clean up after them.</p>
+<p class="step-p">Same logic for Karpenter's NodePools (Karpenter terminates the instances it launched) and for PVCs (the EBS CSI driver deletes the volumes).</p>
+<h3 id="m16-do-it-2">Do it</h3>
+<h4 id="m16-step-1-kubernetes-objects-that-own-aws-resources">Step 1 &#8212; Kubernetes objects that own AWS resources</h4>
+<pre><code><span class="c"># Stop Argo re-creating everything you are about to delete.</span>
+kubectl patch app root -n argocd --type merge \
+  -p '{"metadata":{"finalizers":null}}'
+kubectl delete app --all -n argocd --cascade=orphan
+
+<span class="c"># The ALB and the NLB.</span>
+kubectl delete ingress --all --all-namespaces
+kubectl delete svc --all-namespaces --field-selector spec.type=LoadBalancer
+
+<span class="c"># Karpenter drains and terminates every node it launched.</span>
+kubectl delete nodepool --all
+kubectl delete ec2nodeclass --all
+
+<span class="c"># Releases the Kafka and Prometheus EBS volumes.</span>
+kubectl delete pvc --all --all-namespaces
+
+sleep 180   <span class="c"># let the controllers finish; watch the logs if you are impatient</span></code></pre>
+<p class="step-p">Confirm before moving on &#8212; this is the checkpoint that saves you money:</p>
+<pre><code>aws elbv2 describe-load-balancers --query 'LoadBalancers[].LoadBalancerName' --output text
+aws ec2 describe-instances \
+  --filters "Name=tag:karpenter.sh/nodepool,Values=*" "Name=instance-state-name,Values=running" \
+  --query 'Reservations[].Instances[].InstanceId' --output text</code></pre>
+<p class="step-p">Both must come back empty. If a load balancer is still listed, the controller was already gone when you deleted the Ingress &#8212; delete it by hand with <code class="inline">aws elbv2 delete-load-balancer --load-balancer-arn &lt;arn&gt;</code>.</p>
+<h4 id="m16-step-2-the-cluster">Step 2 &#8212; The cluster</h4>
+<pre><code>eksctl delete cluster -f infra/eks/cluster.yaml --disable-nodegroup-eviction</code></pre>
+<p class="step-p">This takes 15&#8211;20 minutes and also removes the managed node group, the VPC, the NAT gateway, the subnets and the route tables.</p>
+<h4 id="m16-step-3-karpenters-cloudformation-stack">Step 3 &#8212; Karpenter's CloudFormation stack</h4>
+<p class="step-p">Separate from the cluster, because it was created separately: the node IAM role, the instance profile, the interruption SQS queue and the EventBridge rules.</p>
+<pre><code>aws cloudformation delete-stack --stack-name Karpenter-streaming
+aws cloudformation wait stack-delete-complete --stack-name Karpenter-streaming</code></pre>
+<h4 id="m16-step-4-rds">Step 4 &#8212; RDS</h4>
+<p class="step-p">Deletion protection has to come off first, and it is a separate call:</p>
+<pre><code>aws rds modify-db-instance --db-instance-identifier streaming \
+  --no-deletion-protection --apply-immediately
+
+aws rds delete-db-instance --db-instance-identifier streaming \
+  --skip-final-snapshot --delete-automated-backups</code></pre>
+<p class="step-p">Both flags on the delete matter. Without <code class="inline">--skip-final-snapshot</code> RDS takes one by default and it bills at $0.095/GiB-month forever. Without <code class="inline">--delete-automated-backups</code> the retained backups survive the instance and bill too. If you actually want the data, take a snapshot deliberately and know you're paying for it.</p>
+<h4 id="m16-step-5-cloudfront">Step 5 &#8212; CloudFront</h4>
+<p class="step-p">CloudFront cannot be deleted while enabled, and disabling it is not instant.</p>
+<pre><code>DIST_ID=E1XXXXXXXXXXXX
+aws cloudfront get-distribution-config --id "$DIST_ID" &gt; /tmp/dist.json
+ETAG=$(jq -r '.ETag' /tmp/dist.json)
+jq '.DistributionConfig | .Enabled = false' /tmp/dist.json &gt; /tmp/disabled.json
+
+aws cloudfront update-distribution --id "$DIST_ID" \
+  --if-match "$ETAG" --distribution-config file:///tmp/disabled.json
+
+<span class="c"># Poll until Status is Deployed. This takes about 15 minutes. Make tea.</span>
+aws cloudfront get-distribution --id "$DIST_ID" --query 'Distribution.Status' --output text
+
+NEW_ETAG=$(aws cloudfront get-distribution-config --id "$DIST_ID" --query ETag --output text)
+aws cloudfront delete-distribution --id "$DIST_ID" --if-match "$NEW_ETAG"</code></pre>
+<p class="step-p">A disabled distribution costs nothing, so if you get interrupted after the disable, you're not bleeding money &#8212; just leaving clutter.</p>
+<h4 id="m16-step-6-s3">Step 6 &#8212; S3</h4>
+<p class="step-p">A bucket must be empty to delete, and "empty" means more than the object list shows.</p>
+<pre><code>BUCKET=linkify-streaming-media-<span class="ph">&lt;accountid&gt;</span>
+
+<span class="c"># Current objects.</span>
+aws s3 rm "s3://$BUCKET" --recursive
+
+<span class="c"># Object VERSIONS and delete markers. `aws s3 rm` does not touch these, and if</span>
+<span class="c"># versioning was ever enabled they are invisible in the console's object list</span>
+<span class="c"># while still billing.</span>
+aws s3api list-object-versions --bucket "$BUCKET" \
+  --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' &gt; /tmp/versions.json
+[ "$(jq '.Objects | length' /tmp/versions.json)" -gt 0 ] &amp;&amp; \
+  aws s3api delete-objects --bucket "$BUCKET" --delete file:///tmp/versions.json
+
+aws s3api list-object-versions --bucket "$BUCKET" \
+  --query '{Objects: DeleteMarkers[].{Key:Key,VersionId:VersionId}}' &gt; /tmp/markers.json
+[ "$(jq '.Objects | length' /tmp/markers.json)" -gt 0 ] &amp;&amp; \
+  aws s3api delete-objects --bucket "$BUCKET" --delete file:///tmp/markers.json
+
+<span class="c"># Incomplete multipart uploads. Invisible in the console's object list, and</span>
+<span class="c"># very much billable. The 2 GiB upload path creates these whenever a browser</span>
+<span class="c"># upload is abandoned partway.</span>
+aws s3api list-multipart-uploads --bucket "$BUCKET" \
+  --query 'Uploads[].[Key,UploadId]' --output text | while read -r key uid; do
+    aws s3api abort-multipart-upload --bucket "$BUCKET" --key "$key" --upload-id "$uid"
+  done
+
+aws s3api delete-bucket --bucket "$BUCKET"</code></pre>
+<p class="step-p">If <code class="inline">delete-bucket</code> returns <code class="inline">BucketNotEmpty</code> after all that, re-run the versions block &#8212; deleting objects in a versioned bucket creates <em>new</em> delete markers, so it can take two passes.</p>
+<h4 id="m16-step-7-secrets-manager">Step 7 &#8212; Secrets Manager</h4>
+<p class="step-p">Deleted secrets sit in a recovery window, and <strong>they keep billing during it</strong> &#8212; 7 days by default, at $0.40 each.</p>
+<pre><code>for s in streaming/ghcr streaming/mediamtx streaming/db-endpoint; do
+  aws secretsmanager delete-secret --secret-id "$s" --force-delete-without-recovery
+done</code></pre>
+<p class="step-p">That is the complete list of secrets <em>you</em> created &#8212; <a href="part-2-platform.html#m07">Module 7</a> made the first two, <a href="part-3-data-layer.html#m08">Module 8</a> the third. There is no <code class="inline">streaming/app-config</code>: the non-secret configuration lives in <code class="inline">k8s/infra/secrets/configmap-app.yaml</code>, in git, and disappears with the cluster. Confirm nothing is left behind:</p>
+<pre><code>aws secretsmanager list-secrets \
+  --query 'SecretList[?starts_with(Name, `streaming/`)].Name' --output text</code></pre>
+<p class="step-p">The RDS-managed <code class="inline">rds!db-&#8230;</code> secret is not in that list and must not be deleted by hand &#8212; it belongs to the instance and goes away with it in step 4. Deleting it first leaves the instance holding a dangling <code class="inline">MasterUserSecret</code> reference.</p>
+<p class="step-p"><code class="inline">--force-delete-without-recovery</code> is irreversible and that is the point. It is also incompatible with <code class="inline">--recovery-window-in-days</code>; pass one or the other.</p>
+<h4 id="m16-step-8-route-53">Step 8 &#8212; Route 53</h4>
+<p class="step-p">A hosted zone can't be deleted while it holds records other than its own NS and SOA.</p>
+<pre><code>ZONE_ID=ZXXXXXXXXXXXXX
+
+<span class="c"># Show what's left. Anything that isn't NS or SOA at the apex has to go.</span>
+aws route53 list-resource-record-sets --hosted-zone-id "$ZONE_ID" \
+  --query 'ResourceRecordSets[?Type!=`NS` &amp;&amp; Type!=`SOA`].[Name,Type]' --output table
+
+<span class="c"># ExternalDNS should have removed its own records when you deleted the</span>
+<span class="c"># Ingress/Services in step 1. Delete anything remaining by hand, then:</span>
+aws route53 delete-hosted-zone --id "$ZONE_ID"</code></pre>
+<p class="step-p">Also remove the <code class="inline">k8s</code> NS delegation record from the parent <code class="inline">linkifysolutions.com</code> zone at your registrar. Leaving a delegation pointing at a zone that no longer exists means anyone querying <code class="inline">k8s.linkifysolutions.com</code> gets a lame delegation &#8212; harmless, but untidy, and it's the kind of thing that confuses someone a year from now.</p>
+<h4 id="m16-step-9-the-sweep-for-things-nothing-owns">Step 9 &#8212; The sweep for things nothing owns</h4>
+<pre><code><span class="c"># Orphaned load balancers &#8212; check again, seriously.</span>
+aws elbv2 describe-load-balancers --query 'LoadBalancers[].[LoadBalancerName,Type]' --output table
+
+<span class="c"># Unassociated Elastic IPs. Since Feb 2024, IDLE public IPv4 addresses bill</span>
+<span class="c"># $3.65/mo each. The NAT gateway's EIP is free while attached and starts</span>
+<span class="c"># billing the moment the NAT is deleted without releasing it.</span>
+aws ec2 describe-addresses \
+  --query 'Addresses[?AssociationId==null].[PublicIp,AllocationId]' --output table
+<span class="c"># aws ec2 release-address --allocation-id <span class="ph">&lt;id&gt;</span></span>
+
+<span class="c"># Available (detached) EBS volumes &#8212; the Kafka PVC if its StorageClass or</span>
+<span class="c"># `deleteClaim: false` retained it.</span>
+aws ec2 describe-volumes --filters Name=status,Values=available \
+  --query 'Volumes[].[VolumeId,Size,CreateTime]' --output table
+<span class="c"># aws ec2 delete-volume --volume-id <span class="ph">&lt;id&gt;</span></span>
+
+<span class="c"># Snapshots survive everything that created them.</span>
+aws ec2 describe-snapshots --owner-ids self \
+  --query 'Snapshots[].[SnapshotId,VolumeSize,StartTime]' --output table
+aws rds describe-db-snapshots --snapshot-type manual \
+  --query 'DBSnapshots[].[DBSnapshotIdentifier,AllocatedStorage]' --output table
+
+<span class="c"># CloudWatch log groups outlive the cluster, forever, at whatever retention</span>
+<span class="c"># they had. /aws/eks/streaming/cluster is the big one.</span>
+aws logs describe-log-groups --query 'logGroups[].[logGroupName,storedBytes]' --output table
+<span class="c"># aws logs delete-log-group --log-group-name /aws/eks/streaming/cluster</span>
+
+<span class="c"># ECR/Karpenter leftovers: the interruption queue and its EventBridge rules.</span>
+aws sqs list-queues --queue-name-prefix Karpenter</code></pre>
+<div class="confirm section">
+<h3 id="m16-verify-the-bill-actually-went-to-zero">Verify the bill actually went to zero</h3>
+<p class="step-p">The only source of truth is Cost Explorer, and it lags about 24 hours. So: tear down, wait a day, then look.</p>
+<pre><code>aws ce get-cost-and-usage \
+  --time-period Start="$(date -u -v-2d +%Y-%m-%d)",End="$(date -u +%Y-%m-%d)" \
+  --granularity DAILY --metrics UnblendedCost \
+  --group-by Type=DIMENSION,Key=SERVICE \
+  --output table</code></pre>
+<p class="step-p">What you want to see is the previous day at a few cents, and the services list containing only Route 53 (if you kept the zone) and possibly S3.</p>
+<p class="step-p"><strong>What legitimately still costs a little,</strong> so you don't chase zeros that aren't there:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Thing</th>
+<th>Cost</th>
+<th>Why it's fine</th>
+</tr></thead>
+<tbody>
+<tr>
+<td>Route 53 hosted zone</td>
+<td>$0.50/mo</td>
+<td>Only if you deliberately kept the zone to avoid re-delegating later. Reasonable choice.</td>
+</tr>
+<tr>
+<td>S3 buckets you kept</td>
+<td>~$0.023/GB-mo</td>
+<td>Anything you saved on purpose.</td>
+</tr>
+<tr>
+<td>CloudWatch log group storage</td>
+<td>$0.03/GB-mo</td>
+<td>Until you delete the log groups. A few hundred MB is cents.</td>
+</tr>
+<tr>
+<td>Deleted Secrets Manager secrets</td>
+<td>$0.40/secret</td>
+<td>Only if you used a recovery window instead of <code class="inline">--force-delete-without-recovery</code>. Ends when the window does.</td>
+</tr>
+<tr>
+<td>The current month's already-accrued charges</td>
+<td>varies</td>
+<td>Deleting a resource doesn't refund the hours you already used. Two more days of billing after teardown is normal.</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">Anything else showing up 48 hours after teardown is something you missed. Go back to the step 9 sweep &#8212; in practice it is a load balancer, an unassociated Elastic IP, or an EBS volume, in that order of likelihood.</p>
+</div>
+<h3 id="m16-thats-the-course">That's the course</h3>
+<p class="step-p">You've built a streaming platform on EKS that ingests RTMP through an NLB, transcodes on nodes that don't exist until they're needed, serves HLS from CloudFront, keeps no credentials in git, deploys itself from a git commit, and can be deleted completely in nine steps.</p>
+<p class="step-p">The thing worth carrying forward isn't any particular command. It's the shape of the reasoning: every piece of this cost something, and for each one there's a defensible answer to "why this and not the cheaper thing" &#8212; one NAT gateway, Kafka in-cluster, on-demand for live and spot for VOD, Kustomize over Helm, an ALB <em>and</em> an NLB. Being able to give those answers is the actual deliverable.</p>
+<p class="step-p">Back to the <a href="index.html">course index</a>.</p>
+</section>
+
+<footer class="finish">
+  <span class="eyebrow">End of Part V</span>
+  <p>Transcoding scales to zero, deploys are pull-based, and you know both what the system is doing and how to make the bill stop.</p>
+</footer>
+<div class="pager"><a href="part-4-application.html">&larr; Part IV &mdash; The application</a><a href="index.html">Course index &rarr;</a></div>
+</main>
+</div>

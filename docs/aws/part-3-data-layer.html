@@ -1,0 +1,1527 @@
+<title>AWS/EKS &mdash; Part III: Data layer</title>
+<style>
+  :root {
+    --paper: #eef1f4;
+    --surface: #ffffff;
+    --surface-dim: #e4e8ec;
+    --ink: #1b232c;
+    --ink-dim: #57626d;
+    --line: #ccd3d9;
+    --amber: #a35f22;
+    --amber-ink: #7c4718;
+    --teal: #2d5f74;
+    --teal-bg: #dfe9ec;
+    --ok: #2f6b3e;
+    --ok-bg: #dfeee2;
+    --warn: #9a3d3d;
+    --warn-bg: #f2e0e0;
+    --code-bg: #1b232c;
+    --code-ink: #e7ebee;
+    --code-dim: #93a1ac;
+    --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+      --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+      --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+      --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+      --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+    --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+    --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+    --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+    --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1f4; --surface: #ffffff; --surface-dim: #e4e8ec;
+    --ink: #1b232c; --ink-dim: #57626d; --line: #ccd3d9;
+    --amber: #a35f22; --amber-ink: #7c4718; --teal: #2d5f74; --teal-bg: #dfe9ec;
+    --ok: #2f6b3e; --ok-bg: #dfeee2; --warn: #9a3d3d; --warn-bg: #f2e0e0;
+    --code-bg: #1b232c; --code-ink: #e7ebee; --code-dim: #93a1ac; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6; font-size: 16px;
+  }
+  ::selection { background: var(--amber); color: #fff; }
+  a { color: var(--amber-ink); }
+  code, pre, kbd {
+    font-family: "Cascadia Code", "Cascadia Mono", ui-monospace, "SF Mono", Consolas,
+      "Liberation Mono", monospace;
+  }
+
+  .topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .topbar-inner { max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 1.75rem; }
+  .eyebrow {
+    display: inline-block; font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--amber-ink); background: color-mix(in srgb, var(--amber) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    padding: 0.2rem 0.55rem; border-radius: 3px;
+  }
+  h1 {
+    margin: 0.65rem 0 0.35rem; font-size: 1.95rem; font-weight: 700;
+    letter-spacing: -0.015em; text-wrap: balance;
+  }
+  .subtitle {
+    margin: 0 0 1rem; color: var(--ink-dim); font-size: 1.02rem;
+    max-width: 64ch; text-wrap: pretty;
+  }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 0.5rem 1.25rem;
+    font-size: 0.85rem; color: var(--ink-dim);
+  }
+  .meta-row strong { color: var(--ink); font-weight: 600; }
+
+  .layout {
+    max-width: 940px; margin: 0 auto; padding: 2rem 1.5rem 5rem;
+    display: grid; grid-template-columns: 210px minmax(0, 1fr);
+    gap: 2.5rem; align-items: start;
+  }
+  @media (max-width: 820px) {
+    .layout { grid-template-columns: 1fr; }
+    .rail { display: none; }
+  }
+
+  .rail {
+    position: sticky; top: 1.5rem; display: flex; flex-direction: column;
+    gap: 0.1rem; max-height: calc(100vh - 3rem); overflow-y: auto;
+    padding-right: 0.4rem;
+  }
+  .rail-label {
+    font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-dim); margin-bottom: 0.45rem;
+  }
+  .rail-label + .rail-label, .rail a + .rail-label { margin-top: 1.1rem; }
+  .rail a {
+    display: flex; gap: 0.5rem; align-items: baseline;
+    padding: 0.3rem 0 0.3rem 0.7rem; font-size: 0.85rem;
+    color: var(--ink-dim); text-decoration: none;
+    border-left: 2px solid var(--line); margin-left: -1px;
+  }
+  .rail a:hover { color: var(--ink); border-left-color: var(--amber); }
+  .rail a .n {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber-ink); font-size: 0.78rem; flex-shrink: 0;
+  }
+
+  main { min-width: 0; }
+
+  .intro { color: var(--ink-dim); max-width: 68ch; margin: 0 0 2rem; }
+  .intro strong { color: var(--ink); }
+  .intro p { margin: 0 0 0.9rem; text-wrap: pretty; }
+
+  .step {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.5rem 1.6rem 1.7rem;
+    margin-bottom: 1.5rem; box-shadow: var(--shadow); scroll-margin-top: 1.5rem;
+  }
+  .step-head {
+    display: flex; align-items: baseline; gap: 0.85rem;
+    margin-bottom: 0.9rem; flex-wrap: wrap;
+  }
+  .step-num {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber); font-size: 1.05rem; font-weight: 600;
+  }
+  .step h2 { margin: 0; font-size: 1.2rem; font-weight: 650; letter-spacing: -0.008em; }
+  .step h3 {
+    margin: 1.6rem 0 0.6rem; font-size: 0.99rem; font-weight: 650;
+    letter-spacing: -0.005em;
+  }
+  .step h3:first-child { margin-top: 0; }
+  .step h4 {
+    margin: 1.1rem 0 0.4rem; font-size: 0.9rem; font-weight: 650;
+    color: var(--ink-dim); letter-spacing: 0.01em;
+  }
+  .context-chip {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--teal); background: var(--teal-bg);
+    border-radius: 999px; padding: 0.18rem 0.65rem; white-space: nowrap;
+  }
+
+  .why, .confirm, .gotcha {
+    display: flex; gap: 0.7rem; border-radius: 0 6px 6px 0;
+    padding: 0.8rem 0.95rem; margin: 0 0 1rem;
+    font-size: 0.92rem; text-wrap: pretty;
+  }
+  .why { background: var(--teal-bg); border-left: 3px solid var(--teal); }
+  .why b { color: var(--teal); font-weight: 700; }
+  .confirm { background: var(--ok-bg); border-left: 3px solid var(--ok); }
+  .confirm b { color: var(--ok); font-weight: 700; }
+  .gotcha { background: var(--warn-bg); border-left: 3px solid var(--warn); }
+  .gotcha b { color: var(--warn); font-weight: 700; }
+
+  p.step-p { margin: 0 0 1rem; text-wrap: pretty; }
+  p.step-p:last-child { margin-bottom: 0; }
+  .step ul, .step ol { margin: 0 0 1rem; padding-left: 1.35rem; }
+  .step li { margin-bottom: 0.45rem; text-wrap: pretty; }
+  .step li:last-child { margin-bottom: 0; }
+  .step ul ul, .step ol ol, .step ul ol { margin: 0.4rem 0 0; }
+
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+    padding: 0.85rem 1rem; margin: 0 0 1rem; overflow-x: auto;
+    font-size: 0.85rem; line-height: 1.6;
+  }
+  pre code { color: inherit; }
+  pre .c { color: var(--code-dim); }
+  pre .ph { color: var(--code-key); }
+  pre.out {
+    background: var(--surface-dim); color: var(--ink); border: 1px solid var(--line);
+  }
+  pre.out .c { color: var(--ink-dim); }
+  code.inline {
+    background: var(--surface-dim); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.87em; word-break: break-word;
+  }
+
+  .tbl-wrap { overflow-x: auto; margin: 0 0 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 460px; }
+  th, td {
+    text-align: left; padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid var(--line); vertical-align: top;
+  }
+  th {
+    font-size: 0.73rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--ink-dim); font-weight: 600;
+  }
+  td code { font-size: 0.85em; }
+  tbody tr:last-child td { border-bottom: none; }
+
+  .diagram {
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.1rem; margin: 0 0 1.2rem;
+  }
+  .dlayer {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 0.75rem 0.85rem; margin-bottom: 0.55rem;
+  }
+  .dlayer:last-child { margin-bottom: 0; }
+  .dlayer-title {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--amber-ink); margin-bottom: 0.5rem;
+  }
+  .dboxes { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+  .dbox {
+    border: 1px solid var(--line); border-radius: 5px;
+    padding: 0.35rem 0.6rem; font-size: 0.8rem; background: var(--paper);
+  }
+  .dbox b { display: block; font-weight: 650; font-size: 0.82rem; }
+  .dbox span {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; color: var(--ink-dim);
+  }
+  .dbox.accent {
+    border-color: var(--amber);
+    background: color-mix(in srgb, var(--amber) 8%, var(--paper));
+  }
+  .dbox.teal { border-color: var(--teal); background: var(--teal-bg); }
+  .darrow {
+    text-align: center; color: var(--ink-dim); font-size: 0.88rem;
+    margin: 0.15rem 0; font-family: "Cascadia Code", ui-monospace, monospace;
+  }
+
+  /* numbered end-to-end trace */
+  .trace { margin: 0 0 1.2rem; counter-reset: tr; }
+  .trace-item {
+    display: grid; grid-template-columns: 1.7rem minmax(0, 1fr);
+    gap: 0.85rem; padding-bottom: 1rem; position: relative;
+  }
+  .trace-item::before {
+    counter-increment: tr; content: counter(tr);
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.75rem; font-weight: 600; color: var(--amber-ink);
+    background: var(--surface-dim); border: 1px solid var(--line);
+    border-radius: 50%; width: 1.7rem; height: 1.7rem;
+    display: grid; place-items: center;
+  }
+  .trace-item:not(:last-child)::after {
+    content: ""; position: absolute; left: 0.85rem; top: 1.85rem; bottom: 0.1rem;
+    width: 1px; background: var(--line);
+  }
+  .trace-item > div { padding-top: 0.1rem; font-size: 0.92rem; }
+  .trace-item b { font-weight: 650; }
+  .trace-item .who {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.74rem; color: var(--teal); display: block; margin-bottom: 0.1rem;
+  }
+
+  .glossary { font-size: 0.9rem; }
+  .glossary dt {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-weight: 600; color: var(--amber-ink); margin-top: 0.8rem; font-size: 0.85rem;
+  }
+  .glossary dt:first-child { margin-top: 0; }
+  .glossary dd { margin: 0.15rem 0 0; color: var(--ink); text-wrap: pretty; }
+
+  footer.finish {
+    background: var(--surface); border: 1px solid var(--line);
+    border-left: 3px solid var(--amber); border-radius: 0 10px 10px 0;
+    padding: 1.3rem 1.5rem; box-shadow: var(--shadow); font-size: 0.97rem;
+  }
+  footer.finish .eyebrow { margin-bottom: 0.6rem; }
+  footer.finish p { margin: 0 0 0.8rem; text-wrap: pretty; }
+  footer.finish p:last-child { margin-bottom: 0; }
+
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+
+  /* ---- additions for the AWS course ---------------------------------- */
+
+  /* Section-level variants of the three callouts: they hold whole sections
+     (headings, tables, code) rather than a single sentence. */
+  .why.section, .confirm.section, .gotcha.section {
+    display: block; border-radius: 0 8px 8px 0;
+    padding: 1.15rem 1.3rem 1.25rem; margin: 0 0 1.4rem; font-size: 1rem;
+  }
+  .why.section { background: color-mix(in srgb, var(--teal-bg) 60%, var(--surface)); }
+  .confirm.section { background: color-mix(in srgb, var(--ok-bg) 55%, var(--surface)); }
+  .gotcha.section { background: color-mix(in srgb, var(--warn-bg) 55%, var(--surface)); }
+  .section > h3:first-child { margin-top: 0; }
+  .why.section > h3:first-child { color: var(--teal); }
+  .confirm.section > h3:first-child { color: var(--ok); }
+  .gotcha.section > h3:first-child { color: var(--warn); }
+  .section > *:last-child { margin-bottom: 0; }
+  .section pre.out { background: var(--surface); }
+
+  .step h4 { color: var(--ink); font-size: 0.95rem; }
+
+  .modnav {
+    font-size: 0.85rem; color: var(--ink-dim); margin: 0 0 1.2rem;
+    padding-bottom: 0.8rem; border-bottom: 1px solid var(--line);
+  }
+
+  blockquote {
+    margin: 0 0 1rem; padding: 0.1rem 0 0.1rem 1rem;
+    border-left: 3px solid var(--line); color: var(--ink-dim);
+  }
+  blockquote p.step-p:last-child { margin-bottom: 0; }
+
+  .step li > pre, .step li > .tbl-wrap { margin-top: 0.5rem; }
+
+  .pager {
+    display: flex; flex-wrap: wrap; gap: 0.75rem 1rem;
+    justify-content: space-between; margin-top: 1.5rem;
+    font-size: 0.9rem;
+  }
+  .pager a { text-decoration: none; }
+  .pager a:hover { text-decoration: underline; }
+
+  .rail a.home { border-left-color: var(--amber); color: var(--ink); }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="eyebrow">AWS &middot; EKS course &middot; Part III</span>
+    <h1>Data layer</h1>
+    <p class="subtitle">The three stateful pieces: RDS Postgres, an S3 bucket behind CloudFront, and Kafka run by the Strimzi operator inside the cluster.</p>
+    <div class="meta-row">
+      <span><strong>Modules:</strong> 8&ndash;10</span>
+      <span><strong>Region:</strong> us-east-1</span>
+      <span><strong>Cluster:</strong> streaming</span>
+    </div>
+  </div>
+</div>
+
+<div class="layout">
+<nav class="rail">
+  <div class="rail-label">Part III &mdash; Data layer</div>
+  <a href="#m08"><span class="n">08</span> RDS Postgres</a>
+  <a href="#m09"><span class="n">09</span> S3 and CloudFront</a>
+  <a href="#m10"><span class="n">10</span> Kafka with Strimzi</a>
+  <div class="rail-label">Course</div>
+  <a href="index.html" class="home"><span class="n">&#8617;</span> Course index</a>
+  <a href="part-1-foundations.html"><span class="n">I</span> Foundations</a>
+  <a href="part-2-platform.html"><span class="n">II</span> Platform</a>
+  <a href="part-4-application.html"><span class="n">IV</span> The application</a>
+  <a href="part-5-elastic.html"><span class="n">V</span> Elastic and automated</a>
+</nav>
+
+<main>
+<section class="step" id="m08">
+  <div class="step-head">
+    <span class="step-num">08</span>
+    <h2>RDS Postgres</h2>
+  </div>
+<p class="modnav">&#8592; <a href="part-2-platform.html#m07">Module 7: Secrets</a> &#183; <a href="index.html">Index</a> &#183; <a href="part-3-data-layer.html#m09">Module 9: S3 and CloudFront</a> &#8594; ---</p>
+<h3 id="m08-what-youre-building">What you're building</h3>
+<p class="step-p">A managed PostgreSQL 16 instance in the private subnets, reachable only from the EKS cluster, with its master password generated straight into Secrets Manager so it never touches your terminal. Then the part that actually takes thought: getting the four tables into it. RDS has no <code class="inline">/docker-entrypoint-initdb.d</code>, so <code class="inline">postgres/init.sql</code> &#8212; which today is the only thing that has ever created your schema &#8212; will never run. You replace it with a Kubernetes Job that applies numbered SQL files from git.</p>
+<p class="step-p">At the end, <code class="inline">\dt</code> inside the cluster lists <code class="inline">streamers</code>, <code class="inline">streams</code>, <code class="inline">videos</code>, <code class="inline">view_events</code>.</p>
+<p class="step-p">Budget: about <strong>$12/month</strong> for <code class="inline">db.t4g.micro</code> plus ~$1.60 for 20 GiB of gp3. Storage and backups are the parts that keep billing after you stop for the day; the instance is the part you can stop.</p>
+<div class="why section">
+<h3 id="m08-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m08-why-the-instance-is-this-small">Why the instance is this small</h4>
+<p class="step-p"><code class="inline">db.t4g.micro</code> is 2 vCPU and 1 GiB on Graviton, $0.016/hr. Look at what the application actually asks a database to do: a handful of single-row lookups per HTTP request, one <code class="inline">INSERT</code> per view event, and a status update per stream. There is no join deeper than one foreign key and no table that will exceed a few thousand rows this year. <code class="inline">db.t3.micro</code> costs about 25% more for less performance, and Graviton is safe here because there are no container images involved &#8212; you are not building anything for this CPU, you are talking to it over TCP.</p>
+<p class="step-p">20 GiB is the <em>minimum</em> gp3 allocation on RDS; you cannot ask for less. Turn on storage autoscaling with a 100 GiB ceiling as free insurance against <code class="inline">view_events</code> running away.</p>
+<p class="step-p">Single-AZ. Multi-AZ doubles the bill for a failover you will never exercise on a learning cluster, and the honest consequence &#8212; the database is unavailable during maintenance windows and instance replacement &#8212; is something you should experience once rather than pay to hide.</p>
+<p class="step-p">Engine version <strong>16.x</strong>, because compose runs <code class="inline">postgres:16-alpine</code> and you do not want to discover a syntax difference during Module 13. One thing that migrating-from-old-Postgres guides get wrong: <code class="inline">gen_random_uuid()</code> has been built in since PostgreSQL 13, so <code class="inline">001_baseline.sql</code> needs <strong>no <code class="inline">CREATE EXTENSION pgcrypto</code></strong> and no superuser.</p>
+<h4 id="m08-why-the-security-group-references-another-security-group-not-a-cidr">Why the security group references another security group, not a CIDR</h4>
+<p class="step-p">RDS gets its own security group whose only ingress rule is "TCP 5432 from the EKS cluster security group."</p>
+<p class="step-p">That matters more than it looks. EKS attaches the cluster security group to every managed-node-group node <em>and</em> to every node Karpenter launches, automatically, forever. So one rule written against that SG covers nodes that do not exist yet and will be created and destroyed hundreds of times. A CIDR rule (<code class="inline">10.0.0.0/16</code>) would work today and would also let anything else in the VPC reach your database, including a compromised pod in a namespace you have not created yet.</p>
+<p class="step-p">There is a VPC CNI consequence worth understanding, because it is why you do not need Security Groups for Pods: with the AWS VPC CNI, pods get real IPs from the node's subnet and inherit the node's security groups. "The pod can reach RDS" follows from "the node can reach RDS." Nothing extra to configure.</p>
+<h4 id="m08-why---manage-master-user-password">Why <code class="inline">--manage-master-user-password</code></h4>
+<p class="step-p">The alternative is <code class="inline">--master-user-password 'hunter2'</code> on the command line, which puts a production credential in your shell history, in your terminal scrollback, and in whatever process listing anyone on the machine runs. <code class="inline">--manage-master-user-password</code> has RDS generate the password itself, store it in Secrets Manager, and never show it to you. You cannot leak what you never saw.</p>
+<p class="step-p">This is also what makes Module 7's wiring pay off. External Secrets Operator already knows how to pull from Secrets Manager; RDS's managed secret is just another secret to pull. The DSN gets assembled by an ESO template, so the password exists in exactly one place and rotating it is an RDS operation, not a git commit.</p>
+<h4 id="m08-why-rdsforcessl-is-worth-a-paragraph">Why <code class="inline">rds.force_ssl</code> is worth a paragraph</h4>
+<p class="step-p">RDS PostgreSQL 15 and later default <code class="inline">rds.force_ssl</code> to <code class="inline">1</code>, and you should leave it there. The subtlety is how it fails, which is: <strong>it doesn't</strong>. Every service in this codebase does <code class="inline">psycopg.connect(os.environ["POSTGRES_DSN"], connect_timeout=3)</code>, and psycopg3 defaults to <code class="inline">sslmode=prefer</code>. <code class="inline">prefer</code> negotiates TLS successfully against a force_ssl server, so everything appears to work &#8212; while doing zero certificate verification. You get encryption without authentication and no error message telling you so.</p>
+<p class="step-p">Put <code class="inline">?sslmode=require</code> in the DSN explicitly. It does not change the wire behaviour; it changes whether the next person reading the DSN can tell what the connection guarantees. The step beyond, <code class="inline">sslmode=verify-full</code>, needs the RDS CA bundle mounted into every pod plus <code class="inline">sslrootcert=</code> in the DSN &#8212; worth knowing about, not worth doing on this project.</p>
+<h4 id="m08-why-the-schema-bootstrap-is-a-job">Why the schema bootstrap is a Job</h4>
+<p class="step-p">This is the real content of the module, so be clear about what changed.</p>
+<p class="step-p">In compose, <code class="inline">postgres/init.sql</code> is bind-mounted to <code class="inline">/docker-entrypoint-initdb.d/init.sql</code>. The official Postgres image runs everything in that directory exactly once, on first startup against an empty data directory. That hook is a feature of the <em>image</em>, not of Postgres. RDS does not use that image. There is no hook. If you create the instance and deploy the services, every query fails with <code class="inline">relation "streamers" does not exist</code> and nothing in the logs will point at the missing hook, because from the application's point of view the database is up and answering.</p>
+<p class="step-p">Three ways to fix it:</p>
+<ul>
+<li><strong>Run <code class="inline">psql</code> by hand once.</strong> RDS is in a private subnet with no public access, so this needs a bastion host or a port-forward through a pod. It works, it is not reproducible, and in four months nobody will remember it happened or what was in it. Rejected.</li>
+<li><strong>An init container on each Deployment.</strong> Five services would race to create the same four tables on every rollout. One would win; four would crash-loop with <code class="inline">relation "streamers" already exists</code>. Rejected.</li>
+<li><strong>A Kubernetes Job, in git, idempotent, re-runnable.</strong> This one.</li>
+</ul>
+<p class="step-p">The Job mounts a ConfigMap of SQL files and loops over them with <code class="inline">psql -v ON_ERROR_STOP=1</code>. The ConfigMap is <em>generated by Kustomize from <code class="inline">postgres/migrations/*.sql</code></em>, which is the load-bearing detail: the SQL lives in one place in the repo, it is diffable in a pull request, and there is no copy of it pasted into YAML that will drift.</p>
+<h4 id="m08-why-the-migrations-are-a-convention-and-not-a-framework">Why the migrations are a convention and not a framework</h4>
+<p class="step-p">The Job applies <strong>every</strong> file in <code class="inline">postgres/migrations/</code> on <strong>every</strong> run, in lexical order. There is no ledger table, no version tracking, no down-migrations. That works only because every statement is written to be re-runnable: <code class="inline">CREATE TABLE IF NOT EXISTS</code>, <code class="inline">ALTER TABLE ... ADD COLUMN IF NOT EXISTS</code>, <code class="inline">CREATE INDEX IF NOT EXISTS</code>.</p>
+<p class="step-p">Be honest about what you are giving up:</p>
+<ul>
+<li><strong>No version table</strong>, so the Job cannot tell you which migrations have been applied, and cannot detect that someone applied <code class="inline">003</code> to production before <code class="inline">002</code>.</li>
+<li><strong>No rollback.</strong> Getting a bad migration out means writing <code class="inline">004_undo_003.sql</code>.</li>
+<li><strong>No support for a non-idempotent change.</strong> A data backfill (<code class="inline">UPDATE videos SET ...</code>) would re-run on every deploy. A column rename has no <code class="inline">IF NOT EXISTS</code> form. If you need either, this convention does not stretch &#8212; stop and adopt Alembic or Atlas.</li>
+</ul>
+<p class="step-p">Why accept that? Four tables, one repository, and a team small enough to talk to each other. A migration framework here is more machinery to learn than schema to manage. And the escape hatch is cheap: numbered SQL files in a directory is exactly the input format Flyway, Atlas and Alembic's raw-SQL mode already expect, so adopting one later is a config change, not a rewrite.</p>
+<p class="step-p">One rule to internalise now, because it prevents the most common self-inflicted outage in this design: <strong>a migration must be compatible with the image that is currently running.</strong> In <a href="part-5-elastic.html#m15">Module 15</a> this Job becomes its own ArgoCD Application at sync wave 25, one wave ahead of the application at 30 &#8212; meaning it runs <em>before</em> the new pods exist, while the old pods are still serving traffic. So: add columns with defaults, never drop or rename in the same release as the code change. Drop in a follow-up release, after nothing references the column.</p>
+</div>
+<h3 id="m08-do-it">Do it</h3>
+<h4 id="m08-1-confirm-the-repo-is-ready">1. Confirm the repo is ready</h4>
+<p class="step-p"><a href="part-1-foundations.html#m00">Module 0</a> moved the schema to its new home and made it re-runnable. Check that it happened, because everything below reads from that directory:</p>
+<pre><code>ls postgres/migrations/
+grep -c "IF NOT EXISTS" postgres/migrations/001_baseline.sql</code></pre>
+<pre class="out"><code>001_baseline.sql
+4</code></pre>
+<p class="step-p">Four <code class="inline">IF NOT EXISTS</code> &#8212; one per table. If <code class="inline">postgres/init.sql</code> still exists and <code class="inline">postgres/migrations/</code> does not, go back and do Module 0 section 0.4 first; the rest of this module has nothing to apply.</p>
+<p class="step-p">The Job manifests are already in the repo at <code class="inline">k8s/apps/base/db-migrate/</code>.</p>
+<h4 id="m08-2-find-the-network">2. Find the network</h4>
+<p class="step-p">Everything below derives from the cluster, so there is nothing to copy by hand:</p>
+<pre><code>export AWS_PROFILE=linkify-streaming
+export AWS_REGION=us-east-1
+
+VPC_ID=$(aws eks describe-cluster --name streaming \
+  --query 'cluster.resourcesVpcConfig.vpcId' --output text)
+
+CLUSTER_SG=$(aws eks describe-cluster --name streaming \
+  --query 'cluster.resourcesVpcConfig.clusterSecurityGroupId' --output text)
+
+<span class="c"># The private subnets are the ones Module 2 tagged for internal load balancers.</span>
+PRIVATE_SUBNETS=$(aws ec2 describe-subnets \
+  --filters "Name=vpc-id,Values=$VPC_ID" \
+            "Name=tag:kubernetes.io/role/internal-elb,Values=1" \
+  --query 'Subnets[].SubnetId' --output text)
+
+echo "vpc=$VPC_ID"
+echo "cluster sg=$CLUSTER_SG"
+echo "private subnets=$PRIVATE_SUBNETS"</code></pre>
+<p class="step-p"><code class="inline">CLUSTER_SG</code> is the value the whole security model hangs on. It is the security group EKS creates and attaches to every node &#8212; its group name looks like <code class="inline">eks-cluster-sg-streaming-1234567890</code>. If that echo prints <code class="inline">None</code>, the cluster name is wrong or your profile is pointed at the wrong account; fix it before continuing.</p>
+<h4 id="m08-3-subnet-group-and-security-group">3. Subnet group and security group</h4>
+<pre><code>aws rds create-db-subnet-group \
+  --db-subnet-group-name streaming-db \
+  --db-subnet-group-description "streaming private subnets" \
+  --subnet-ids $PRIVATE_SUBNETS</code></pre>
+<p class="step-p">RDS requires the subnet group to span at least two Availability Zones even for a single-AZ instance. That is an API requirement, not a hint that you should go Multi-AZ.</p>
+<pre><code>RDS_SG=$(aws ec2 create-security-group \
+  --group-name streaming-rds \
+  --description "RDS Postgres, reachable from the EKS cluster only" \
+  --vpc-id "$VPC_ID" \
+  --query GroupId --output text)
+
+aws ec2 authorize-security-group-ingress \
+  --group-id "$RDS_SG" \
+  --protocol tcp --port 5432 \
+  --source-group "$CLUSTER_SG"
+
+echo "rds sg=$RDS_SG"</code></pre>
+<p class="step-p">That is the only ingress rule this security group will ever have. Confirm it:</p>
+<pre><code>aws ec2 describe-security-groups --group-ids "$RDS_SG" \
+  --query 'SecurityGroups[0].IpPermissions'</code></pre>
+<p class="step-p">Expect exactly one permission, port 5432, with a <code class="inline">UserIdGroupPairs</code> entry naming <code class="inline">$CLUSTER_SG</code> and <strong>an empty <code class="inline">IpRanges</code></strong>. A non-empty <code class="inline">IpRanges</code> means you have a CIDR rule you did not intend.</p>
+<h4 id="m08-4-parameter-group">4. Parameter group</h4>
+<p class="step-p">You cannot modify a default parameter group, so make your own:</p>
+<pre><code>aws rds create-db-parameter-group \
+  --db-parameter-group-name streaming-pg16 \
+  --db-parameter-group-family postgres16 \
+  --description "streaming"
+
+aws rds modify-db-parameter-group \
+  --db-parameter-group-name streaming-pg16 \
+  --parameters \
+    "ParameterName=rds.force_ssl,ParameterValue=1,ApplyMethod=pending-reboot" \
+    "ParameterName=log_min_duration_statement,ParameterValue=1000,ApplyMethod=immediate" \
+    "ParameterName=log_connections,ParameterValue=1,ApplyMethod=immediate"</code></pre>
+<p class="step-p"><code class="inline">log_min_duration_statement=1000</code> logs any query over one second. On this workload nothing should ever appear there, so anything that does is a real finding. <code class="inline">log_connections</code> is on because every handler in this codebase opens a fresh connection per request &#8212; when connection count becomes a problem, this log is how you will see it.</p>
+<h4 id="m08-5-create-the-instance">5. Create the instance</h4>
+<pre><code>aws rds create-db-instance \
+  --db-instance-identifier streaming-db \
+  --engine postgres \
+  --engine-version 16.10 \
+  --db-instance-class db.t4g.micro \
+  --allocated-storage 20 \
+  --max-allocated-storage 100 \
+  --storage-type gp3 \
+  --db-name streaming \
+  --master-username streamadmin \
+  --manage-master-user-password \
+  --db-subnet-group-name streaming-db \
+  --vpc-security-group-ids "$RDS_SG" \
+  --db-parameter-group-name streaming-pg16 \
+  --backup-retention-period 7 \
+  --no-multi-az \
+  --no-publicly-accessible \
+  --deletion-protection \
+  --no-enable-performance-insights \
+  --tags Key=Project,Value=streaming</code></pre>
+<p class="step-p">Two things to check rather than trust:</p>
+<pre><code><span class="c"># Which 16.x versions this region will actually accept today.</span>
+aws rds describe-db-engine-versions --engine postgres \
+  --query 'DBEngineVersions[?starts_with(EngineVersion, `16.`)].EngineVersion' \
+  --output text</code></pre>
+<p class="step-p">If <code class="inline">16.10</code> is not in that list, use the highest 16.x that is. Do not jump to 17 &#8212; compose runs 16.</p>
+<p class="step-p">Note <code class="inline">--deletion-protection</code>. It is on deliberately, and it means Module 16's teardown has an extra step (<code class="inline">aws rds modify-db-instance --no-deletion-protection</code>) before the delete will work. That friction is the point.</p>
+<p class="step-p">Creation takes 5&#8211;10 minutes:</p>
+<pre><code>aws rds wait db-instance-available --db-instance-identifier streaming-db</code></pre>
+<h4 id="m08-6-read-the-endpoint-and-the-secret-arn">6. Read the endpoint and the secret ARN</h4>
+<pre><code>DB_HOST=$(aws rds describe-db-instances --db-instance-identifier streaming-db \
+  --query 'DBInstances[0].Endpoint.Address' --output text)
+
+DB_SECRET_ARN=$(aws rds describe-db-instances --db-instance-identifier streaming-db \
+  --query 'DBInstances[0].MasterUserSecret.SecretArn' --output text)
+
+DB_SECRET_NAME=$(aws secretsmanager describe-secret --secret-id "$DB_SECRET_ARN" \
+  --query Name --output text)
+
+echo "host=$DB_HOST"
+echo "secret=$DB_SECRET_NAME"</code></pre>
+<p class="step-p">Now look at what is actually inside that secret, because the answer decides how you write the ESO template and it is a common source of a broken DSN:</p>
+<pre><code>aws secretsmanager get-secret-value --secret-id "$DB_SECRET_ARN" \
+  --query SecretString --output text | python3 -m json.tool | sed 's/"password".*/"password": "REDACTED"/'</code></pre>
+<p class="step-p">For an RDS-managed master user secret this is <strong>just <code class="inline">username</code> and <code class="inline">password</code></strong> &#8212; the endpoint, port and database name are not in it, because RDS considers those instance metadata rather than credentials. (Secrets that people create by hand with the "credentials for RDS database" template <em>do</em> carry <code class="inline">host</code>/<code class="inline">port</code>/<code class="inline">dbname</code>, which is where the confusion comes from.) Those two keys are also the only ones AWS documents: the API contract covers the secret's ARN and its status, not its JSON shape.</p>
+<p class="step-p"><strong>Which is exactly why the ESO template does not read the endpoint from it.</strong> Referencing a key that is not there is not an error in ESO &#8212; the template renders an empty string, the <code class="inline">ExternalSecret</code> reports <code class="inline">SecretSynced</code>, and you get <code class="inline">postgresql://user:pw@:5432/?sslmode=require</code> in a Secret that looks perfectly healthy. Betting the DSN on an undocumented field, where being wrong produces a green checkmark, is the wrong bet.</p>
+<h4 id="m08-6b-record-the-endpoint-as-its-own-secrets-manager-entry">6b. Record the endpoint as its own Secrets Manager entry</h4>
+<p class="step-p">The host, port and database name are not credentials &#8212; they are stable facts about an instance sitting in a private subnet. But <a href="part-2-platform.html#m07">Module 7</a>'s template wants one uniform source, so put them where it can fetch them:</p>
+<pre><code>aws secretsmanager create-secret \
+  --name streaming/db-endpoint \
+  --description "Non-secret RDS connection facts for the ESO template" \
+  --secret-string "{\"host\":\"$DB_HOST\",\"port\":\"5432\",\"dbname\":\"streaming\"}"</code></pre>
+<p class="step-p">Three notes on that:</p>
+<ul>
+<li><strong><code class="inline">dbname</code> is <code class="inline">streaming</code></strong> because that is what <code class="inline">--db-name streaming</code> created in step 5. It is not the master username.</li>
+<li><strong>It is under the <code class="inline">streaming/</code> prefix</strong>, so Module 7's IAM policy &#8212; which already allows <code class="inline">streaming/*</code> &#8212; covers it with no change. Nothing to add.</li>
+<li><strong>If you ever restore this instance from a snapshot under a new identifier, the endpoint changes.</strong> Update this secret with <code class="inline">aws secretsmanager put-secret-value --secret-id streaming/db-endpoint --secret-string '{...}'</code> and ESO picks it up within the hour. That is a one-line fix in one place, which is the reason for keeping it here rather than baking the hostname into the manifest.</li>
+</ul>
+<p class="step-p">Confirm it reads back:</p>
+<pre><code>aws secretsmanager get-secret-value --secret-id streaming/db-endpoint \
+  --query SecretString --output text</code></pre>
+<pre class="out"><code>{"host":"streaming-db.abc123xyz.us-east-1.rds.amazonaws.com","port":"5432","dbname":"streaming"}</code></pre>
+<h4 id="m08-7-wire-it-to-eso">7. Wire it to ESO</h4>
+<p class="step-p">This uses the <code class="inline">ClusterSecretStore</code> from <a href="part-2-platform.html#m07">Module 7</a>. Check the CRD's served API version first rather than assuming &#8212; ESO promoted these types from <code class="inline">v1beta1</code> to <code class="inline">v1</code> and both may be present:</p>
+<pre><code>kubectl get crd externalsecrets.external-secrets.io \
+  -o jsonpath='{range .spec.versions[*]}{.name}{" served="}{.served}{" storage="}{.storage}{"\n"}{end}'</code></pre>
+<p class="step-p">Use the version with <code class="inline">storage=true</code>. The manifest itself already exists &#8212; <code class="inline">k8s/infra/secrets/externalsecret-db.yaml</code>, written and explained in <a href="part-2-platform.html#m07">Module 7</a>. Do not write a second one. It has exactly one placeholder, because the RDS-managed secret's name is generated rather than chosen:</p>
+<pre><code>sed -i.bak "s|rds!db-REPLACE-ME|$DB_SECRET_NAME|" k8s/infra/secrets/externalsecret-db.yaml
+rm k8s/infra/secrets/externalsecret-db.yaml.bak
+
+grep -A1 'extract:' k8s/infra/secrets/externalsecret-db.yaml</code></pre>
+<pre class="out"><code>    - extract:
+        key: rds!db-a1b2c3d4-5e6f-7890-abcd-ef1234567890
+--
+    - extract:
+        key: streaming/db-endpoint</code></pre>
+<p class="step-p">Two <code class="inline">extract</code> entries, and that is the whole point of the design: <code class="inline">username</code> and <code class="inline">password</code> from the secret RDS owns and rotates, <code class="inline">host</code>/<code class="inline">port</code>/<code class="inline">dbname</code> from the entry you created in step 6b. ESO merges both into one map and the template in that file composes the DSN from it.</p>
+<p class="step-p"><code class="inline">| urlquery</code> in that template is not optional. RDS-generated passwords contain punctuation, and an unescaped <code class="inline">/</code>, <code class="inline">@</code> or <code class="inline">#</code> inside a DSN silently truncates the connection string into something that points at the wrong host or database.</p>
+<p class="step-p">The resulting DSN has this shape &#8212; this is what every service will read as <code class="inline">POSTGRES_DSN</code>:</p>
+<pre class="out"><code>postgresql://streamadmin:<span class="ph">&lt;generated&gt;</span>@streaming-db.abc123xyz.us-east-1.rds.amazonaws.com:5432/streaming?sslmode=require</code></pre>
+<p class="step-p"><strong>No IAM change is needed here.</strong> Module 7's policy already lists two resource patterns &#8212; <code class="inline">arn:aws:secretsmanager:us-east-1:${ACCOUNT_ID}:secret:streaming/*</code> and <code class="inline">arn:aws:secretsmanager:us-east-1:${ACCOUNT_ID}:secret:rds!db-*</code> &#8212; which is exactly the two secrets above: <code class="inline">streaming/db-endpoint</code> matches the first, the RDS-managed secret matches the second. Nor is a <code class="inline">kms:Decrypt</code> grant required: the managed secret is encrypted with the AWS-managed <code class="inline">aws/secretsmanager</code> key, and access to that key is granted implicitly by the Secrets Manager permission. (If you ever move the secret to a <strong>customer-managed</strong> KMS key, that stops being true and you would add <code class="inline">kms:Decrypt</code> on that key's ARN &#8212; but nothing in this course does.)</p>
+<p class="step-p">Worth re-reading the policy once rather than taking that on trust:</p>
+<pre><code>aws iam get-role-policy --role-name streaming-external-secrets \
+  --policy-name read-streaming-secrets --query 'PolicyDocument.Statement[].Resource'</code></pre>
+<p class="step-p">Apply and confirm the Secret materialises:</p>
+<pre><code>kubectl apply -f k8s/infra/secrets/externalsecret-db.yaml
+kubectl -n streaming get externalsecret streaming-db</code></pre>
+<pre class="out"><code>NAME           STORE                STATUS         READY
+streaming-db   aws-secretsmanager   SecretSynced   True</code></pre>
+<p class="step-p"><code class="inline">READY False</code> here is an IAM problem 90% of the time; <code class="inline">kubectl -n streaming describe externalsecret streaming-db</code> prints the AWS error verbatim.</p>
+<h4 id="m08-8-run-the-migration-job">8. Run the migration Job</h4>
+<p class="step-p">The manifests are at <code class="inline">k8s/apps/base/db-migrate/</code>. Look at them before running:</p>
+<ul>
+<li><code class="inline">job.yaml</code> &#8212; a <code class="inline">postgres:16-alpine</code> pod that loops over <code class="inline">/migrations/*.sql</code> with <code class="inline">ON_ERROR_STOP=1</code> and <code class="inline">--single-transaction</code>, reading <code class="inline">POSTGRES_DSN</code> from the Secret ESO just created.</li>
+<li><code class="inline">kustomization.yaml</code> &#8212; a <code class="inline">configMapGenerator</code> that builds the ConfigMap from <code class="inline">../../../../postgres/migrations/001_baseline.sql</code>.</li>
+</ul>
+<p class="step-p">That relative path reaches outside the kustomization directory, which Kustomize refuses by default. Build with the restrictor relaxed:</p>
+<pre><code>kubectl kustomize --load-restrictor LoadRestrictionsNone k8s/apps/base/db-migrate \
+  | kubectl apply -f -</code></pre>
+<p class="step-p">Watch it:</p>
+<pre><code>kubectl -n streaming wait --for=condition=complete job/db-migrate --timeout=180s
+kubectl -n streaming logs job/db-migrate</code></pre>
+<pre class="out"><code>applying migrations from /migrations
+--&gt; 001_baseline.sql
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+migrations complete
+            List of relations
+ Schema |    Name     | Type  |   Owner
+--------+-------------+-------+------------
+ public | streamers   | table | streamadmin
+ public | streams     | table | streamadmin
+ public | videos      | table | streamadmin
+ public | view_events | table | streamadmin
+(4 rows)</code></pre>
+<p class="step-p">Run it a second time to prove it is re-runnable. A Job's pod template is immutable, so re-running means deleting first:</p>
+<pre><code>kubectl -n streaming delete job db-migrate
+kubectl kustomize --load-restrictor LoadRestrictionsNone k8s/apps/base/db-migrate \
+  | kubectl apply -f -
+kubectl -n streaming wait --for=condition=complete job/db-migrate --timeout=180s</code></pre>
+<p class="step-p">The log now shows four <code class="inline">NOTICE: relation "streamers" already exists, skipping</code> lines instead of <code class="inline">CREATE TABLE</code>, and the Job still completes. That is the whole idempotency argument, demonstrated rather than asserted.</p>
+<h4 id="m08-9-adding-a-migration-later">9. Adding a migration later</h4>
+<p class="step-p">The convention, in full: a new numbered file in <code class="inline">postgres/migrations/</code>, every statement re-runnable, and no edits to a file that has already been applied anywhere.</p>
+<pre><code><span class="c"># Illustration only -- do NOT commit this one. 002 is spoken for.</span>
+cat &gt; /tmp/00N_example.sql &lt;&lt;'SQL'
+ALTER TABLE streams ADD COLUMN IF NOT EXISTS example_note TEXT;
+CREATE INDEX IF NOT EXISTS streams_status_idx ON streams (status);
+SQL</code></pre>
+<p class="step-p">Commit a real one and re-run the Job (Module 15 makes this automatic on every sync). The new file changes the ConfigMap's content hash, which changes the Job's pod template, which is how ArgoCD knows there is work to do.</p>
+<p class="step-p"><strong><code class="inline">002_transcode_claim.sql</code> is already reserved.</strong> <a href="part-5-elastic.html#m14">Module 14</a> adds it &#8212; <code class="inline">transcode_status</code> and <code class="inline">transcode_heartbeat</code> on <code class="inline">streams</code>, <code class="inline">transcode_heartbeat</code> on <code class="inline">videos</code>, and a partial index on <code class="inline">streams (status)</code> &#8212; because the one-Job-per-stream model needs a claim and a heartbeat lease that this schema does not have yet. Write it there, with the content Module 14 gives you, not here. This matters more than it looks: <code class="inline">ADD COLUMN IF NOT EXISTS</code> is a no-op once the column exists, so a placeholder <code class="inline">transcode_status TEXT</code> created now would silently keep Module 14's <code class="inline">NOT NULL DEFAULT 'pending'</code> from ever taking effect, and nothing would report an error.</p>
+<div class="confirm section">
+<h3 id="m08-verify">Verify</h3>
+<p class="step-p">The checkpoint is: <strong>the four tables exist, and you can see them from inside the cluster over TLS.</strong></p>
+<pre><code>kubectl -n streaming run psql --rm -it --restart=Never --image=postgres:16-alpine \
+  --overrides='
+{
+  "spec": {
+    "containers": [{
+      "name": "psql",
+      "image": "postgres:16-alpine",
+      "stdin": true, "tty": true,
+      "command": ["sh","-c","exec psql \"$POSTGRES_DSN\""],
+      "env": [{"name":"POSTGRES_DSN","valueFrom":{"secretKeyRef":{"name":"streaming-db","key":"POSTGRES_DSN"}}}]
+    }]
+  }
+}'</code></pre>
+<p class="step-p">The <code class="inline">--overrides</code> form is used instead of <code class="inline">--env</code> on purpose: it keeps the DSN out of your shell history and out of the pod spec, where <code class="inline">kubectl get pod -o yaml</code> would show it to anyone with namespace read access.</p>
+<p class="step-p">At the prompt:</p>
+<pre class="out"><code>psql (16.10)
+SSL connection (protocol: TLSv1.3, cipher: TLS_AES_256_GCM_SHA384, ...)
+Type "help" for help.
+
+streaming=&gt; \dt
+             List of relations
+ Schema |    Name     | Type  |    Owner
+--------+-------------+-------+-------------
+ public | streamers   | table | streamadmin
+ public | streams     | table | streamadmin
+ public | videos      | table | streamadmin
+ public | view_events | table | streamadmin
+(4 rows)
+
+streaming=&gt; \d streams
+                    Table "public.streams"
+   Column    |           Type           | Nullable |     Default
+-------------+--------------------------+----------+------------------
+ id          | uuid                     | not null | gen_random_uuid()
+ streamer_id | uuid                     | not null |
+ path        | text                     | not null |
+ status      | text                     | not null | 'live'::text
+ started_at  | timestamp with time zone | not null | now()
+ ended_at    | timestamp with time zone |          |
+
+streaming=&gt; \q</code></pre>
+<p class="step-p">Three things in that output are the actual checkpoint, not decoration:</p>
+<ol>
+<li><strong><code class="inline">SSL connection (protocol: TLSv1.3 ...)</code></strong> on the banner line &#8212; <code class="inline">rds.force_ssl</code> is doing its job and your DSN is not silently falling back.</li>
+<li><strong>Four tables.</strong></li>
+<li><strong><code class="inline">gen_random_uuid()</code> as a default</strong> &#8212; proof that PG16's built-in UUID function resolved without <code class="inline">pgcrypto</code>.</li>
+</ol>
+<p class="step-p">Do not move to Module 9 until all three are true.</p>
+</div>
+<div class="gotcha section">
+<h3 id="m08-what-breaks">What breaks</h3>
+<p class="step-p">Ordered by how often it actually happens.</p>
+<h4 id="m08-1-security-file-is-not-in-or-below-on-kubectl-apply--k">1. <code class="inline">security; file ... is not in or below ...</code> on <code class="inline">kubectl apply -k</code></h4>
+<pre class="out"><code>error: loading KV pairs: file sources: [../../../../postgres/migrations/001_baseline.sql]:
+security; file '/&#8230;/postgres/migrations/001_baseline.sql' is not in or below
+'/&#8230;/k8s/apps/base/db-migrate'</code></pre>
+<p class="step-p">Kustomize refuses to read files outside the kustomization root unless told otherwise. This is the first thing you will hit, and <code class="inline">kubectl apply -k</code> has no flag for it &#8212; you have to build and pipe:</p>
+<pre><code>kubectl kustomize --load-restrictor LoadRestrictionsNone k8s/apps/base/db-migrate | kubectl apply -f -</code></pre>
+<p class="step-p">In Module 15, ArgoCD needs the same permission, set once in the <code class="inline">argocd-cm</code> ConfigMap:</p>
+<pre><code>data:
+  kustomize.buildOptions: --load-restrictor LoadRestrictionsNone</code></pre>
+<p class="step-p">If relaxing it bothers you, the alternative is to move the SQL to <code class="inline">k8s/apps/base/db-migrate/sql/</code> and give up on <code class="inline">postgres/migrations/</code> being the shared home for compose and EKS. A symlink does <strong>not</strong> work &#8212; Kustomize resolves the symlink and then rejects the resolved path.</p>
+<h4 id="m08-2-the-externalsecret-is-stuck-ready-false">2. The ExternalSecret is stuck <code class="inline">READY False</code></h4>
+<pre><code>kubectl -n streaming describe externalsecret streaming-db</code></pre>
+<p class="step-p">Look at the Events. Three errors dominate:</p>
+<ul>
+<li><code class="inline">ResourceNotFoundException</code> on <code class="inline">rds!db-REPLACE-ME</code> &#8212; step 7's <code class="inline">sed</code> did not run, or ran against a different copy of the file. <code class="inline">grep REPLACE-ME k8s/infra/secrets/externalsecret-db.yaml</code> answers it in one line.</li>
+<li><code class="inline">ResourceNotFoundException</code> on <code class="inline">streaming/db-endpoint</code> &#8212; you skipped step 6b. Create it and the next refresh succeeds.</li>
+<li><code class="inline">AccessDeniedException ... secretsmanager:GetSecretValue</code> &#8212; genuinely IAM, but check the <em>name</em> before you touch the policy. Module 7's role already allows both <code class="inline">streaming/*</code> and <code class="inline">rds!db-*</code>, so this normally means the Pod Identity association is missing or the secret is in another region, not that a permission is absent. <code class="inline">aws iam get-role-policy --role-name streaming-external-secrets --policy-name read-streaming-secrets</code> shows you what is actually allowed.</li>
+</ul>
+<p class="step-p"><strong>A synced ExternalSecret is not proof of a correct one.</strong> If the template referenced a key that no source provides, ESO renders it as an empty string and still reports <code class="inline">SecretSynced</code>. Decode the result rather than trusting the status:</p>
+<pre><code>kubectl -n streaming get secret streaming-db -o jsonpath='{.data.POSTGRES_DSN}' | base64 -d; echo</code></pre>
+<p class="step-p">An <code class="inline">@:5432</code> with nothing between the <code class="inline">@</code> and the colon means the host came out empty &#8212; the <code class="inline">streaming/db-endpoint</code> entry is missing a key or has it spelled differently.</p>
+<p class="step-p">After changing anything, force a re-sync rather than waiting an hour:</p>
+<pre><code>kubectl -n streaming annotate externalsecret streaming-db force-sync="$(date +%s)" --overwrite</code></pre>
+<h4 id="m08-3-the-job-pod-hangs-then-fails-with-connection-timeout-expired">3. The Job pod hangs, then fails with <code class="inline">connection timeout expired</code></h4>
+<p class="step-p">Almost always the security group. Confirm the rule references the cluster SG:</p>
+<pre><code>aws ec2 describe-security-groups --group-ids "$RDS_SG" \
+  --query 'SecurityGroups[0].IpPermissions[0].UserIdGroupPairs'</code></pre>
+<p class="step-p">Then confirm the RDS instance is actually using that SG &#8212; it is easy to create the group and forget to attach it:</p>
+<pre><code>aws rds describe-db-instances --db-instance-identifier streaming-db \
+  --query 'DBInstances[0].VpcSecurityGroups'</code></pre>
+<p class="step-p">If both look right, check the endpoint resolves from inside the cluster:</p>
+<pre><code>kubectl -n streaming run dns --rm -it --restart=Never --image=busybox:1.36 -- \
+  nslookup streaming-db.abc123xyz.us-east-1.rds.amazonaws.com</code></pre>
+<p class="step-p">An RDS endpoint resolves to a <strong>private</strong> 10.x address. If it resolves to a public address, <code class="inline">--no-publicly-accessible</code> was not applied.</p>
+<p class="step-p">Note that this same class of failure has a nastier form later: the services use <code class="inline">connect_timeout=3</code>, which was fine against a Postgres container on the same Docker bridge and is aggressive against RDS across an AZ boundary. It hits <code class="inline">ingest-webhook</code>'s <code class="inline">/hooks/auth</code> path first, and a timeout there means <strong>MediaMTX rejects the publish</strong> &#8212; the stream never starts, and the error looks like an OBS problem. Watch for it in Module 13.</p>
+<h4 id="m08-4-relation-streamers-already-exists-and-the-job-goes-failed">4. <code class="inline">relation "streamers" already exists</code> and the Job goes <code class="inline">Failed</code></h4>
+<p class="step-p">A migration is not idempotent. Find the offending statement:</p>
+<pre><code>kubectl -n streaming logs job/db-migrate | tail -20</code></pre>
+<p class="step-p"><code class="inline">ON_ERROR_STOP=1</code> means the file that printed last is the file that failed. Every <code class="inline">CREATE</code> needs <code class="inline">IF NOT EXISTS</code>. If you hit this on a statement that has no <code class="inline">IF NOT EXISTS</code> form, that is the signal described above &#8212; you have outgrown the convention for that particular change, and wrapping it in a <code class="inline">DO $$ ... EXCEPTION WHEN duplicate_object THEN NULL; $$</code> block is a warning sign, not a solution.</p>
+<h4 id="m08-5-psql-fatal-no-pghbaconf-entry-no-encryption">5. <code class="inline">psql: FATAL: no pg_hba.conf entry ... no encryption</code></h4>
+<p class="step-p">Something is connecting with <code class="inline">sslmode=disable</code>. Check the DSN that actually landed in the Secret:</p>
+<pre><code>kubectl -n streaming get secret streaming-db -o jsonpath='{.data.POSTGRES_DSN}' \
+  | base64 -d | sed 's#://[^@]*@#://***@#'</code></pre>
+<p class="step-p">The redaction keeps the password out of your scrollback while still showing you whether <code class="inline">?sslmode=require</code> survived the template. A common cause is a stray newline: use <code class="inline">&gt;-</code> (fold, strip trailing newline) in the ESO template, not <code class="inline">&gt;</code> or <code class="inline">|</code>.</p>
+<h4 id="m08-6-fatal-too-many-connections">6. <code class="inline">FATAL: too many connections</code></h4>
+<p class="step-p">Every request handler in this codebase opens a fresh <code class="inline">psycopg.connect()</code> with no pool, and now pays a TLS handshake for each one. <code class="inline">db.t4g.micro</code> allows roughly 85 connections. Two <code class="inline">web</code> + two <code class="inline">upload-api</code> + two <code class="inline">ingest-webhook</code> + readiness probes are comfortable; add eight concurrent transcode Jobs in Module 14 and it gets close.</p>
+<pre><code>aws rds describe-db-instances --db-instance-identifier streaming-db \
+  --query 'DBInstances[0].DBInstanceClass'</code></pre>
+<p class="step-p">The fix is <code class="inline">psycopg_pool.ConnectionPool</code> in the services, which is a follow-up and not a blocker. If you need relief today, scale replicas down rather than scaling the instance up.</p>
+<p class="step-p">Next: <a href="part-3-data-layer.html#m09">Module 9 &#8212; S3 and CloudFront</a>, where the same "it worked in compose because the dev tool was permissive" pattern shows up twice more.</p>
+</div>
+</section>
+
+<section class="step" id="m09">
+  <div class="step-head">
+    <span class="step-num">09</span>
+    <h2>S3 and CloudFront</h2>
+  </div>
+<p class="modnav">&#8592; <a href="part-3-data-layer.html#m08">Module 8: RDS Postgres</a> &#183; <a href="index.html">Index</a> &#183; <a href="part-3-data-layer.html#m10">Module 10: Kafka with Strimzi</a> &#8594; ---</p>
+<h3 id="m09-what-youre-building">What you're building</h3>
+<p class="step-p">The object storage that replaces the MinIO container: one private S3 bucket holding source uploads and HLS output, fronted by a CloudFront distribution on <code class="inline">cdn.k8s.linkifysolutions.com</code> that is the <em>only</em> thing allowed to read it. Plus the two IAM roles that let <code class="inline">upload-api</code> and <code class="inline">transcode-worker</code> reach it without credentials, and the bucket CORS policy without which the player breaks in Chrome and works in Safari.</p>
+<p class="step-p">At the end, <code class="inline">curl -I https://cdn.k8s.linkifysolutions.com/hls/...</code> returns 200 with the right content type and an <code class="inline">access-control-allow-origin</code> header.</p>
+<p class="step-p">Cost: pennies while you are learning. CloudFront's first 1 TB/month of egress is free on the AWS Free Tier's always-free allowance; S3 storage for a few GB of HLS is under a dollar. The line item that can surprise you is covered under lifecycle rules below.</p>
+<div class="why section">
+<h3 id="m09-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m09-why-the-bucket-is-private-when-the-minio-one-was-not">Why the bucket is private, when the MinIO one was not</h4>
+<p class="step-p"><code class="inline">docker-compose.yml</code> runs this on startup:</p>
+<pre><code>mc mb --ignore-existing local/media &amp;&amp;
+mc anonymous set download local/media/hls</code></pre>
+<p class="step-p">That makes the entire <code class="inline">hls/</code> prefix world-readable with no authentication. On a dev box that is a reasonable trade: MinIO is bound to a Docker network, the only person who can reach it is you, and it removes an entire class of "why is the player 403ing" debugging from your first week.</p>
+<p class="step-p">The same command against S3 exposes a bucket to the whole internet, with per-request and per-GB billing attached to it, no rate limiting, and no way to know it happened until the bill arrives. The failure mode is not "someone reads my test video"; it is "someone points a downloader at it and you pay for the egress." Block Public Access stays fully on, and CloudFront gets read access through an Origin Access Control &#8212; a signed request from CloudFront's service principal, restricted to one distribution.</p>
+<p class="step-p">Note where the bucket policy is scoped: <code class="inline">hls/*</code> only. <code class="inline">raw/</code> &#8212; the original uploads &#8212; is not readable by CloudFront at all, so a request for <code class="inline">/raw/anything</code> returns 403 from S3 with nothing extra to configure. That is structural rather than procedural: you cannot accidentally expose source uploads later by adding a cache behaviour, because the permission does not exist.</p>
+<h4 id="m09-the-key-layout-and-where-it-comes-from">The key layout, and where it comes from</h4>
+<pre class="out"><code>s3://linkify-streaming-media-<span class="ph">&lt;accountid&gt;</span>/
+  raw/{video_id}{ext}                              # source uploads, never public
+  hls/live/{stream_id}/master.m3u8
+  hls/live/{stream_id}/{1080p,720p,480p}/playlist.m3u8
+  hls/live/{stream_id}/{1080p,720p,480p}/segment_%03d.ts
+  hls/vod/{video_id}/...                           # same shape</code></pre>
+<p class="step-p">You are not choosing this layout &#8212; the code already writes it. <code class="inline">services/upload-api/main.py</code> builds <code class="inline">object_key = f"raw/{video_id}{ext}"</code>, and <code class="inline">services/transcode-worker/main.py</code> sets <code class="inline">s3_prefix = f"hls/live/{stream_id}"</code> and <code class="inline">f"hls/vod/{video_id}"</code>. What you are choosing is that the bucket, its lifecycle rules and its CloudFront behaviours line up with those three prefixes.</p>
+<p class="step-p">The bucket name gets the account ID appended because S3 names are globally unique across all AWS customers. <code class="inline">linkify-streaming-media</code> is almost certainly taken; <code class="inline">linkify-streaming-media-123456789012</code> is yours and is reproducible if you tear down and rebuild.</p>
+<h4 id="m09-lifecycle-rules-on-day-one-especially-the-invisible-one">Lifecycle rules on day one, especially the invisible one</h4>
+<p class="step-p">Three rules, and the third is the one nobody sets.</p>
+<p class="step-p"><strong><code class="inline">hls/live/</code> expires after 7 days.</strong> Live HLS is a rotating window that nothing reads once the stream ends. The VOD copy is the durable artifact.</p>
+<p class="step-p"><strong><code class="inline">raw/</code> expires after 30 days.</strong> This assumes the transcoded VOD output is what you keep and the source is disposable. If you ever want to re-transcode from source at a new bitrate, extend it &#8212; that is a real trade-off, not a default to accept blindly.</p>
+<p class="step-p"><strong>Abort incomplete multipart uploads after 1 day.</strong> This is the invisible one. <code class="inline">upload_fileobj</code> switches to multipart for anything over 8 MB. When an upload dies partway &#8212; the client disconnects, or <code class="inline">_SizeLimitedReader</code> raises <code class="inline">_UploadTooLarge</code> because someone exceeded the 2 GiB cap &#8212; the parts already uploaded stay in the bucket. They <strong>do not appear in <code class="inline">aws s3 ls</code></strong>, they <strong>do not appear in the console's object listing</strong>, and they <strong>bill as standard storage forever</strong>. The only way to see them is <code class="inline">list-multipart-uploads</code>. Given that this application has a size limit and a rate limiter, i.e. it expects people to hit failure paths, this will happen. One rule, set once, and it never does.</p>
+<h4 id="m09-why-the-cache-behaviours-have-to-be-split">Why the cache behaviours have to be split</h4>
+<p class="step-p"><code class="inline">_s3_extra_args</code> in <code class="inline">services/transcode-worker/main.py</code> already sets exactly the right headers per object:</p>
+<pre><code>def _s3_extra_args(fname: str, *, live: bool) -&gt; dict:
+    if fname.endswith(".m3u8"):
+        cache_control = "no-cache, must-revalidate" if live else "public, max-age=31536000, immutable"
+        return {"ContentType": "application/vnd.apple.mpegurl", "CacheControl": cache_control}
+    return {"ContentType": "video/mp2t", "CacheControl": "public, max-age=31536000, immutable"}</code></pre>
+<p class="step-p">So: live manifests are <code class="inline">no-cache, must-revalidate</code>; VOD manifests and <em>all</em> <code class="inline">.ts</code> segments are <code class="inline">immutable</code> for a year. That split is correct, and it is correct because of what HLS is. A live <code class="inline">.m3u8</code> is rewritten every couple of seconds with a new segment appended and an old one dropped. A <code class="inline">.ts</code> segment, once written, never changes &#8212; its filename identifies its contents.</p>
+<p class="step-p">The trap: <strong>CloudFront's <code class="inline">MinTTL</code> overrides the origin's <code class="inline">Cache-Control</code>.</strong> The managed <code class="inline">CachingOptimized</code> policy has <code class="inline">MinTTL = 1</code>, which is survivable for a live manifest (one second of staleness). Anything larger is not, and the failure is spectacular in a confusing direction:</p>
+<ul>
+<li>Viewers receive a playlist that lists segments which ffmpeg's <code class="inline">+delete_segments</code> has already removed.</li>
+<li>The player requests those segments, gets 404s, and hls.js shows "Connection hiccup &#8212; reconnecting&#8230;" in a loop.</li>
+<li>Meanwhile the stream is fine. The transcoder is running, S3 has current segments, and if you <code class="inline">curl</code> the manifest with a cache-buster it looks perfect.</li>
+</ul>
+<p class="step-p"><strong>If CloudFront caches live manifests, the stream freezes for viewers and nothing you look at on the server side will show it.</strong> That is the single most confusing failure in this module. The fix is a dedicated cache behaviour for <code class="inline">hls/live/*.m3u8</code> with <code class="inline">MinTTL 0, DefaultTTL 1, MaxTTL 2</code> &#8212; one second of caching, which is still enough to absorb a thundering herd of viewers hitting the same manifest, and short enough that no viewer ever sees a segment list that has expired.</p>
+<p class="step-p">Everything else falls through to the default behaviour with <code class="inline">CachingOptimized</code>, which honours the origin's <code class="inline">max-age=31536000, immutable</code> and serves segments from the edge essentially forever. That is where all the bandwidth is, and it is the entire reason for putting a CDN here.</p>
+<p class="step-p">CloudFront path patterns treat <code class="inline">*</code> as matching across <code class="inline">/</code>, so <code class="inline">hls/live/*.m3u8</code> correctly matches <code class="inline">hls/live/&lt;uuid&gt;/720p/playlist.m3u8</code>. Do not take that on faith &#8212; the Verify section checks it with <code class="inline">x-cache</code> and <code class="inline">age</code> headers.</p>
+<h4 id="m09-cors-the-delta-that-silently-breaks-the-player">CORS: the delta that silently breaks the player</h4>
+<p class="step-p">Nothing in the compose stack configures CORS, and nothing needed to: <strong>MinIO reflects the <code class="inline">Origin</code> header by default. S3 does not.</strong></p>
+<p class="step-p">The browser loads the page from <code class="inline">https://stream.k8s.linkifysolutions.com</code>. hls.js then fetches <code class="inline">https://cdn.k8s.linkifysolutions.com/hls/.../master.m3u8</code> <strong>via XHR/fetch</strong>, which is a cross-origin request. Without <code class="inline">Access-Control-Allow-Origin</code> on the response the browser discards it, and <code class="inline">watch.html</code> shows "Playback error". Meanwhile the network tab shows <strong>200 OK</strong>, with the correct body. The object is there, the URL is right, the response is fine, and the player is broken.</p>
+<p class="step-p">There is an asymmetry that makes this worse. The player does:</p>
+<pre><code>if (video.canPlayType("application/vnd.apple.mpegurl")) { video.src = src; }
+else if (Hls.isSupported()) { /* hls.js */ }</code></pre>
+<p class="step-p">Safari takes the first branch &#8212; native HLS through a <code class="inline">&lt;video&gt;</code> element, which is not subject to CORS. So <strong>it works perfectly in Safari on your Mac and fails in Chrome</strong>, which is a great way to spend an afternoon blaming the network.</p>
+<p class="step-p">Fix it in two places, because each alone has a hole:</p>
+<p class="step-p"><strong>(a) Bucket CORS</strong>, which is correct at the origin. This is what answers a preflight <code class="inline">OPTIONS</code>.</p>
+<p class="step-p"><strong>(b) A CloudFront <code class="inline">ResponseHeadersPolicy</code></strong>, which is what actually saves you. With bucket CORS alone, <code class="inline">Access-Control-Allow-Origin</code> comes <em>from the origin</em> and is therefore <strong>cached by CloudFront</strong>. Unless <code class="inline">Origin</code> is part of the cache key, whichever request populates the cache first decides what every subsequent viewer gets &#8212; and the first request may well have no <code class="inline">Origin</code> header at all (Safari, a <code class="inline">curl</code>, a monitoring probe). You would get CORS failures that depend on which edge location the viewer hit and that "fix themselves" after an invalidation. A ResponseHeadersPolicy makes CloudFront synthesise the header on every response regardless of what is cached, which removes the whole class of bug.</p>
+<p class="step-p">You still want (a), because preflight <code class="inline">OPTIONS</code> requests are forwarded to S3 and S3 has to answer them.</p>
+<h4 id="m09-the-media-path-segment-is-gone">The <code class="inline">/media</code> path segment is gone</h4>
+<p class="step-p">With MinIO, <code class="inline">MINIO_PUBLIC_URL</code> was a host and <code class="inline">/media/</code> in the URL was the <strong>bucket name</strong> in a path-style URL:</p>
+<pre class="out"><code>http://localhost:9000/media/hls/live/<span class="ph">&lt;id&gt;</span>/master.m3u8
+       &#9492;&#9472;&#9472; host &#9472;&#9472;&#9496;  &#9492;bucket&#9496;&#9492;&#9472;&#9472;&#9472;&#9472; key &#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</code></pre>
+<p class="step-p">With CloudFront the origin <em>is</em> one bucket, so there is no bucket segment in the path. <code class="inline">https://cdn.k8s.../media/hls/...</code> maps to the S3 key <code class="inline">media/hls/...</code>, which does not exist, and every player 403s.</p>
+<p class="step-p"><a href="part-1-foundations.html#m00">Module 0</a> already handled this by introducing <code class="inline">HLS_PUBLIC_BASE_URL</code>:</p>
+<pre><code>HLS_PUBLIC_BASE_URL = os.environ.get("HLS_PUBLIC_BASE_URL") or (
+    os.environ["MINIO_PUBLIC_URL"] + "/media"   <span class="c"># back-compat for docker compose</span>
+)
+manifest_url = f"{HLS_PUBLIC_BASE_URL}/hls/{prefix}/{content_id}/master.m3u8"</code></pre>
+<p class="step-p">On EKS you set <code class="inline">HLS_PUBLIC_BASE_URL=https://cdn.k8s.linkifysolutions.com</code> and the <code class="inline">/media</code> segment disappears. Compose keeps working unchanged. That value gets wired into the ConfigMap in <a href="part-4-application.html#m11">Module 11</a>; note it now so it is not a surprise there.</p>
+<h4 id="m09-why-two-iam-roles-not-one">Why two IAM roles, not one</h4>
+<p class="step-p"><code class="inline">upload-api</code> writes to <code class="inline">raw/</code> and never touches HLS. <code class="inline">transcode-worker</code> reads <code class="inline">raw/</code> and writes <code class="inline">hls/</code>, and never needs to delete anything (ffmpeg's <code class="inline">+delete_segments</code> deletes from the local scratch directory; <code class="inline">_upload_pass</code> never removes from S3 &#8212; which is exactly why the <code class="inline">hls/live/</code> lifecycle rule exists).</p>
+<p class="step-p">Giving each its own role costs one extra <code class="inline">create-role</code> and buys you a real boundary: a bug in the upload path cannot overwrite HLS output, and a bug in the transcoder cannot destroy someone's source file. On a two-service system that is a small win; the habit is the point.</p>
+<p class="step-p">One non-obvious permission: <code class="inline">upload-api</code>'s <code class="inline">health()</code> calls <code class="inline">head_bucket(Bucket=...)</code>, and <code class="inline">HeadBucket</code> is authorised by <strong><code class="inline">s3:ListBucket</code> on the bucket ARN</strong>, not by any object permission. Omit it and you get a health check that returns <code class="inline">An error occurred (403)</code> while every real upload works fine &#8212; a readiness probe failing for a reason that has nothing to do with readiness.</p>
+<p class="step-p">Pod Identity, rather than IRSA, because it is the newer mechanism and does not require an OIDC-provider round trip or annotating the ServiceAccount with a role ARN. <a href="part-2-platform.html#m07">Module 7</a> covers the distinction. The one thing to remember: <strong>an association only takes effect when the pod starts.</strong> Create the association after the pods are running and you will debug a permissions problem that is actually a stale pod.</p>
+</div>
+<h3 id="m09-do-it">Do it</h3>
+<pre><code>export AWS_PROFILE=linkify-streaming
+export AWS_REGION=us-east-1
+
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+BUCKET="linkify-streaming-media-${ACCOUNT_ID}"
+echo "$BUCKET"</code></pre>
+<h4 id="m09-1-the-bucket">1. The bucket</h4>
+<pre><code><span class="c"># us-east-1 is the one region where create-bucket takes no LocationConstraint.</span>
+aws s3api create-bucket --bucket "$BUCKET" --region us-east-1
+
+aws s3api put-public-access-block --bucket "$BUCKET" \
+  --public-access-block-configuration \
+    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+aws s3api put-bucket-encryption --bucket "$BUCKET" \
+  --server-side-encryption-configuration \
+    '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"},"BucketKeyEnabled":true}]}'</code></pre>
+<p class="step-p">SSE-S3 (<code class="inline">AES256</code>) rather than SSE-KMS: KMS charges per request, and HLS is a very high request-count workload &#8212; a live stream writes a segment per rendition every few seconds and rewrites three manifests every two. SSE-KMS here would be a real line item for no threat-model gain, since the bucket is already private.</p>
+<p class="step-p">Confirm Block Public Access took, because everything downstream depends on it:</p>
+<pre><code>aws s3api get-public-access-block --bucket "$BUCKET" \
+  --query PublicAccessBlockConfiguration</code></pre>
+<p class="step-p">All four values must be <code class="inline">true</code>.</p>
+<h4 id="m09-2-lifecycle-rules">2. Lifecycle rules</h4>
+<pre><code>cat &gt; /tmp/lifecycle.json &lt;&lt;'JSON'
+{"Rules": [
+  {"ID": "expire-live-hls", "Status": "Enabled",
+   "Filter": {"Prefix": "hls/live/"},
+   "Expiration": {"Days": 7}},
+
+  {"ID": "expire-raw-uploads", "Status": "Enabled",
+   "Filter": {"Prefix": "raw/"},
+   "Expiration": {"Days": 30}},
+
+  {"ID": "abort-incomplete-mpu", "Status": "Enabled",
+   "Filter": {"Prefix": ""},
+   "AbortIncompleteMultipartUpload": {"DaysAfterInitiation": 1}}
+]}
+JSON
+
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket "$BUCKET" --lifecycle-configuration file:///tmp/lifecycle.json
+
+aws s3api get-bucket-lifecycle-configuration --bucket "$BUCKET"</code></pre>
+<p class="step-p">The command that shows you what the third rule is for &#8212; run it any time you suspect the bucket is bigger than the object listing says:</p>
+<pre><code>aws s3api list-multipart-uploads --bucket "$BUCKET"</code></pre>
+<p class="step-p">Empty output today. Come back after Module 13 and after someone has cancelled an upload.</p>
+<h4 id="m09-3-origin-access-control">3. Origin Access Control</h4>
+<pre><code>OAC_ID=$(aws cloudfront create-origin-access-control \
+  --origin-access-control-config '{
+    "Name": "streaming-media-oac",
+    "Description": "S3 origin for the streaming HLS distribution",
+    "OriginAccessControlOriginType": "s3",
+    "SigningBehavior": "always",
+    "SigningProtocol": "sigv4"
+  }' --query 'OriginAccessControl.Id' --output text)
+
+echo "oac=$OAC_ID"</code></pre>
+<p class="step-p">Origin Access <em>Identity</em> (OAI) is the legacy mechanism and is still what most tutorials show. Use OAC: it signs with SigV4, works in every region, and supports SSE-KMS if you ever change your mind about encryption.</p>
+<h4 id="m09-4-cache-and-response-headers-policies">4. Cache and response-headers policies</h4>
+<pre><code><span class="c"># 1s cache for live manifests. MinTTL 0 is the part that matters &#8212; it is what</span>
+<span class="c"># stops CloudFront overriding the origin's no-cache.</span>
+LIVE_CACHE_POLICY_ID=$(aws cloudfront create-cache-policy --cache-policy-config '{
+  "Name": "streaming-hls-live-manifest",
+  "Comment": "Near-live HLS playlists",
+  "MinTTL": 0,
+  "DefaultTTL": 1,
+  "MaxTTL": 2,
+  "ParametersInCacheKeyAndForwardedToOrigin": {
+    "EnableAcceptEncodingGzip": true,
+    "EnableAcceptEncodingBrotli": true,
+    "HeadersConfig": {"HeaderBehavior": "none"},
+    "CookiesConfig": {"CookieBehavior": "none"},
+    "QueryStringsConfig": {"QueryStringBehavior": "none"}
+  }
+}' --query 'CachePolicy.Id' --output text)
+
+RHP_ID=$(aws cloudfront create-response-headers-policy --response-headers-policy-config '{
+  "Name": "streaming-hls-cors",
+  "Comment": "Synthesise CORS headers regardless of what is cached",
+  "CorsConfig": {
+    "AccessControlAllowOrigins": {"Quantity": 1, "Items": ["https://stream.k8s.linkifysolutions.com"]},
+    "AccessControlAllowMethods": {"Quantity": 3, "Items": ["GET", "HEAD", "OPTIONS"]},
+    "AccessControlAllowHeaders": {"Quantity": 1, "Items": ["*"]},
+    "AccessControlAllowCredentials": false,
+    "AccessControlExposeHeaders": {"Quantity": 4, "Items": ["Content-Length", "Content-Range", "ETag", "Accept-Ranges"]},
+    "AccessControlMaxAgeSec": 3000,
+    "OriginOverride": true
+  }
+}' --query 'ResponseHeadersPolicy.Id' --output text)
+
+echo "live cache policy=$LIVE_CACHE_POLICY_ID"
+echo "response headers policy=$RHP_ID"</code></pre>
+<p class="step-p"><code class="inline">OriginOverride: true</code> is deliberate: CloudFront replaces whatever the origin said about CORS with this, on every response, cached or not.</p>
+<p class="step-p">You also need two AWS-managed policy IDs. They are stable, but look them up rather than pasting IDs from a blog post:</p>
+<pre><code>aws cloudfront list-cache-policies --type managed \
+  --query "CachePolicyList.Items[?CachePolicy.CachePolicyConfig.Name=='Managed-CachingOptimized'].CachePolicy.Id" \
+  --output text
+<span class="c"># expect: 658327ea-f89d-4fab-a63d-7e88639e58f6</span>
+
+aws cloudfront list-origin-request-policies --type managed \
+  --query "OriginRequestPolicyList.Items[?OriginRequestPolicy.OriginRequestPolicyConfig.Name=='Managed-CORS-S3Origin'].OriginRequestPolicy.Id" \
+  --output text
+<span class="c"># expect: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf</span></code></pre>
+<p class="step-p"><code class="inline">Managed-CORS-S3Origin</code> forwards <code class="inline">Origin</code>, <code class="inline">Access-Control-Request-Method</code> and <code class="inline">Access-Control-Request-Headers</code> to S3. Without it, a preflight <code class="inline">OPTIONS</code> reaches S3 with no <code class="inline">Origin</code> header and S3 answers 403 &#8212; the bucket CORS config never gets a chance to apply.</p>
+<h4 id="m09-5-the-distribution">5. The distribution</h4>
+<p class="step-p">You need the wildcard ACM certificate from <a href="part-2-platform.html#m05">Module 5</a>. CloudFront only accepts certificates from <strong>us-east-1</strong>, regardless of where anything else lives &#8212; which for this project is free, since you are in us-east-1 anyway.</p>
+<pre><code>CERT_ARN=$(aws acm list-certificates --region us-east-1 \
+  --query "CertificateSummaryList[?DomainName=='*.k8s.linkifysolutions.com'].CertificateArn" \
+  --output text)
+
+CACHING_OPTIMIZED=658327ea-f89d-4fab-a63d-7e88639e58f6
+CORS_S3_ORIGIN=88a5eaf4-2fd4-4709-b370-b4c650ea3fcf
+
+cat &gt; /tmp/dist.json &lt;&lt;JSON
+{
+  "CallerReference": "streaming-cdn-$(date +%s)",
+  "Comment": "streaming HLS",
+  "Enabled": true,
+  "HttpVersion": "http2and3",
+  "PriceClass": "PriceClass_100",
+  "Aliases": {"Quantity": 1, "Items": ["cdn.k8s.linkifysolutions.com"]},
+  "Origins": {"Quantity": 1, "Items": [{
+    "Id": "s3-media",
+    "DomainName": "${BUCKET}.s3.us-east-1.amazonaws.com",
+    "OriginAccessControlId": "${OAC_ID}",
+    "S3OriginConfig": {"OriginAccessIdentity": ""},
+    "CustomHeaders": {"Quantity": 0},
+    "ConnectionAttempts": 3,
+    "ConnectionTimeout": 10
+  }]},
+  "DefaultCacheBehavior": {
+    "TargetOriginId": "s3-media",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {"Quantity": 3, "Items": ["GET", "HEAD", "OPTIONS"],
+      "CachedMethods": {"Quantity": 2, "Items": ["GET", "HEAD"]}},
+    "Compress": true,
+    "CachePolicyId": "${CACHING_OPTIMIZED}",
+    "OriginRequestPolicyId": "${CORS_S3_ORIGIN}",
+    "ResponseHeadersPolicyId": "${RHP_ID}"
+  },
+  "CacheBehaviors": {"Quantity": 1, "Items": [{
+    "PathPattern": "hls/live/*.m3u8",
+    "TargetOriginId": "s3-media",
+    "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {"Quantity": 3, "Items": ["GET", "HEAD", "OPTIONS"],
+      "CachedMethods": {"Quantity": 2, "Items": ["GET", "HEAD"]}},
+    "Compress": true,
+    "CachePolicyId": "${LIVE_CACHE_POLICY_ID}",
+    "OriginRequestPolicyId": "${CORS_S3_ORIGIN}",
+    "ResponseHeadersPolicyId": "${RHP_ID}"
+  }]},
+  "ViewerCertificate": {
+    "ACMCertificateArn": "${CERT_ARN}",
+    "SSLSupportMethod": "sni-only",
+    "MinimumProtocolVersion": "TLSv1.2_2021"
+  },
+  "Restrictions": {"GeoRestriction": {"RestrictionType": "none", "Quantity": 0}}
+}
+JSON
+
+DIST_ID=$(aws cloudfront create-distribution --distribution-config file:///tmp/dist.json \
+  --query 'Distribution.Id' --output text)
+
+DIST_DOMAIN=$(aws cloudfront get-distribution --id "$DIST_ID" \
+  --query 'Distribution.DomainName' --output text)
+
+echo "distribution=$DIST_ID  domain=$DIST_DOMAIN"</code></pre>
+<p class="step-p"><code class="inline">PriceClass_100</code> is North America and Europe. It roughly halves per-GB delivery cost and this project has no viewers elsewhere. <code class="inline">Compress: true</code> matters for <code class="inline">.m3u8</code>, which is text and compresses around 5:1; CloudFront skips compression on <code class="inline">.ts</code> automatically because of its content type.</p>
+<p class="step-p">Deployment takes a few minutes:</p>
+<pre><code>aws cloudfront wait distribution-deployed --id "$DIST_ID"</code></pre>
+<h4 id="m09-6-the-bucket-policy-that-lets-only-this-distribution-in">6. The bucket policy that lets only this distribution in</h4>
+<pre><code>cat &gt; /tmp/bucket-policy.json &lt;&lt;JSON
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "AllowCloudFrontHLSOnly",
+    "Effect": "Allow",
+    "Principal": {"Service": "cloudfront.amazonaws.com"},
+    "Action": "s3:GetObject",
+    "Resource": "arn:aws:s3:::${BUCKET}/hls/*",
+    "Condition": {"StringEquals": {
+      "AWS:SourceArn": "arn:aws:cloudfront::${ACCOUNT_ID}:distribution/${DIST_ID}"
+    }}
+  }]
+}
+JSON
+
+aws s3api put-bucket-policy --bucket "$BUCKET" --policy file:///tmp/bucket-policy.json</code></pre>
+<p class="step-p">Read that <code class="inline">Resource</code> line again: <code class="inline">hls/*</code>, not <code class="inline">*</code>. A request through CloudFront for <code class="inline">/raw/anything</code> gets 403 from S3, permanently, because the permission to read it does not exist.</p>
+<h4 id="m09-7-cors-on-the-bucket">7. CORS on the bucket</h4>
+<pre><code>aws s3api put-bucket-cors --bucket "$BUCKET" --cors-configuration '{
+  "CORSRules": [{
+    "AllowedOrigins": ["https://stream.k8s.linkifysolutions.com"],
+    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedHeaders": ["Origin", "Range", "Access-Control-Request-Method", "Access-Control-Request-Headers"],
+    "ExposeHeaders": ["Content-Length", "Content-Range", "ETag", "Accept-Ranges"],
+    "MaxAgeSeconds": 3000
+  }]
+}'
+
+aws s3api get-bucket-cors --bucket "$BUCKET"</code></pre>
+<p class="step-p"><code class="inline">Range</code> in <code class="inline">AllowedHeaders</code> and <code class="inline">Content-Range</code> / <code class="inline">Accept-Ranges</code> in <code class="inline">ExposeHeaders</code> are load-bearing: hls.js issues range requests for segments, and without the exposed response headers seeking in a VOD breaks while normal playback looks fine.</p>
+<p class="step-p">If you later serve the page from another origin (a local dev server on <code class="inline">http://localhost:8080</code>, say), add it to <strong>both</strong> this list and the ResponseHeadersPolicy. Missing it in one of the two produces the intermittent-by-edge-location behaviour described above.</p>
+<h4 id="m09-8-dns">8. DNS</h4>
+<p class="step-p">CloudFront is not a Kubernetes object, so ExternalDNS will not manage this record. Create it once:</p>
+<pre><code>ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+  --dns-name k8s.linkifysolutions.com \
+  --query 'HostedZones[0].Id' --output text | cut -d/ -f3)
+
+cat &gt; /tmp/cdn-record.json &lt;&lt;JSON
+{"Changes": [{
+  "Action": "UPSERT",
+  "ResourceRecordSet": {
+    "Name": "cdn.k8s.linkifysolutions.com",
+    "Type": "A",
+    "AliasTarget": {
+      "HostedZoneId": "Z2FDTNDATAQYW2",
+      "DNSName": "${DIST_DOMAIN}",
+      "EvaluateTargetHealth": false
+    }
+  }
+}]}
+JSON
+
+aws route53 change-resource-record-sets --hosted-zone-id "$ZONE_ID" \
+  --change-batch file:///tmp/cdn-record.json</code></pre>
+<p class="step-p"><code class="inline">Z2FDTNDATAQYW2</code> is a constant &#8212; it is CloudFront's hosted zone ID for alias records, the same for every distribution in every account. It looks like a placeholder and is not.</p>
+<h4 id="m09-9-iam-roles-and-pod-identity">9. IAM roles and Pod Identity</h4>
+<p class="step-p">First check the Pod Identity Agent addon is installed (Module 4):</p>
+<pre><code>aws eks list-addons --cluster-name streaming --query addons
+<span class="c"># expect eks-pod-identity-agent in the list</span></code></pre>
+<p class="step-p">Trust policy, identical for both roles:</p>
+<pre><code>cat &gt; /tmp/pod-identity-trust.json &lt;&lt;'JSON'
+{"Version": "2012-10-17", "Statement": [{
+  "Effect": "Allow",
+  "Principal": {"Service": "pods.eks.amazonaws.com"},
+  "Action": ["sts:AssumeRole", "sts:TagSession"]
+}]}
+JSON</code></pre>
+<p class="step-p"><code class="inline">sts:TagSession</code> is required, not optional &#8212; EKS tags the session with the cluster and namespace, and omitting it produces an <code class="inline">AccessDenied</code> at pod start that names neither.</p>
+<p class="step-p"><code class="inline">upload-api</code> &#8212; writes <code class="inline">raw/</code>, and reads nothing:</p>
+<pre><code>aws iam create-role --role-name streaming-upload-api \
+  --assume-role-policy-document file:///tmp/pod-identity-trust.json
+
+cat &gt; /tmp/upload-api-s3.json &lt;&lt;JSON
+{"Version":"2012-10-17","Statement":[
+  {"Sid":"HeadBucketForHealthCheck",
+   "Effect":"Allow","Action":"s3:ListBucket",
+   "Resource":"arn:aws:s3:::${BUCKET}"},
+  {"Effect":"Allow",
+   "Action":["s3:PutObject","s3:AbortMultipartUpload"],
+   "Resource":"arn:aws:s3:::${BUCKET}/raw/*"}
+]}
+JSON
+
+aws iam put-role-policy --role-name streaming-upload-api \
+  --policy-name s3-raw-write --policy-document file:///tmp/upload-api-s3.json</code></pre>
+<p class="step-p"><code class="inline">transcode-worker</code> &#8212; reads <code class="inline">raw/</code>, writes <code class="inline">hls/</code>:</p>
+<pre><code>aws iam create-role --role-name streaming-transcode-worker \
+  --assume-role-policy-document file:///tmp/pod-identity-trust.json
+
+cat &gt; /tmp/transcode-s3.json &lt;&lt;JSON
+{"Version":"2012-10-17","Statement":[
+  {"Effect":"Allow","Action":"s3:ListBucket",
+   "Resource":"arn:aws:s3:::${BUCKET}"},
+  {"Effect":"Allow","Action":"s3:GetObject",
+   "Resource":"arn:aws:s3:::${BUCKET}/raw/*"},
+  {"Effect":"Allow",
+   "Action":["s3:PutObject","s3:AbortMultipartUpload"],
+   "Resource":"arn:aws:s3:::${BUCKET}/hls/*"}
+]}
+JSON
+
+aws iam put-role-policy --role-name streaming-transcode-worker \
+  --policy-name s3-raw-read-hls-write --policy-document file:///tmp/transcode-s3.json</code></pre>
+<p class="step-p">Associate each with its ServiceAccount. The ServiceAccounts themselves are created in <a href="part-4-application.html#m11">Module 11</a>; the association can be made first and will apply to pods created later.</p>
+<pre><code>for SA in upload-api transcode-worker; do
+  aws eks create-pod-identity-association \
+    --cluster-name streaming \
+    --namespace streaming \
+    --service-account "$SA" \
+    --role-arn "arn:aws:iam::${ACCOUNT_ID}:role/streaming-${SA}"
+done
+
+aws eks list-pod-identity-associations --cluster-name streaming \
+  --query 'associations[].{ns:namespace,sa:serviceAccount}' --output table</code></pre>
+<p class="step-p">If those pods are already running, restart them &#8212; an association is only picked up at pod start:</p>
+<pre><code>kubectl -n streaming rollout restart deploy/upload-api 2&gt;/dev/null || true</code></pre>
+<p class="step-p">Record the values Module 11 will need:</p>
+<pre><code>cat &lt;&lt;EOF
+S3_BUCKET=${BUCKET}
+S3_ADDRESSING_STYLE=virtual
+HLS_PUBLIC_BASE_URL=https://cdn.k8s.linkifysolutions.com
+AWS_REGION=us-east-1
+<span class="c"># and S3_ENDPOINT / S3_ACCESS_KEY / S3_SECRET_KEY must be UNSET on AWS</span>
+EOF</code></pre>
+<p class="step-p">Those last three matter. boto3 checks explicit credentials <em>first</em>, so leaving <code class="inline">S3_ACCESS_KEY</code> set anywhere means Pod Identity is attached, working, and completely ignored.</p>
+<div class="confirm section">
+<h3 id="m09-verify">Verify</h3>
+<p class="step-p">Upload a test object that mimics what the transcoder writes, then fetch it through CloudFront.</p>
+<pre><code>printf '#EXTM3U\n#EXT-X-VERSION:3\n' &gt; /tmp/test.m3u8
+
+aws s3 cp /tmp/test.m3u8 "s3://${BUCKET}/hls/vod/checkpoint/master.m3u8" \
+  --content-type application/vnd.apple.mpegurl \
+  --cache-control "public, max-age=31536000, immutable"</code></pre>
+<p class="step-p"><strong>Checkpoint 1 &#8212; it is served, with the right type and CORS:</strong></p>
+<pre><code>curl -sI -H "Origin: https://stream.k8s.linkifysolutions.com" \
+  https://cdn.k8s.linkifysolutions.com/hls/vod/checkpoint/master.m3u8</code></pre>
+<pre class="out"><code>HTTP/2 200
+content-type: application/vnd.apple.mpegurl
+content-length: 25
+cache-control: public, max-age=31536000, immutable
+access-control-allow-origin: https://stream.k8s.linkifysolutions.com
+access-control-expose-headers: Content-Length, Content-Range, ETag, Accept-Ranges
+x-cache: Miss from cloudfront</code></pre>
+<p class="step-p">Four things must be true: <code class="inline">HTTP/2 200</code>; <code class="inline">content-type: application/vnd.apple.mpegurl</code> (not <code class="inline">binary/octet-stream</code>); <code class="inline">cache-control</code> echoing what you set; and <code class="inline">access-control-allow-origin</code> present.</p>
+<p class="step-p"><strong>Checkpoint 2 &#8212; the preflight is answered:</strong></p>
+<pre><code>curl -s -o /dev/null -D- -X OPTIONS \
+  -H "Origin: https://stream.k8s.linkifysolutions.com" \
+  -H "Access-Control-Request-Method: GET" \
+  -H "Access-Control-Request-Headers: range" \
+  https://cdn.k8s.linkifysolutions.com/hls/vod/checkpoint/master.m3u8</code></pre>
+<pre class="out"><code>HTTP/2 200
+access-control-allow-origin: https://stream.k8s.linkifysolutions.com
+access-control-allow-methods: GET, HEAD, OPTIONS
+access-control-max-age: 3000</code></pre>
+<p class="step-p"><strong>Checkpoint 3 &#8212; <code class="inline">raw/</code> is not reachable:</strong></p>
+<pre><code>aws s3 cp /tmp/test.m3u8 "s3://${BUCKET}/raw/checkpoint.txt"
+curl -s -o /dev/null -w '%{http_code}\n' https://cdn.k8s.linkifysolutions.com/raw/checkpoint.txt</code></pre>
+<pre class="out"><code>403</code></pre>
+<p class="step-p">A <code class="inline">200</code> here means the bucket policy is scoped to <code class="inline">*</code> instead of <code class="inline">hls/*</code>. Fix it before going further; this is the difference between a private bucket and a public one.</p>
+<p class="step-p"><strong>Checkpoint 4 &#8212; the live behaviour is actually matching.</strong> Put an object where a live manifest would go and check that it is barely cached:</p>
+<pre><code>aws s3 cp /tmp/test.m3u8 "s3://${BUCKET}/hls/live/checkpoint/720p/playlist.m3u8" \
+  --content-type application/vnd.apple.mpegurl \
+  --cache-control "no-cache, must-revalidate"
+
+for i in 1 2 3; do
+  curl -sI https://cdn.k8s.linkifysolutions.com/hls/live/checkpoint/720p/playlist.m3u8 \
+    | grep -Ei '^(x-cache|age|cache-control)'
+  sleep 2
+done</code></pre>
+<pre class="out"><code>cache-control: no-cache, must-revalidate
+x-cache: Miss from cloudfront
+cache-control: no-cache, must-revalidate
+x-cache: Miss from cloudfront
+...</code></pre>
+<p class="step-p">Repeated <code class="inline">Miss</code> (or a <code class="inline">Hit</code> with <code class="inline">age: 0</code>/<code class="inline">age: 1</code>) is what you want &#8212; it proves <code class="inline">hls/live/*.m3u8</code> matched the 1-second behaviour and that the <code class="inline">*</code> wildcard does cross <code class="inline">/</code>. If you instead see <code class="inline">x-cache: Hit from cloudfront</code> with <code class="inline">age</code> climbing past 2, the path pattern did not match and the default <code class="inline">CachingOptimized</code> behaviour is serving it. <strong>Do not proceed to Module 13 in that state</strong> &#8212; it is the frozen-stream failure, and it will look like a transcoder bug.</p>
+<p class="step-p">Clean up:</p>
+<pre><code>aws s3 rm "s3://${BUCKET}/hls/vod/checkpoint/master.m3u8"
+aws s3 rm "s3://${BUCKET}/hls/live/checkpoint/720p/playlist.m3u8"
+aws s3 rm "s3://${BUCKET}/raw/checkpoint.txt"</code></pre>
+</div>
+<div class="gotcha section">
+<h3 id="m09-what-breaks">What breaks</h3>
+<h4 id="m09-1-the-player-shows-an-error-the-network-tab-shows-200">1. The player shows an error, the network tab shows 200</h4>
+<p class="step-p">CORS. Confirm it from the browser console first &#8212; Chrome names it explicitly:</p>
+<pre class="out"><code>Access to XMLHttpRequest at 'https://cdn.k8s.../master.m3u8' from origin
+'https://stream.k8s...' has been blocked by CORS policy: No
+'Access-Control-Allow-Origin' header is present on the requested resource.</code></pre>
+<p class="step-p">Then reproduce it with <code class="inline">curl</code>, which is the fast loop:</p>
+<pre><code>curl -sI -H "Origin: https://stream.k8s.linkifysolutions.com" \
+  https://cdn.k8s.linkifysolutions.com/hls/live/<span class="ph">&lt;stream-id&gt;</span>/master.m3u8 \
+  | grep -i access-control</code></pre>
+<p class="step-p">No output means the ResponseHeadersPolicy is not attached to the behaviour that served this path. Check both behaviours have it:</p>
+<pre><code>aws cloudfront get-distribution-config --id "$DIST_ID" \
+  --query 'DistributionConfig.[DefaultCacheBehavior.ResponseHeadersPolicyId, CacheBehaviors.Items[].ResponseHeadersPolicyId]'</code></pre>
+<p class="step-p"><strong>If it works in Safari, that is not evidence it works.</strong> Safari plays HLS natively through the <code class="inline">&lt;video&gt;</code> element, which bypasses CORS entirely. Always test in Chrome.</p>
+<h4 id="m09-2-viewers-see-connection-hiccup-reconnecting-while-the-stream-is-fine">2. Viewers see "Connection hiccup &#8212; reconnecting&#8230;" while the stream is fine</h4>
+<p class="step-p">CloudFront is caching live manifests. Check the age on a real live manifest during a stream:</p>
+<pre><code>curl -sI https://cdn.k8s.linkifysolutions.com/hls/live/<span class="ph">&lt;stream-id&gt;</span>/720p/playlist.m3u8 \
+  | grep -Ei '^(x-cache|age)'</code></pre>
+<p class="step-p"><code class="inline">age</code> above 2 means the request is hitting the default behaviour. Either the path pattern is wrong, or the behaviours are in the wrong order (CloudFront evaluates <code class="inline">CacheBehaviors</code> in order and the default is always last &#8212; with one custom behaviour that cannot be wrong, but it can be if someone adds a second).</p>
+<p class="step-p">While debugging, <code class="inline">aws cloudfront create-invalidation --distribution-id "$DIST_ID" --paths '/hls/live/*'</code> clears it &#8212; but that is a symptom fix. Invalidations are also billed after the first 1,000 paths per month, so do not put one in a loop.</p>
+<h4 id="m09-3-every-object-403s-through-cloudfront-but-aws-s3-ls-works-fine">3. Every object 403s through CloudFront but <code class="inline">aws s3 ls</code> works fine</h4>
+<p class="step-p">The OAC is not authorised. Three things to check in order:</p>
+<pre><code><span class="c"># a) Is the OAC actually attached to the origin?</span>
+aws cloudfront get-distribution-config --id "$DIST_ID" \
+  --query 'DistributionConfig.Origins.Items[0].OriginAccessControlId'
+
+<span class="c"># b) Does the bucket policy name THIS distribution?</span>
+aws s3api get-bucket-policy --bucket "$BUCKET" --query Policy --output text | python3 -m json.tool
+
+<span class="c"># c) Is the origin domain the REST endpoint, not a website endpoint?</span>
+aws cloudfront get-distribution-config --id "$DIST_ID" \
+  --query 'DistributionConfig.Origins.Items[0].DomainName'</code></pre>
+<p class="step-p">(c) catches a common one: the origin must be <code class="inline">&lt;bucket&gt;.s3.us-east-1.amazonaws.com</code>. If it is <code class="inline">&lt;bucket&gt;.s3-website-us-east-1.amazonaws.com</code>, CloudFront treats it as a custom origin, does not sign requests, and OAC does nothing.</p>
+<h4 id="m09-4-nocredentialserror-or-accessdenied-from-a-pod">4. <code class="inline">NoCredentialsError</code> or <code class="inline">AccessDenied</code> from a pod</h4>
+<p class="step-p">Check the association exists and that the ServiceAccount name matches exactly:</p>
+<pre><code>aws eks list-pod-identity-associations --cluster-name streaming \
+  --query 'associations[].{ns:namespace,sa:serviceAccount,role:roleArn}' --output table
+
+kubectl -n streaming get pod <span class="ph">&lt;pod&gt;</span> -o jsonpath='{.spec.serviceAccountName}{"\n"}'</code></pre>
+<p class="step-p">Then check what identity the pod actually has:</p>
+<pre><code>kubectl -n streaming exec <span class="ph">&lt;pod&gt;</span> -- env | grep -i aws</code></pre>
+<p class="step-p">You should see <code class="inline">AWS_CONTAINER_CREDENTIALS_FULL_URI</code> and <code class="inline">AWS_CONTAINER_AUTHORIZATION_TOKEN_FILE</code>. If those are absent, the association was created after the pod started &#8212; <code class="inline">kubectl rollout restart</code> the Deployment. If <code class="inline">S3_ACCESS_KEY</code> is present, that is your problem instead: boto3 prefers explicit credentials and never consults Pod Identity.</p>
+<h4 id="m09-5-upload-apis-readiness-probe-fails-but-uploads-work">5. <code class="inline">upload-api</code>'s readiness probe fails but uploads work</h4>
+<p class="step-p"><code class="inline">head_bucket</code> needs <code class="inline">s3:ListBucket</code> on the <strong>bucket</strong> ARN. Confirm:</p>
+<pre><code>aws iam get-role-policy --role-name streaming-upload-api --policy-name s3-raw-write \
+  --query 'PolicyDocument.Statement[?Action==`s3:ListBucket`]'</code></pre>
+<p class="step-p">An empty result is the bug. The resource must be <code class="inline">arn:aws:s3:::&lt;bucket&gt;</code> with no <code class="inline">/*</code>.</p>
+<h4 id="m09-6-the-bucket-is-larger-than-the-sum-of-its-objects">6. The bucket is larger than the sum of its objects</h4>
+<p class="step-p">Incomplete multipart uploads.</p>
+<pre><code>aws s3api list-multipart-uploads --bucket "$BUCKET"</code></pre>
+<p class="step-p">The lifecycle rule from step 2 cleans these up within a day. If the rule is missing, they accumulate silently and forever. Verify the rule is present rather than assuming:</p>
+<pre><code>aws s3api get-bucket-lifecycle-configuration --bucket "$BUCKET" \
+  --query "Rules[?ID=='abort-incomplete-mpu']"</code></pre>
+<h4 id="m09-7-cdnk8slinkifysolutionscom-does-not-resolve-or-serves-the-wrong-certificate">7. <code class="inline">cdn.k8s.linkifysolutions.com</code> does not resolve, or serves the wrong certificate</h4>
+<pre><code>dig +short cdn.k8s.linkifysolutions.com
+curl -sv https://cdn.k8s.linkifysolutions.com/ 2&gt;&amp;1 | grep -E 'subject|issuer|SSL'</code></pre>
+<p class="step-p">A <code class="inline">SSL: no alternative certificate subject name matches</code> means the distribution's <code class="inline">Aliases</code> does not include <code class="inline">cdn.k8s.linkifysolutions.com</code>, or the ACM certificate does not cover it. Both are visible in <code class="inline">get-distribution-config</code>. Remember the certificate must be in <strong>us-east-1</strong>; a certificate in another region cannot be attached to a distribution at all, and the API error for that is unhelpfully generic.</p>
+<p class="step-p">Next: <a href="part-3-data-layer.html#m10">Module 10 &#8212; Kafka with Strimzi</a>.</p>
+</div>
+</section>
+
+<section class="step" id="m10">
+  <div class="step-head">
+    <span class="step-num">10</span>
+    <h2>Kafka with Strimzi</h2>
+  </div>
+<p class="modnav">&#8592; <a href="part-3-data-layer.html#m09">Module 9: S3 and CloudFront</a> &#183; <a href="index.html">Index</a> &#183; <a href="part-4-application.html#m11">Module 11: Running the services</a> &#8594; ---</p>
+<div class="gotcha section">
+<h3 id="m10-read-this-before-you-copy-any-yaml">Read this before you copy any YAML</h3>
+<p class="step-p">Kafka on Kubernetes changed shape twice in the last two years, and the internet has not caught up. Two specific things will send you down a wrong path:</p>
+<ol>
+<li><strong>Strimzi &#8805; 0.46 removed ZooKeeper entirely.</strong> KRaft is the only mode, and broker sizing/storage/replica count moved out of the <code class="inline">Kafka</code> resource into a separate <code class="inline">KafkaNodePool</code> resource. Any guide that shows <code class="inline">spec.zookeeper</code> or <code class="inline">spec.kafka.replicas</code> predates this.</li>
+<li><strong>Strimzi 1.0 dropped the <code class="inline">kafka.strimzi.io/v1beta2</code> API in favour of <code class="inline">kafka.strimzi.io/v1</code>.</strong> Almost every blog post, Stack Overflow answer, and a fair number of doc snippets still say <code class="inline">v1beta2</code>.</li>
+</ol>
+<p class="step-p">So: <strong>do not guess the API version.</strong> After installing the operator, ask the cluster what it actually serves:</p>
+<pre><code>kubectl get crd kafkanodepools.kafka.strimzi.io \
+  -o jsonpath='{range .spec.versions[*]}{.name}{" served="}{.served}{" storage="}{.storage}{"\n"}{end}'</code></pre>
+<pre class="out"><code>v1beta2 served=true storage=true</code></pre>
+<p class="step-p">Use the version with <code class="inline">storage=true</code>. The manifests in <code class="inline">k8s/infra/kafka/</code> are written for <code class="inline">v1beta2</code>, matching the operator version pinned below. If your check prints <code class="inline">v1 served=true storage=true</code>, it is a find-and-replace across those five files, plus one structural change noted in "What breaks".</p>
+</div>
+<h3 id="m10-what-youre-building">What you're building</h3>
+<p class="step-p">The Strimzi operator in the <code class="inline">kafka</code> namespace, a single-node Kafka cluster in KRaft mode with a 20 GiB gp3 volume, and five topics declared as Kubernetes resources &#8212; which is what replaces <code class="inline">kafka/init-topics.sh</code>.</p>
+<p class="step-p">At the end, <code class="inline">kubectl -n kafka get kafka</code> shows Ready, five <code class="inline">KafkaTopic</code>s are Ready, and a throwaway <code class="inline">kcat</code> pod can list the topics with the right partition counts.</p>
+<p class="step-p">Cost: this runs on the existing node group. The only new AWS resource is a 20 GiB gp3 EBS volume, about $1.60/month. That is the whole reason Kafka is here rather than on MSK &#8212; MSK Serverless has roughly a $100/month floor even when completely idle.</p>
+<div class="why section">
+<h3 id="m10-why-it-works-this-way">Why it works this way</h3>
+<h4 id="m10-why-an-operator-instead-of-a-statefulset">Why an operator instead of a StatefulSet</h4>
+<p class="step-p">You could write a StatefulSet for Kafka. People do. What you would then own: rolling restarts that respect partition leadership, storage class and PVC lifecycle, KRaft controller quorum formation, certificate rotation if you ever enable TLS, and topic creation as an imperative script you have to remember to run.</p>
+<p class="step-p">Strimzi turns all of that into resources you declare and a controller that reconciles. Concretely: a topic becomes a <code class="inline">KafkaTopic</code> object that git owns, so <code class="inline">kafka/init-topics.sh</code> &#8212; a shell script somebody has to run at the right moment against the right broker &#8212; stops existing. That is the same trade you made for the schema in <a href="part-3-data-layer.html#m08">Module 8</a>, and it is worth making twice.</p>
+<p class="step-p">The cost is a CRD API surface to learn and an operator to keep pinned. Pin it. Strimzi releases roughly monthly and does not hesitate to remove APIs.</p>
+<h4 id="m10-why-one-node-that-is-both-controller-and-broker">Why one node that is both controller and broker</h4>
+<p class="step-p"><code class="inline">roles: [controller, broker]</code> on a single replica. In KRaft, controllers hold the cluster metadata log (what ZooKeeper used to do) and brokers hold the data. Splitting them is the right answer at three-plus nodes; at one node it would just mean two pods on the same machine pretending to be a quorum.</p>
+<p class="step-p">Storage is a 20 GiB gp3 persistent claim with <code class="inline">deleteClaim: false</code>. Two things to understand about that number:</p>
+<ul>
+<li>It is not about capacity. Every message on every topic in this system is a few hundred bytes of JSON. At 10,000 events a day with seven-day retention you are under 100 MB. 20 GiB is "you will never think about this again."</li>
+<li>gp3's baseline 3,000 IOPS and 125 MB/s come free at any size, so a bigger volume buys nothing here.</li>
+</ul>
+<p class="step-p"><strong>Do not use <code class="inline">type: ephemeral</code>.</strong> With one replica, a pod reschedule would lose every offset &#8212; including <code class="inline">__consumer_offsets</code>. That means every consumer restarts from its <code class="inline">auto.offset.reset</code> position, and in <a href="part-5-elastic.html#m14">Module 14</a> KEDA's lag measurement, which is computed from committed offsets, goes invalid and the ScaledJobs misbehave in ways that look random.</p>
+<p class="step-p">The pod carries <code class="inline">karpenter.sh/do-not-disrupt: "true"</code>. Karpenter consolidates under-utilised nodes, and a single-broker Kafka has no failover &#8212; a helpful consolidation mid-stream is a full outage.</p>
+<h4 id="m10-replication-factor-1-and-what-that-honestly-means">Replication factor 1, and what that honestly means</h4>
+<p class="step-p">Every topic is <code class="inline">replicas: 1</code>, and the <code class="inline">Kafka</code> CR sets <code class="inline">default.replication.factor</code>, <code class="inline">offsets.topic.replication.factor</code>, <code class="inline">transaction.state.log.replication.factor</code> and <code class="inline">min.insync.replicas</code> all to 1.</p>
+<p class="step-p">Those overrides are <strong>mandatory</strong>, not stylistic. Strimzi's defaults are 3. With one broker, a topic that wants three replicas can never reach in-sync state, <code class="inline">__consumer_offsets</code> never initialises, and every consumer in the application blocks trying to join a group &#8212; which presents as five services that start cleanly, log nothing unusual, and process nothing.</p>
+<p class="step-p"><code class="inline">min.insync.replicas: 1</code> deserves its own note. All three producers in this codebase set <code class="inline">enable.idempotence=True</code>, which forces <code class="inline">acks=all</code>. With <code class="inline">min.insync.replicas</code> above the replica count, every produce fails <code class="inline">NOT_ENOUGH_REPLICAS</code>, and in <code class="inline">ingest-webhook</code> that surfaces as a blocked <code class="inline">flush()</code> on the RTMP auth path &#8212; MediaMTX rejects the publish and it looks like an OBS problem.</p>
+<p class="step-p">The honest caveat: <strong>replication factor 1 means the broker is a single point of data loss.</strong> If that EBS volume is lost, every message and every consumer offset is gone. Not delayed &#8212; gone. The system recovers in the sense that new events flow once the broker returns, but anything in flight is not replayable. That is acceptable here because the events are operational signals with a seven-day retention, not a system of record &#8212; the system of record is Postgres. It would not be acceptable for anything you bill on.</p>
+<p class="step-p">Related, and worth budgeting for: with one broker, <strong>every Strimzi upgrade, Kafka version bump, or node roll is a total Kafka outage</strong> for a minute or two. Do not do any of them during a stream.</p>
+<h4 id="m10-plain-listener-not-tls-and-who-connects">Plain listener, not TLS, and who connects</h4>
+<p class="step-p">One listener: <code class="inline">name: plain</code>, port 9092, <code class="inline">type: internal</code>, <code class="inline">tls: false</code>.</p>
+<p class="step-p">Everything that talks to Kafka is inside the cluster &#8212; the five services in the <code class="inline">streaming</code> namespace and, importantly, the KEDA operator in <code class="inline">keda</code>. There is no path from outside the VPC to port 9092 and no <code class="inline">type: loadbalancer</code> listener to create one. Adding TLS would mean distributing Strimzi's CA into every client, configuring <code class="inline">security.protocol=SSL</code> and a truststore in <code class="inline">confluent-kafka</code>, and debugging certificate rotation &#8212; real work, for encryption between two pods on a private subnet in a single-tenant cluster.</p>
+<p class="step-p">Two things make that decision defensible rather than lazy. First, the NetworkPolicy in <code class="inline">k8s/infra/kafka/networkpolicy.yaml</code> restricts who may open 9092 at all. Second, ports <strong>9090 and 9091 are reserved by Strimzi</strong> for the control plane and inter-broker replication, and those are TLS-encrypted with Strimzi's own CA whether you ask or not. A listener declared on either port is rejected outright.</p>
+<p class="step-p">So: <strong>the apps use 9092, and KEDA uses 9092.</strong> There is no second answer.</p>
+<h4 id="m10-the-bootstrap-dns-name-and-why-the-compose-value-stops-working">The bootstrap DNS name, and why the compose value stops working</h4>
+<p class="step-p">Strimzi creates two Services:</p>
+<pre class="out"><code>streaming-kafka-bootstrap.kafka.svc:9092    # what every client uses
+streaming-kafka-brokers.kafka.svc           # headless, per-pod, for the operator</code></pre>
+<p class="step-p">The name is <code class="inline">&lt;cluster-name&gt;-kafka-bootstrap</code>, where the cluster name is the <code class="inline">Kafka</code> CR's <code class="inline">metadata.name</code>. Ours is <code class="inline">streaming</code>.</p>
+<p class="step-p">Today, <code class="inline">KAFKA_BOOTSTRAP_SERVERS=kafka:9092</code>. That short name resolved because compose put every container on one Docker network. On EKS, the app pods are in namespace <code class="inline">streaming</code> and Kafka is in <code class="inline">kafka</code>, so the short name resolves to nothing. It has to become <code class="inline">streaming-kafka-bootstrap.kafka.svc:9092</code> (or the fully-qualified <code class="inline">streaming-kafka-bootstrap.kafka.svc.cluster.local:9092</code> &#8212; identical result, one fewer DNS lookup).</p>
+<p class="step-p">This failure is quiet in an unhelpful way. <code class="inline">confluent-kafka</code> logs <code class="inline">Failed to resolve 'kafka:9092': Name or service not known</code> at whatever log level the client is configured for, then retries forever while the producer's <code class="inline">flush()</code> blocks. Nothing crashes.</p>
+<p class="step-p">The KEDA half is easy to miss: <strong>the KEDA operator pod, not your application pods, is what connects to Kafka to measure consumer lag.</strong> So the <code class="inline">ScaledJob</code> trigger's <code class="inline">bootstrapServers</code> must be reachable from the <code class="inline">keda</code> namespace, and any NetworkPolicy has to allow it. Forget that and KEDA reports <code class="inline">error getting kafka client</code> and never spawns a Job &#8212; with the application working perfectly, because the application's connectivity is a different question.</p>
+<h4 id="m10-why-streamstartrequests-exists-when-nothing-produces-to-it-yet">Why <code class="inline">stream.start.requests</code> exists, when nothing produces to it yet</h4>
+<p class="step-p"><code class="inline">kafka/init-topics.sh</code> creates five topics. You are creating five, but not the same five: <code class="inline">transcode.jobs</code> is dropped and <code class="inline">stream.start.requests</code> is added.</p>
+<p class="step-p"><code class="inline">transcode.jobs</code> goes because nothing produces to it and nothing consumes it. It is a leftover from an earlier design that had a dispatcher stage, which KEDA replaces. It has never held a message. Delete it from <code class="inline">kafka/init-topics.sh</code> too, so dev and prod agree about what exists.</p>
+<p class="step-p"><code class="inline">stream.start.requests</code> is new, and the reason is a real constraint in <a href="part-5-elastic.html#m14">Module 14</a> that is easier to absorb now than to discover then. <strong>KEDA's Kafka scaler triggers on raw consumer-group lag. It cannot read messages and it cannot filter by content.</strong> All it knows is "this consumer group is N messages behind on this topic."</p>
+<p class="step-p"><code class="inline">stream.lifecycle</code> carries both <code class="inline">started</code> and <code class="inline">ended</code> events. If you pointed KEDA's live trigger at it, every <code class="inline">ended</code> event would also count as lag, and KEDA would spawn a transcode Job for a stream that has just finished &#8212; which would start ffmpeg against an RTMP path with no publisher, fail, retry, and count against your concurrency ceiling the whole time.</p>
+<p class="step-p">So the trigger needs a topic that contains <em>only</em> the thing that should cause a Job. <code class="inline">stream.start.requests</code> carries <code class="inline">started</code> events and nothing else. <code class="inline">stream.lifecycle</code> keeps carrying both, because the live transcode pod tails it to learn that its own stream has ended.</p>
+<p class="step-p">Eight partitions, matching <code class="inline">stream.lifecycle</code>, because the partition count is the hard ceiling on how many Jobs KEDA can run concurrently &#8212; a topic needs at least as many partitions as the concurrency it must support.</p>
+<h4 id="m10-partition-counts-inherited-not-invented">Partition counts, inherited not invented</h4>
+<p class="step-p">Straight from the reasoning already in <code class="inline">kafka/init-topics.sh</code>:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>Topic</th>
+<th>Partitions</th>
+<th>Why</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">stream.lifecycle</code></td>
+<td>8</td>
+<td>Keyed by MediaMTX path. Also the topic each live transcode pod tails for its own <code class="inline">ended</code> event.</td>
+</tr>
+<tr>
+<td><code class="inline">upload.events</code></td>
+<td>8</td>
+<td>KEDA's VOD trigger. Partition count is the hard cap on concurrent VOD Jobs.</td>
+</tr>
+<tr>
+<td><code class="inline">stream.start.requests</code></td>
+<td>8</td>
+<td>KEDA's live trigger. Same ceiling as <code class="inline">stream.lifecycle</code>.</td>
+</tr>
+<tr>
+<td><code class="inline">transcode.status</code></td>
+<td>3</td>
+<td>One <code class="inline">analytics-worker</code> consumer, log-only, no horizontal-scaling plan.</td>
+</tr>
+<tr>
+<td><code class="inline">viewer.analytics</code></td>
+<td>3</td>
+<td>Same.</td>
+</tr>
+<tr>
+<td>~~<code class="inline">transcode.jobs</code>~~</td>
+<td>&#8212;</td>
+<td>Dropped. Unused.</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">One live transcode was measured at roughly 2.3 cores and 1 GB, so eight is about double any concurrency this cluster will reach &#8212; headroom without being meaningless.</p>
+<p class="step-p"><strong>Partitions can only go up.</strong> The Topic Operator will increase them to match the CR but cannot decrease. Editing <code class="inline">8</code> &#8594; <code class="inline">4</code> leaves the CR permanently <code class="inline">NotReady</code> with a <code class="inline">PartitionDecreaseException</code>, and in Module 15 that means ArgoCD is permanently <code class="inline">Degraded</code>. Choose now.</p>
+<p class="step-p">And the destructive one, worth internalising before Module 15: <strong>deleting a <code class="inline">KafkaTopic</code> CR deletes the Kafka topic and all its data.</strong> With ArgoCD's <code class="inline">automated.prune: true</code>, renaming <code class="inline">topics.yaml</code> or moving one topic into another file is a prune-then-recreate &#8212; which reads as a no-op in the diff and is a data wipe in practice. Every topic in <code class="inline">topics.yaml</code> carries <code class="inline">argocd.argoproj.io/sync-options: Prune=false</code> for exactly this reason.</p>
+</div>
+<h3 id="m10-do-it">Do it</h3>
+<h4 id="m10-1-install-the-operator-pinned">1. Install the operator, pinned</h4>
+<pre><code>helm repo add strimzi https://strimzi.io/charts/
+helm repo update
+
+<span class="c"># See what exists before pinning to something from a blog post.</span>
+helm search repo strimzi/strimzi-kafka-operator --versions | head -8</code></pre>
+<pre class="out"><code>NAME                             CHART VERSION  APP VERSION
+strimzi/strimzi-kafka-operator   0.49.0         0.49.0
+strimzi/strimzi-kafka-operator   0.48.0         0.48.0
+...</code></pre>
+<p class="step-p">Pin <strong>0.49.x</strong> and write <code class="inline">v1beta2</code>. That is a deliberate choice: the whole ecosystem's examples still match <code class="inline">v1beta2</code>, so you get one less unknown while you are learning the rest of this stack. Moving to Strimzi 1.x and <code class="inline">kafka.strimzi.io/v1</code> is a separate, deliberate task, not something to fold into a migration.</p>
+<pre><code>kubectl create namespace kafka --dry-run=client -o yaml | kubectl apply -f -
+
+helm upgrade --install strimzi strimzi/strimzi-kafka-operator \
+  --namespace kafka \
+  --version 0.49.0 \
+  --set watchAnyNamespace=false \
+  --set resources.requests.cpu=200m \
+  --set resources.requests.memory=384Mi \
+  --set resources.limits.memory=384Mi \
+  --wait</code></pre>
+<p class="step-p"><code class="inline">watchAnyNamespace=false</code> means the operator only reconciles resources in <code class="inline">kafka</code>, which is where all of them live. Widening it later is one <code class="inline">helm upgrade</code>.</p>
+<pre><code>kubectl -n kafka rollout status deploy/strimzi-cluster-operator</code></pre>
+<h4 id="m10-2-check-the-api-version-actually-run-this">2. Check the API version &#8212; actually run this</h4>
+<pre><code>kubectl get crd kafkanodepools.kafka.strimzi.io \
+  -o jsonpath='{range .spec.versions[*]}{.name}{" served="}{.served}{" storage="}{.storage}{"\n"}{end}'</code></pre>
+<p class="step-p">If it prints <code class="inline">v1beta2 served=true storage=true</code>, the manifests match and you continue. If it prints anything else, stop and read "What breaks" #1.</p>
+<p class="step-p">While you are here, note which Kafka versions this operator can actually run, so <code class="inline">spec.kafka.version</code> is not a guess:</p>
+<pre><code>kubectl -n kafka get deploy strimzi-cluster-operator \
+  -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="STRIMZI_KAFKA_IMAGES")].value}{"\n"}'</code></pre>
+<pre class="out"><code>3.8.0=quay.io/strimzi/kafka:0.49.0-kafka-3.8.0
+3.9.0=quay.io/strimzi/kafka:0.49.0-kafka-3.9.0
+...</code></pre>
+<p class="step-p">The manifests use <code class="inline">3.9.0</code>. If it is not in that list, pick the highest version that is and update <code class="inline">k8s/infra/kafka/kafka.yaml</code> to match.</p>
+<h4 id="m10-3-confirm-the-gp3-storageclass-exists">3. Confirm the gp3 StorageClass exists</h4>
+<p class="step-p">The <code class="inline">KafkaNodePool</code> asks for <code class="inline">class: gp3</code>. EKS ships <code class="inline">gp2</code> as default and no gp3 at all, which <a href="part-2-platform.html#m04">Module 4</a> fixed.</p>
+<pre><code>kubectl get storageclass</code></pre>
+<pre class="out"><code>NAME            PROVISIONER             DEFAULT   VOLUMEBINDINGMODE
+gp3 (default)   ebs.csi.aws.com         true      WaitForFirstConsumer
+gp2             kubernetes.io/aws-ebs             WaitForFirstConsumer</code></pre>
+<p class="step-p">No <code class="inline">gp3</code> line means the PVC will sit <code class="inline">Pending</code> forever and you will spend an hour blaming Strimzi. Go back to Module 4.</p>
+<h4 id="m10-4-apply-the-cluster">4. Apply the cluster</h4>
+<p class="step-p">The manifests are at <code class="inline">k8s/infra/kafka/</code>:</p>
+<div class="tbl-wrap">
+<table>
+<thead><tr>
+<th>File</th>
+<th>What it is</th>
+</tr></thead>
+<tbody>
+<tr>
+<td><code class="inline">namespace.yaml</code></td>
+<td>the <code class="inline">kafka</code> namespace</td>
+</tr>
+<tr>
+<td><code class="inline">nodepool-dual.yaml</code></td>
+<td><code class="inline">KafkaNodePool</code> &#8212; one dual-role node, 20 GiB gp3</td>
+</tr>
+<tr>
+<td><code class="inline">kafka.yaml</code></td>
+<td>the <code class="inline">Kafka</code> CR, KRaft mode, one plain listener</td>
+</tr>
+<tr>
+<td><code class="inline">topics.yaml</code></td>
+<td>five <code class="inline">KafkaTopic</code> CRs</td>
+</tr>
+<tr>
+<td><code class="inline">networkpolicy.yaml</code></td>
+<td>who may reach 9092</td>
+</tr>
+</tbody></table></div>
+<p class="step-p">Read them before applying &#8212; the comments carry the reasoning that would otherwise only exist in this document.</p>
+<pre><code>kubectl apply -k k8s/infra/kafka</code></pre>
+<pre class="out"><code>namespace/kafka configured
+kafkanodepool.kafka.strimzi.io/dual created
+kafka.kafka.strimzi.io/streaming created
+kafkatopic.kafka.strimzi.io/stream.lifecycle created
+kafkatopic.kafka.strimzi.io/upload.events created
+kafkatopic.kafka.strimzi.io/stream.start.requests created
+kafkatopic.kafka.strimzi.io/transcode.status created
+kafkatopic.kafka.strimzi.io/viewer.analytics created
+networkpolicy.networking.k8s.io/kafka-clients created</code></pre>
+<p class="step-p">Then wait. The first reconcile pulls a Kafka image, provisions an EBS volume and formats the KRaft metadata log; two to four minutes is normal.</p>
+<pre><code>kubectl -n kafka wait kafka/streaming --for=condition=Ready --timeout=600s</code></pre>
+<p class="step-p">Watch it while it goes if you want to see the ordering &#8212; the <code class="inline">Kafka</code> CR stays <code class="inline">NotReady</code> until the node pool's pod is up, and the <code class="inline">KafkaTopic</code>s stay <code class="inline">NotReady</code> until the <code class="inline">Kafka</code> CR is Ready. Both are expected, not errors:</p>
+<pre><code>kubectl -n kafka get pods -w</code></pre>
+<div class="confirm section">
+<h3 id="m10-verify">Verify</h3>
+<p class="step-p">Three checkpoints. All three must pass.</p>
+<h4 id="m10-1-the-cluster-is-ready">1. The cluster is Ready</h4>
+<pre><code>kubectl -n kafka get kafka</code></pre>
+<pre class="out"><code>NAME        DESIRED KAFKA REPLICAS   DESIRED ZK REPLICAS   READY   METADATA STATE   WARNINGS
+streaming                                                  True    KRaft</code></pre>
+<p class="step-p"><code class="inline">READY True</code> and <code class="inline">METADATA STATE KRaft</code>. Empty replica columns are correct &#8212; those are ZooKeeper-era fields, and with node pools the replica count lives on the <code class="inline">KafkaNodePool</code>:</p>
+<pre><code>kubectl -n kafka get kafkanodepool</code></pre>
+<pre class="out"><code>NAME   DESIRED REPLICAS   ROLES                    NODEIDS
+dual   1                  ["controller","broker"]  [0]</code></pre>
+<h4 id="m10-2-five-topics-all-ready">2. Five topics, all Ready</h4>
+<pre><code>kubectl -n kafka get kafkatopic</code></pre>
+<pre class="out"><code>NAME                    CLUSTER     PARTITIONS   REPLICATION FACTOR   READY
+stream.lifecycle        streaming   8            1                    True
+stream.start.requests   streaming   8            1                    True
+transcode.status        streaming   3            1                    True
+upload.events           streaming   8            1                    True
+viewer.analytics        streaming   3            1                    True</code></pre>
+<p class="step-p">Five rows, <code class="inline">READY True</code> on every one, and <code class="inline">transcode.jobs</code> absent.</p>
+<p class="step-p">A <code class="inline">READY</code> column that is blank or <code class="inline">False</code> means the Topic Operator has not reconciled it. <code class="inline">kubectl -n kafka describe kafkatopic &lt;name&gt;</code> puts the reason in <code class="inline">.status.conditions</code>.</p>
+<h4 id="m10-3-a-client-can-see-them-with-the-right-partition-counts">3. A client can see them, with the right partition counts</h4>
+<p class="step-p"><code class="inline">kubectl get</code> is asking the operator. This asks Kafka.</p>
+<pre><code>kubectl -n kafka run kcat --rm -it --restart=Never \
+  --image=edenhill/kcat:1.7.1 -- \
+  -b streaming-kafka-bootstrap.kafka.svc:9092 -L</code></pre>
+<pre class="out"><code>Metadata for all topics (from broker 0: streaming-kafka-bootstrap.kafka.svc:9092/0):
+ 1 brokers:
+  broker 0 at streaming-dual-0.streaming-kafka-brokers.kafka.svc:9092 (controller)
+ 5 topics:
+  topic "stream.lifecycle" with 8 partitions:
+    partition 0, leader 0, replicas: 0, isrs: 0
+    ...
+  topic "upload.events" with 8 partitions:
+    ...
+  topic "stream.start.requests" with 8 partitions:
+    ...
+  topic "transcode.status" with 3 partitions:
+    ...
+  topic "viewer.analytics" with 3 partitions:
+    ...</code></pre>
+<p class="step-p">What to actually read in that output:</p>
+<ul>
+<li><strong><code class="inline">1 brokers</code></strong> and the broker is <code class="inline">(controller)</code> &#8212; the dual-role node is doing both jobs.</li>
+<li><strong><code class="inline">5 topics</code></strong>, not 6. <code class="inline">__consumer_offsets</code> will appear here once a consumer group exists; it does not yet.</li>
+<li><strong>8 / 8 / 8 / 3 / 3 partitions</strong> in that order.</li>
+<li><strong><code class="inline">replicas: 0, isrs: 0</code></strong> on every partition &#8212; one replica, on broker 0, and it is in-sync. Read as "replica list is [broker 0]", not as "zero replicas".</li>
+</ul>
+<p class="step-p">Prove a round trip while you are here:</p>
+<pre><code>kubectl -n kafka run kcat-p --rm -i --restart=Never --image=edenhill/kcat:1.7.1 -- \
+  -b streaming-kafka-bootstrap.kafka.svc:9092 -P -t transcode.status &lt;&lt;&lt; '{"event":"checkpoint"}'
+
+kubectl -n kafka run kcat-c --rm -it --restart=Never --image=edenhill/kcat:1.7.1 -- \
+  -b streaming-kafka-bootstrap.kafka.svc:9092 -C -t transcode.status -o beginning -e</code></pre>
+<pre class="out"><code>{"event":"checkpoint"}
+% Reached end of topic transcode.status [1] at offset 1: exiting</code></pre>
+<p class="step-p">Record the value <a href="part-4-application.html#m11">Module 11</a> needs:</p>
+<pre class="out"><code>KAFKA_BOOTSTRAP_SERVERS=streaming-kafka-bootstrap.kafka.svc:9092</code></pre>
+<p class="step-p">And note what is retired: <strong><code class="inline">KAFKA_CLUSTER_ID</code> from <code class="inline">.env</code> is gone.</strong> Strimzi generates and manages the KRaft cluster ID itself. Setting it does nothing; leaving it in a ConfigMap is a lie waiting to confuse someone.</p>
+</div>
+<div class="gotcha section">
+<h3 id="m10-what-breaks">What breaks</h3>
+<h4 id="m10-1-no-matches-for-kind-kafkanodepool-in-version-kafkastrimziiov1beta2">1. <code class="inline">no matches for kind "KafkaNodePool" in version "kafka.strimzi.io/v1beta2"</code></h4>
+<p class="step-p">The operator you installed serves a different API version. Confirm:</p>
+<pre><code>kubectl get crd kafkanodepools.kafka.strimzi.io \
+  -o jsonpath='{range .spec.versions[*]}{.name}{" served="}{.served}{" storage="}{.storage}{"\n"}{end}'</code></pre>
+<p class="step-p">If it says <code class="inline">v1</code>, you are on Strimzi 1.x. Two changes:</p>
+<pre><code>sed -i '' 's#kafka.strimzi.io/v1beta2#kafka.strimzi.io/v1#' k8s/infra/kafka/*.yaml</code></pre>
+<p class="step-p">and then check <code class="inline">kafka.yaml</code> for anything under <code class="inline">spec.kafka</code> that belongs to the node pool. In <code class="inline">v1beta2</code> a stray <code class="inline">spec.kafka.replicas</code> or <code class="inline">spec.kafka.storage</code> is ignored; in <code class="inline">v1</code> it is <strong>rejected</strong>, and the error names the field. The manifests here already have none, but a copied snippet will.</p>
+<p class="step-p">The reverse error &#8212; <code class="inline">v1beta2</code> CRDs and manifests written for <code class="inline">v1</code> &#8212; is the same fix in the other direction.</p>
+<h4 id="m10-2-the-kafka-pod-is-pending-forever">2. The Kafka pod is <code class="inline">Pending</code> forever</h4>
+<p class="step-p">Almost always storage.</p>
+<pre><code>kubectl -n kafka get pvc
+kubectl -n kafka describe pvc data-0-streaming-dual-0</code></pre>
+<p class="step-p">Look at the Events. Two dominate:</p>
+<ul>
+<li><code class="inline">storageclass.storage.k8s.io "gp3" not found</code> &#8212; Module 4's StorageClass is missing. This is the single most common cause and the error is at the <em>PVC</em>, not at anything named Kafka, which is why people blame the operator.</li>
+<li><code class="inline">failed to provision volume ... could not create volume ... UnauthorizedOperation</code> &#8212; the EBS CSI driver addon is installed but its IAM role is not attached. <code class="inline">aws eks describe-addon --cluster-name streaming --addon-name aws-ebs-csi-driver --query 'addon.serviceAccountRoleArn'</code> should return a role ARN, not <code class="inline">null</code>.</li>
+</ul>
+<p class="step-p">If the PVC is <code class="inline">Bound</code> and the pod is still <code class="inline">Pending</code>, it is scheduling instead:</p>
+<pre><code>kubectl -n kafka describe pod streaming-dual-0 | sed -n '/Events:/,$p'</code></pre>
+<p class="step-p"><code class="inline">Insufficient memory</code> means the node group cannot fit a 2 GiB request. The node group is two <code class="inline">t3.medium</code> (4 GiB each); Kafka at 2 GiB plus the DaemonSets is tight but fits. If it does not, that is a Module 6 (Karpenter) conversation, not a reason to shrink the broker below 2 GiB &#8212; a 1 GiB heap with no page cache headroom is worse than no Kafka.</p>
+<h4 id="m10-3-topics-stay-notready">3. Topics stay <code class="inline">NotReady</code></h4>
+<pre><code>kubectl -n kafka describe kafkatopic stream.lifecycle | sed -n '/Status:/,$p'</code></pre>
+<ul>
+<li><strong><code class="inline">PartitionDecreaseException</code></strong> &#8212; someone lowered the partition count in the CR. Partitions only go up. Put the original number back; the CR reconciles and the topic was never actually changed.</li>
+<li><strong>The Topic Operator is not running.</strong> <code class="inline">kubectl -n kafka get pods | grep entity-operator</code> should show one Running pod with two containers. If <code class="inline">entityOperator.topicOperator</code> is missing from <code class="inline">kafka.yaml</code>, the <code class="inline">KafkaTopic</code> CRs are inert YAML and nothing tells you so.</li>
+<li><strong><code class="inline">label strimzi.io/cluster does not match any Kafka cluster</code></strong> &#8212; a typo in the label. It must equal the <code class="inline">Kafka</code> CR's <code class="inline">metadata.name</code>, which is <code class="inline">streaming</code>.</li>
+</ul>
+<p class="step-p">One behaviour that surprises people: the Topic Operator is <strong>unidirectional</strong>. It reconciles CR &#8594; Kafka, not the other way. A topic created directly with <code class="inline">kafka-topics.sh</code> never gets a CR, and a topic altered directly gets silently reverted on the next reconcile. Manage topics through git or not at all.</p>
+<h4 id="m10-4-an-app-logs-failed-to-resolve-kafka9092-and-then-hangs">4. An app logs <code class="inline">Failed to resolve 'kafka:9092'</code> and then hangs</h4>
+<p class="step-p"><code class="inline">KAFKA_BOOTSTRAP_SERVERS</code> is still the compose value.</p>
+<pre><code>kubectl -n streaming exec deploy/ingest-webhook -- env | grep KAFKA</code></pre>
+<p class="step-p">It must be <code class="inline">streaming-kafka-bootstrap.kafka.svc:9092</code>. Verify the name resolves from the app's namespace, which also proves the Service exists under the name you think it does:</p>
+<pre><code>kubectl -n streaming run dns --rm -it --restart=Never --image=busybox:1.36 -- \
+  nslookup streaming-kafka-bootstrap.kafka.svc.cluster.local</code></pre>
+<p class="step-p">The failure is quiet: <code class="inline">confluent-kafka</code> retries name resolution forever and <code class="inline">flush()</code> blocks. Nothing crashes and nothing logs an error at default level, so the symptom you see is "events never arrive" rather than "cannot connect."</p>
+<h4 id="m10-5-keda-reports-error-getting-kafka-client-while-the-apps-work-fine">5. KEDA reports <code class="inline">error getting kafka client</code> while the apps work fine</h4>
+<p class="step-p">Different client, different namespace. The KEDA operator pod in <code class="inline">keda</code> is what connects to measure lag.</p>
+<pre><code>kubectl -n keda logs deploy/keda-operator | grep -i kafka</code></pre>
+<p class="step-p">Check the NetworkPolicy includes <code class="inline">keda</code>:</p>
+<pre><code>kubectl -n kafka get networkpolicy kafka-clients -o yaml | grep -A2 namespaceSelector</code></pre>
+<p class="step-p">Then check whether the policy is even enforced, because on EKS with the VPC CNI it may not be:</p>
+<pre><code>kubectl -n kube-system get ds aws-node \
+  -o jsonpath='{.spec.template.spec.containers[0].args}{"\n"}'</code></pre>
+<p class="step-p">If <code class="inline">--enable-network-policy=true</code> is absent, NetworkPolicy is not enforced at all and <code class="inline">networkpolicy.yaml</code> is documentation. Know which it is before you spend time debugging a policy that is not running.</p>
+<p class="step-p">The other half of this trap: if anyone sets <code class="inline">spec.kafka.listeners[].networkPolicyPeers</code> in <code class="inline">kafka.yaml</code>, Strimzi generates its <em>own</em> deny-everything-else policy. Forget <code class="inline">keda</code> in that list and you get this exact symptom with no policy of yours to blame. That field is deliberately unset here.</p>
+<h4 id="m10-6-producers-fail-with-notenoughreplicas">6. Producers fail with <code class="inline">NOT_ENOUGH_REPLICAS</code></h4>
+<p class="step-p"><code class="inline">min.insync.replicas</code> is above the replica count.</p>
+<pre><code>kubectl -n kafka get kafka streaming -o jsonpath='{.spec.kafka.config}{"\n"}' | python3 -m json.tool</code></pre>
+<p class="step-p">All four replication settings must be <code class="inline">1</code>. This also fires if a <code class="inline">KafkaTopic</code> overrides <code class="inline">min.insync.replicas</code> in its own <code class="inline">config</code> block &#8212; check the topic as well as the cluster.</p>
+<p class="step-p">The application-side symptom is worth recognising: the producers set <code class="inline">enable.idempotence=True</code>, which forces <code class="inline">acks=all</code>, so this presents as <code class="inline">ingest-webhook</code> blocking on <code class="inline">flush()</code> during RTMP auth, and MediaMTX refusing the publish. It looks like a streaming problem.</p>
+<h4 id="m10-7-everything-was-fine-then-the-broker-restarted-and-consumers-reset">7. Everything was fine, then the broker restarted and consumers reset</h4>
+<p class="step-p">Check whether the PVC survived:</p>
+<pre><code>kubectl -n kafka get pvc</code></pre>
+<p class="step-p">If the PVC is new (recent <code class="inline">AGE</code>), the volume was recreated and <code class="inline">__consumer_offsets</code> is empty. That happens if the node pool was deleted with <code class="inline">deleteClaim: true</code>, or if someone switched storage to <code class="inline">ephemeral</code>. The manifests set <code class="inline">deleteClaim: false</code> precisely to make this hard to do by accident.</p>
+<p class="step-p">There is no recovery &#8212; offsets are gone. Consumers resume from <code class="inline">auto.offset.reset</code>, and KEDA's lag numbers are meaningless until each group commits again. Recognising it quickly is the whole win.</p>
+<p class="step-p">That completes Part III. You now have a database with a schema, object storage with a CDN in front of it, and a message bus with topics &#8212; every stateful dependency the application has. <a href="part-4-application.html#m11">Module 11</a> puts the services on top of them.</p>
+</div>
+</section>
+
+<footer class="finish">
+  <span class="eyebrow">End of Part III</span>
+  <p>Postgres, object storage and Kafka are all in place. Next the application itself goes on top of them.</p>
+</footer>
+<div class="pager"><a href="part-2-platform.html">&larr; Part II &mdash; Platform</a><a href="part-4-application.html">Part IV &mdash; The application &rarr;</a></div>
+</main>
+</div>
