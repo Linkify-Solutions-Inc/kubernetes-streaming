@@ -1,0 +1,57 @@
+# KEDA — the pod half of the autoscaling answer. Karpenter (Module 6) adds
+# nodes; KEDA creates the pods that make those nodes necessary. Neither does
+# anything useful alone.
+#
+# Installed as an Argo Application wrapping the upstream Helm chart, not by
+# `helm install`. Sync-wave 0: KEDA's CRDs (ScaledJob, ScaledObject,
+# TriggerAuthentication) must exist before k8s/apps/base/transcode/ is synced
+# in wave 3, or Argo's dry-run fails with `no matches for kind "ScaledJob"`.
+#
+# See docs/aws/14-keda-scaledjobs.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: keda
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://kedacore.github.io/charts
+    chart: keda
+    targetRevision: 2.19.0 # pinned; KEDA minors move fast and change CRD fields
+    helm:
+      values: |
+        # One replica of each. HA here would buy nothing: a KEDA outage means
+        # Jobs stop being created, which is visible within seconds as Kafka lag
+        # you can see on the Grafana dashboard from Module 16.
+        operator:
+          replicaCount: 1
+        metricsServer:
+          replicaCount: 1
+        resources:
+          operator:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 512Mi}
+        # No IRSA / Pod Identity. The Kafka scaler opens a plain TCP connection
+        # to an in-cluster Service and makes zero AWS API calls. KEDA only needs
+        # an AWS identity for AWS-flavoured scalers (SQS, CloudWatch, DynamoDB,
+        # or MSK with IAM auth). Keeping Kafka in-cluster on Strimzi is what
+        # buys us that simplicity.
+        podIdentity:
+          aws:
+            irsa:
+              enabled: false
+  destination:
+    namespace: keda
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # The KEDA CRDs carry large validation schemas that blow the 262144-byte
+      # last-applied-configuration annotation limit under client-side apply.
+      - ServerSideApply=true

@@ -1,0 +1,110 @@
+# EKS cluster for the streaming platform.
+#
+#   eksctl create cluster -f infra/eks/cluster.yaml     # ~15-20 minutes
+#
+# This file is the source of truth for the cluster, the VPC, the node group
+# and the core add-ons. eksctl keeps no state file, so anything you change in
+# the console will NOT be reconciled -- make cluster-level changes here and
+# apply them with eksctl, and keep everything else (add-ons via Helm,
+# workloads via Kustomize) declarative in git too.
+#
+# See docs/aws/03-eks-cluster.md for a walkthrough of every stanza.
+#
+# Substitute before applying:
+#   <accountid>         your 12-digit AWS account ID
+#   <SSO_ROLE_SUFFIX>   the AWSReservedSSO_... role name from Module 1
+apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: streaming
+  region: us-east-1
+  version: "1.35"
+  tags:
+    Project: streaming
+
+# EKS Access Entries, not the legacy aws-auth ConfigMap. "API" means the
+# ConfigMap is not consulted at all -- one source of truth, auditable in
+# CloudTrail, and recoverable with the EKS API if it is ever wrong.
+accessConfig:
+  authenticationMode: API
+  bootstrapClusterCreatorAdminPermissions: true
+  accessEntries:
+    # A second admin, so deleting the creating principal cannot lock you out.
+    # This is the SSO *role* ARN (with the aws-reserved path), not the
+    # assumed-role session ARN that `aws sts get-caller-identity` prints.
+    - principalARN: arn:aws:iam::<accountid>:role/aws-reserved/sso.amazonaws.com/us-east-1/AWSReservedSSO_<SSO_ROLE_SUFFIX>
+      accessPolicies:
+        - policyARN: arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy
+          accessScope:
+            type: cluster
+
+vpc:
+  cidr: 10.42.0.0/16
+  nat:
+    # One NAT gateway: $32.85/mo instead of $98.55. An AZ failure costs all
+    # private subnets their egress. See docs/aws/02-vpc-and-networking.md.
+    gateway: Single
+  clusterEndpoints:
+    publicAccess: true    # kubectl from a laptop, no bastion
+    privateAccess: true   # node -> API server traffic stays in the VPC
+  publicAccessCIDRs:
+    - 0.0.0.0/0           # Tighten to a static office/home /32 if you have one.
+
+# Creates the cluster's OIDC provider. Pod Identity is the modern default and
+# is used where it can be, but the AWS Load Balancer Controller and Karpenter
+# still want IRSA -- which needs this.
+iam:
+  withOIDC: true
+
+managedNodeGroups:
+  - name: system
+    instanceType: t3.medium
+    amiFamily: AmazonLinux2023
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 4
+    volumeSize: 40
+    volumeType: gp3
+    volumeEncrypted: true
+    privateNetworking: true
+    availabilityZones: [us-east-1a, us-east-1b]
+    labels:
+      workload: system
+    tags:
+      Project: streaming
+      # Deliberately empty: Karpenter must not manage or consolidate these.
+      karpenter.sh/discovery: ""
+    # Do NOT taint this group. Karpenter, CoreDNS, the load balancer
+    # controller, External Secrets, Strimzi and every stateless app pod live
+    # here; a taint means adding tolerations to every chart for no benefit at
+    # this size.
+
+cloudWatch:
+  clusterLogging:
+    # Control-plane logs. "authenticator" is the one that tells you why an
+    # access entry did not work; "audit" is how you find out what actually
+    # changed an object. Omitting "controllerManager" and "scheduler" keeps
+    # the volume (and the bill) down.
+    enableTypes: ["api", "audit", "authenticator"]
+    # eksctl does not set retention on the log group by default -- without
+    # this it is "Never expire" and grows forever at $0.03/GB/month.
+    logRetentionInDays: 7
+
+addons:
+  - name: vpc-cni
+    version: latest
+    configurationValues: |-
+      {"env":{"ENABLE_PREFIX_DELEGATION":"false","WARM_ENI_TARGET":"1"}}
+  - name: coredns
+    version: latest
+  - name: kube-proxy
+    version: latest
+  - name: eks-pod-identity-agent
+    version: latest
+  - name: aws-ebs-csi-driver
+    version: latest
+    podIdentityAssociations:
+      - namespace: kube-system
+        serviceAccountName: ebs-csi-controller-sa
+        permissionPolicyARNs: ["arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"]

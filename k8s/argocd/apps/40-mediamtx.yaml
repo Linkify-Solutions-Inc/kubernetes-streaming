@@ -1,0 +1,54 @@
+# Wave 40 — MediaMTX and its NLB Service.
+#
+# The ONLY Application in this repo with no automated sync policy, and the
+# reason is the NLB's deregistration behaviour (Module 12): rolling the
+# mediamtx pod tears down every in-flight RTMP connection on the platform.
+# Every live stream drops, and OBS does not silently reconnect.
+#
+# An automated sync means a config typo committed at 4pm ends everyone's stream
+# at 4pm. Manual sync means you choose the moment:
+#
+#   argocd app sync mediamtx
+#   # or: kubectl -n argocd patch app mediamtx --type merge \
+#   #       -p '{"operation":{"sync":{"revision":"master"}}}'
+#
+# Argo still shows it as OutOfSync, so you always know a change is waiting.
+#
+# The manual gate only works because this Application is the SOLE owner of the
+# MediaMTX objects. That is why MediaMTX lives at k8s/apps/mediamtx/ — its own
+# kustomize root — instead of in k8s/apps/base/, which the auto-synced wave-3
+# `streaming` Application renders. Two Argo Applications cannot both own the
+# same objects: if MediaMTX were still in the base, `streaming` would re-sync
+# within 30 seconds whatever this one was holding back, and you would get
+# exactly the mid-broadcast restart this file exists to prevent.
+#
+# `path` is the AWS OVERLAY, not the base. The base is cloud-neutral and is
+# also consumed by k8s/apps/overlays/dev for the kubeadm box; the overlay adds
+# the public RTMP NLB Service and the `workload: system` node placement, both
+# of which only mean anything on EKS. Module 15's "Do it" step 4 has the layout
+# and the check that proves the split is clean.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: mediamtx
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "40"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Linkify-Solutions-Inc/kubernetes-streaming.git
+    targetRevision: master
+    path: k8s/apps/mediamtx/overlays/aws
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: streaming
+  # Deliberately empty. No automated block, no selfHeal.
+  syncPolicy: {}
+  ignoreDifferences:
+    - group: ""
+      kind: Service
+      jsonPointers:
+        - /status

@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Referenced from k8s/apps/base/kustomization.yaml. There is no Deployment here
+# on purpose — transcode-worker stopped being a long-running Deployment in
+# Module 14 and became two ScaledJobs plus a recovery CronJob.
+# The `transcode-worker` ServiceAccount is NOT redefined here — it stays where
+# Module 11 put it (../transcode-worker/serviceaccount.yaml) and is listed in
+# k8s/apps/base/kustomization.yaml. Module 14 deletes only the Deployment next
+# to it; keeping the ServiceAccount means the EKS Pod Identity association and
+# any imagePullSecret survive the switch to ScaledJobs untouched.
+resources:
+  - scaledjob-live.yaml
+  - scaledjob-vod.yaml
+  - sweeper-cronjob.yaml
+
+# CI rewrites the tag in the PROD OVERLAY's `images:` block, not here (Module
+# 15). Base keeps :latest so `kubectl apply -k k8s/apps/base` is still usable
+# for a throwaway test cluster.

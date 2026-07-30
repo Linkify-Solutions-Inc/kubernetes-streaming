@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: upload-api
+spec:
+  # ClusterIP, and it stays ClusterIP. POST /streamers mints stream keys
+  # with no authentication whatsoever -- this Service must never appear in
+  # an Ingress. web proxies to it server-side.
+  type: ClusterIP
+  selector:
+    app: upload-api
+  ports:
+    - name: http
+      port: 8000
+      targetPort: http

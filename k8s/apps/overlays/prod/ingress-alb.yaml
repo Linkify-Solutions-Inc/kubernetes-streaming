@@ -1,0 +1,68 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: streaming
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    # NLB/ALB -> pod IP directly. With the VPC CNI handing pods real VPC
+    # addresses this is free and strictly better than `instance` mode, which
+    # lands on a NodePort and gets kube-proxy DNAT'd, possibly to a pod on a
+    # different node, adding a cross-AZ hop and its data charge.
+    alb.ingress.kubernetes.io/target-type: ip
+
+    # Without group.name, EVERY Ingress object provisions its own ALB at
+    # ~$16/month. With it, they share one. It is not retrofittable without a
+    # DNS change, so set it now even with a single Ingress.
+    alb.ingress.kubernetes.io/group.name: streaming
+
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
+    # The controller synthesises a 301 redirect action on the HTTP listener.
+    # Port 80 exists only to send people to 443.
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: <acm-cert-arn>
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+
+    alb.ingress.kubernetes.io/healthcheck-path: /livez
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+
+    # 1800s idle timeout for the upload path. Necessary but NOT sufficient:
+    # web's own httpx timeout is a *total* timeout and fires first. See
+    # docs/aws/12-ingress-and-rtmp.md.
+    alb.ingress.kubernetes.io/load-balancer-attributes: >-
+      idle_timeout.timeout_seconds=1800,
+      routing.http2.enabled=true
+    alb.ingress.kubernetes.io/target-group-attributes: >-
+      deregistration_delay.timeout_seconds=30,
+      stickiness.enabled=false
+
+    # ExternalDNS (Module 5) reads this and creates the Route 53 ALIAS.
+    external-dns.alpha.kubernetes.io/hostname: stream.k8s.linkifysolutions.com
+spec:
+  ingressClassName: alb
+  rules:
+    - host: stream.k8s.linkifysolutions.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8000
+
+# ONLY `web` IS IN HERE, and that is a security boundary, not an oversight.
+#
+#   upload-api      -- POST /streamers mints stream keys with no auth. web
+#                      proxies to it server-side over ClusterIP.
+#   ingest-webhook  -- called only by MediaMTX, inside the cluster.
+#                      /hooks/auth would let anyone on the internet probe
+#                      stream keys; /hooks/publish would let them forge
+#                      stream-start events and spend your transcode budget.
+#   analytics-worker -- no HTTP surface at all.
+#
+# If you need to reach one of them, `kubectl port-forward`. Do not add a
+# path rule "just for debugging" -- group.name means it lands on the same
+# public ALB.

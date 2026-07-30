@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# The app-of-apps. k8s/bootstrap/root-app.yaml points here; Argo renders this
+# directory and creates the seven child Applications below.
+#
+# The number prefix on each filename IS the sync wave, literally — 20-kafka.yaml
+# carries `sync-wave: "20"`. So `ls` shows you the dependency order, and the
+# gaps are the point: they leave room to insert a stage between two existing
+# ones without renumbering everything after it, which is exactly how
+# 25-db-migrate.yaml came to sit between Kafka and the application.
+#
+# The annotation is still the mechanism; the filename is documentation that
+# happens to agree with it. Keep them in step.
+#
+# See docs/aws/15-argocd-gitops.md.
+namespace: argocd
+
+resources:
+  - 00-platform.yaml # operators and CRDs
+  - 10-secrets.yaml # ClusterSecretStore + ExternalSecrets (needs ESO CRDs)
+  - 10-karpenter-pools.yaml # EC2NodeClass + NodePools (needs Karpenter CRDs)
+  - 20-kafka.yaml # Kafka cluster + topics (needs Strimzi CRDs + gp3 SC)
+  - 25-db-migrate.yaml # schema, before anything queries it (needs the DB Secret)
+  - 30-streaming.yaml # our five services (needs Secret, Kafka, KEDA CRDs)
+  - 40-mediamtx.yaml # RTMP ingest — MANUAL sync, see the file

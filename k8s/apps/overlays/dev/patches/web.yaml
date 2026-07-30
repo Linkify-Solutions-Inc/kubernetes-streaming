@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+spec:
+  replicas: 1
+  template:
+    spec:
+      # One node. `null` removes the constraint rather than leaving an
+      # unsatisfiable one behind.
+      topologySpreadConstraints: null

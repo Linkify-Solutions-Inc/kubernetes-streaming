@@ -1,0 +1,52 @@
+apiVersion: karpenter.k8s.aws/v1
+kind: EC2NodeClass
+metadata:
+  name: transcode
+spec:
+  # The alias pins the AMI family (AL2023) and tracks the latest EKS-optimized
+  # release for the cluster's Kubernetes version. Do not also set `amiFamily`:
+  # with an alias it is derived, and setting both is a validation error.
+  amiSelectorTerms:
+    - alias: al2023@latest
+
+  # Created by the official Karpenter CloudFormation stack.
+  role: KarpenterNodeRole-streaming
+
+  # Karpenter finds where to launch by tag, not by hard-coded IDs. The managed
+  # node group's subnets/SGs carry `karpenter.sh/discovery: streaming`; the
+  # node group's own instances carry an EMPTY value so they never match.
+  subnetSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: streaming
+  securityGroupSelectorTerms:
+    - tags:
+        karpenter.sh/discovery: streaming
+
+  # Scratch disk for ffmpeg. transcode-worker writes through Python's tempfile
+  # into /tmp, which Kubernetes accounts as ephemeral-storage on the node root
+  # volume. Sized for the worst case (VOD: a 2 GiB source that is hours long,
+  # so ~2 GiB in and ~12 GB of HLS out, two jobs per node) plus AL2023 (~3 GiB)
+  # and the transcode image
+  # with ffmpeg (~1.5 GiB). A node that lives 20 minutes costs less than a cent
+  # for this disk — size it generously.
+  blockDeviceMappings:
+    - deviceName: /dev/xvda # AL2023 root device
+      ebs:
+        volumeSize: 200Gi
+        volumeType: gp3
+        iops: 3000 # free gp3 baseline
+        throughput: 125 # free gp3 baseline, MB/s
+        encrypted: true
+        deleteOnTermination: true
+
+  # IMDSv2 with a hop limit of 2 so pods behind the CNI can still reach the
+  # metadata service. Karpenter defaults to 1, which breaks some SDK paths.
+  metadataOptions:
+    httpEndpoint: enabled
+    httpTokens: required
+    httpPutResponseHopLimit: 2
+
+  tags:
+    Project: streaming
+    Workload: transcode
+    ManagedBy: karpenter

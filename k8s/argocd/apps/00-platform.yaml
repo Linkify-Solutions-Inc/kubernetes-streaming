@@ -1,0 +1,51 @@
+# Wave 0 — software other people wrote. Operators, controllers, CRDs.
+#
+# This is a separate Application from everything that uses those CRDs, and that
+# separation is load-bearing. Sync waves alone do NOT solve the CRD-before-CR
+# problem: within a single Application, Argo dry-runs every manifest before
+# applying any of them, so a ScaledJob in the same Application as the KEDA chart
+# fails the whole sync with `no matches for kind "ScaledJob"` — before wave
+# ordering ever gets a chance to run. Application-level separation does solve
+# it, because Argo will not begin syncing wave 10 until wave 0's Application
+# reports Healthy.
+#
+# See docs/aws/15-argocd-gitops.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Linkify-Solutions-Inc/kubernetes-streaming.git
+    targetRevision: master
+    # A directory of Applications-wrapping-Helm-charts: external-secrets,
+    # strimzi-operator, keda, aws-load-balancer-controller, karpenter,
+    # kube-prometheus-stack.
+    #
+    # Deliberately a PLAIN directory with no kustomization.yaml. Argo picks up
+    # every manifest it finds, so adding an operator is one new file and
+    # nothing else. A kustomization.yaml here would mean a new chart silently
+    # does not deploy until someone remembers to add it to `resources`.
+    path: k8s/platform
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m

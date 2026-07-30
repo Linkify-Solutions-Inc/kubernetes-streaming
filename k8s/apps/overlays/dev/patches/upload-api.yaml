@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: upload-api
+spec:
+  replicas: 1
+  template:
+    spec:
+      topologySpreadConstraints: null
+      containers:
+        # Strategic-merge patches match containers by name.
+        - name: upload-api
+          env:
+            # MinIO needs an explicit endpoint and static credentials. On
+            # EKS all three are absent and boto3 falls through to Pod
+            # Identity -- which is the entire point of the Module 0 change
+            # that made these optional.
+            - name: S3_ENDPOINT
+              value: http://minio.streaming.svc.cluster.local:9000
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: streaming-secrets
+                  key: MINIO_ROOT_USER
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: streaming-secrets
+                  key: MINIO_ROOT_PASSWORD

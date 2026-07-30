@@ -1,0 +1,40 @@
+# Wave 10 — the EC2NodeClass and the two transcode NodePools from Module 6.
+# Needs Karpenter's CRDs from wave 0.
+#
+# Same wave as `secrets` because they are independent of each other; Argo runs a
+# wave's Applications concurrently and only advances when all of them are
+# Healthy.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: karpenter-pools
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "10"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Linkify-Solutions-Inc/kubernetes-streaming.git
+    targetRevision: master
+    path: k8s/infra/karpenter
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: karpenter
+  syncPolicy:
+    automated:
+      # prune: true would delete a NodePool if someone renamed a file, and
+      # deleting a NodePool drains its nodes. On a live cluster that is a
+      # stream-killing outage from a typo. Prune these by hand.
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  ignoreDifferences:
+    # Karpenter writes observed state back into NodePool.status continuously.
+    - group: karpenter.sh
+      kind: NodePool
+      jsonPointers:
+        - /status

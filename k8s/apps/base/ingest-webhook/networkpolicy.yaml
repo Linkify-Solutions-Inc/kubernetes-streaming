@@ -1,0 +1,26 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ingest-webhook-from-mediamtx
+spec:
+  # /hooks/publish and /hooks/unpublish take a single `path` form field and
+  # do zero authentication -- by design, because /hooks/auth already gated
+  # the key. That makes them forgeable by anything that can reach port 8000.
+  # Only MediaMTX ever calls them.
+  podSelector:
+    matchLabels:
+      app: ingest-webhook
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: mediamtx
+      ports:
+        - protocol: TCP
+          port: 8000
+# GOTCHA: the AWS VPC CNI does not enforce NetworkPolicy unless you turn it
+# on (`enableNetworkPolicy: "true"` in the vpc-cni add-on config, Module 4).
+# Without it this manifest applies cleanly, reports no error, and does
+# nothing at all. Verify with an actual curl from a pod outside the
+# selector; do not assume.

@@ -1,0 +1,42 @@
+---
+# Who may reach the broker on 9092.
+#
+# Written by hand rather than via spec.kafka.listeners[].networkPolicyPeers,
+# because that field makes Strimzi generate a deny-everything-else policy and
+# forgetting `keda` in the list produces "error getting kafka client" in the
+# KEDA operator and ScaledJobs that never fire.
+#
+# NOTE: on EKS with the VPC CNI, NetworkPolicy is only enforced if the
+# aws-node addon has ENABLE_NETWORK_POLICY=true. If it does not, this file is
+# documentation, not enforcement. Check which it is:
+#   kubectl -n kube-system get ds aws-node \
+#     -o jsonpath='{.spec.template.spec.containers[0].args}{"\n"}'
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kafka-clients
+  namespace: kafka
+spec:
+  podSelector:
+    matchLabels:
+      strimzi.io/cluster: streaming
+      strimzi.io/kind: Kafka
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # the five application services
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: streaming
+        # the KEDA operator — it, not your app pods, is what measures lag
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: keda
+        # the Entity Operator and inter-broker traffic
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kafka
+      ports:
+        - port: 9092
+          protocol: TCP

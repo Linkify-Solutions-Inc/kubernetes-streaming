@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: analytics-worker
+spec:
+  replicas: 1
+  # Recreate, not RollingUpdate: two replicas alive at once means a Kafka
+  # consumer-group rebalance mid-rollout for no benefit.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: analytics-worker
+  template:
+    metadata:
+      labels:
+        app: analytics-worker
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: analytics-worker
+          image: ghcr.io/linkify-solutions-inc/kubernetes-streaming-analytics-worker
+          ports:
+            - name: http
+              containerPort: 8000
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: streaming-db
+                  key: POSTGRES_DSN
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: streaming-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+          # The probe target is the small health thread added in Module 0:
+          # 200 while the consumer polled within the last 60s, 503 otherwise.
+          # A Kafka consumer that silently stops polling -- rebalance storm,
+          # broker gone, swallowed exception -- is a real failure mode that a
+          # probe-less Deployment never notices.
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 2
+            failureThreshold: 30
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 15
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              memory: 384Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

@@ -1,0 +1,102 @@
+---
+# Five topics, replacing kafka/init-topics.sh.
+#
+# Partition counts carry over from that script's reasoning: KEDA's Kafka
+# scaler caps ScaledJob concurrency at the number of partitions carrying lag,
+# so a topic needs at least as many partitions as the concurrent-Job ceiling
+# it has to support. See docs/aws/10-kafka-strimzi.md.
+#
+# Partitions can only go UP. Editing 8 -> 4 leaves the CR permanently NotReady
+# with a PartitionDecreaseException.
+#
+# DELETING ONE OF THESE CRs DELETES THE KAFKA TOPIC AND ITS DATA. That is why
+# every one carries Prune=false for Module 15.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: stream.lifecycle
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: streaming
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  # Keyed by MediaMTX path. Also the topic each live transcode pod tails to
+  # learn that its own stream has ended.
+  partitions: 8
+  replicas: 1
+  config:
+    retention.ms: "604800000"   # 7d
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: upload.events
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: streaming
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  # KEDA's VOD trigger. Partition count is the hard concurrency cap on VOD
+  # transcode Jobs.
+  partitions: 8
+  replicas: 1
+  config:
+    retention.ms: "604800000"
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: stream.start.requests
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: streaming
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  # NEW in the AWS design; nothing produces to it yet. Module 14 needs it:
+  # KEDA's Kafka scaler triggers on raw consumer-group lag and cannot inspect
+  # message contents, so pointing it at stream.lifecycle would spawn a
+  # transcode Job for every 'ended' event too. This topic carries 'started'
+  # only. Same partition count as stream.lifecycle — it is the same
+  # concurrency ceiling.
+  partitions: 8
+  replicas: 1
+  config:
+    retention.ms: "604800000"
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: transcode.status
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: streaming
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  # One analytics-worker consumer, log-only, no horizontal-scaling plan.
+  partitions: 3
+  replicas: 1
+  config:
+    retention.ms: "604800000"
+---
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaTopic
+metadata:
+  name: viewer.analytics
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: streaming
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+spec:
+  partitions: 3
+  replicas: 1
+  config:
+    retention.ms: "604800000"
+# transcode.jobs is deliberately absent. Nothing produces to it and nothing
+# consumes it — it survived from an earlier design that had a dispatcher stage
+# KEDA replaced. Delete it from kafka/init-topics.sh too, so dev and prod
+# agree about what exists.

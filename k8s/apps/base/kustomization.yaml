@@ -1,0 +1,65 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# The base is the truth. Overlays are deltas.
+#   overlays/dev  -> the kubeadm box (in-cluster Postgres + MinIO, ingress-nginx)
+#   overlays/prod -> EKS (RDS, S3/CloudFront, ALB, NLB)
+#
+# Nothing here is AWS-specific on purpose: if you find yourself typing an
+# ARN, an account id or a *.amazonaws.com hostname in this directory, it
+# belongs in overlays/prod instead.
+
+namespace: streaming
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: streaming
+    # Selectors are immutable on a Deployment. If these labels were folded
+    # into the selectors, adding one later would make every apply fail with
+    # "field is immutable" and you would have to delete the Deployment.
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - web/deployment.yaml
+  - web/service.yaml
+  - upload-api/serviceaccount.yaml
+  - upload-api/deployment.yaml
+  - upload-api/service.yaml
+  - ingest-webhook/deployment.yaml
+  - ingest-webhook/service.yaml
+  - ingest-webhook/networkpolicy.yaml
+  - analytics-worker/deployment.yaml
+  - transcode-worker/serviceaccount.yaml
+  - transcode-worker/deployment.yaml
+
+# MediaMTX is deliberately NOT here. It lives in k8s/apps/mediamtx/ as its own
+# kustomize root, owned by its own manual-sync ArgoCD Application, because
+# restarting it drops every live RTMP connection on the platform. Two Argo
+# Applications cannot own the same objects, so it has to be one or the other.
+# See k8s/apps/mediamtx/base/kustomization.yaml and docs/aws/15-argocd-gitops.md.
+
+configMapGenerator:
+  - name: streaming-config
+    envs:
+      - config.env
+
+# The generated ConfigMap gets a content hash appended to its name
+# (streaming-config-7t2gh4k8db). Change a value, the name changes, every
+# Deployment referencing it is a new pod template, and the rollout happens
+# by itself. That is the whole reason config lives in a generator rather
+# than a hand-written ConfigMap.
+generatorOptions:
+  disableNameSuffixHash: false
+
+images:
+  - name: ghcr.io/linkify-solutions-inc/kubernetes-streaming-web
+    newTag: latest
+  - name: ghcr.io/linkify-solutions-inc/kubernetes-streaming-upload-api
+    newTag: latest
+  - name: ghcr.io/linkify-solutions-inc/kubernetes-streaming-ingest-webhook
+    newTag: latest
+  - name: ghcr.io/linkify-solutions-inc/kubernetes-streaming-analytics-worker
+    newTag: latest
+  - name: ghcr.io/linkify-solutions-inc/kubernetes-streaming-transcode-worker
+    newTag: latest

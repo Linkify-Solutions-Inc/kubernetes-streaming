@@ -1,0 +1,54 @@
+---
+# The Kafka cluster itself. Sizing, storage and replicas are NOT here — with
+# KafkaNodePool they live in nodepool-dual.yaml. On Strimzi >= 0.46 putting
+# spec.kafka.replicas/storage/resources here is ignored; on >= 1.0 it is
+# rejected outright.
+#
+# API VERSION WARNING: see the header of nodepool-dual.yaml.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: streaming
+  namespace: kafka
+  annotations:
+    # Both of these are no-ops on >= 0.46 (KRaft and node pools are the only
+    # mode). Kept because they document the intent and cost nothing.
+    strimzi.io/node-pools: enabled
+    strimzi.io/kraft: enabled
+spec:
+  kafka:
+    # Check what your pinned operator actually ships before changing this:
+    #   kubectl -n kafka get deploy strimzi-cluster-operator \
+    #     -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="STRIMZI_KAFKA_IMAGES")].value}'
+    version: 3.9.0
+    metadataVersion: 3.9-IV0
+    listeners:
+      # Plain, in-cluster, no TLS. Everything that talks to Kafka — the five
+      # services in `streaming` and the KEDA operator in `keda` — is inside
+      # the VPC and inside the cluster. Ports 9090 and 9091 are reserved by
+      # Strimzi for the control plane and replication; a listener on either is
+      # rejected.
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    config:
+      # MANDATORY for a single broker. Strimzi defaults these to 3; with one
+      # broker, __consumer_offsets never initialises and every consumer in the
+      # app hangs trying to join a group.
+      offsets.topic.replication.factor: 1
+      transaction.state.log.replication.factor: 1
+      transaction.state.log.min.isr: 1
+      default.replication.factor: 1
+      # The producers set enable.idempotence=True, which forces acks=all. With
+      # min.insync.replicas > the replica count, every produce fails
+      # NOT_ENOUGH_REPLICAS and ingest-webhook blocks in flush().
+      min.insync.replicas: 1
+      # A typo'd topic name in code should fail loudly, not silently create a
+      # 1-partition topic that KEDA can then never scale past 1.
+      auto.create.topics.enable: "false"
+      log.retention.hours: 168
+  entityOperator:
+    # Without the Topic Operator the KafkaTopic CRs are inert YAML.
+    topicOperator: {}
+    userOperator: {}

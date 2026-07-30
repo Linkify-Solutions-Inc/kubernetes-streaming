@@ -1,0 +1,10 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kafka
+  labels:
+    # NetworkPolicy namespaceSelectors match on this label. Kubernetes sets it
+    # automatically on every namespace, but declaring it makes the selector in
+    # networkpolicy.yaml readable without going and looking it up.
+    kubernetes.io/metadata.name: kafka

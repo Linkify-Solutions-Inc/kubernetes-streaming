@@ -1,0 +1,41 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# EKS. RDS, S3 + CloudFront, ALB Ingress.
+# `kustomize build k8s/apps/overlays/prod` prints the literal YAML the
+# cluster receives. Read it before you apply it.
+#
+# MediaMTX and its RTMP NLB are NOT rendered here. They are a separate
+# kustomize root at k8s/apps/mediamtx/, owned by a separate manual-sync ArgoCD
+# Application, so that a deploy of the five services can never restart the
+# process holding every live RTMP connection. `kustomize build` on this
+# directory must emit no MediaMTX Deployment, Service or PDB -- that is the
+# check in docs/aws/15-argocd-gitops.md.
+
+namespace: streaming
+
+resources:
+  - ../../base
+  - ingress-alb.yaml
+
+configMapGenerator:
+  - name: streaming-config
+    behavior: merge
+    envs:
+      - config.env
+
+# CI writes here. `kustomize edit set image
+# ghcr.io/linkify-solutions-inc/kubernetes-streaming-web=...:sha-abc1234`
+# is a one-line, machine-writable, git-diffable operation -- which is the
+# whole reason this is Kustomize and not Helm. See Module 15.
+images:
+  - name: ghcr.io/linkify-solutions-inc/kubernetes-streaming-web
+    newTag: latest
+  - name: ghcr.io/linkify-solutions-inc/kubernetes-streaming-upload-api
+    newTag: latest
+  - name: ghcr.io/linkify-solutions-inc/kubernetes-streaming-ingest-webhook
+    newTag: latest
+  - name: ghcr.io/linkify-solutions-inc/kubernetes-streaming-analytics-worker
+    newTag: latest
+  - name: ghcr.io/linkify-solutions-inc/kubernetes-streaming-transcode-worker
+    newTag: latest

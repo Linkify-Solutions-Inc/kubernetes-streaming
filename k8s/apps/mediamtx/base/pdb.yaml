@@ -1,0 +1,18 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: mediamtx
+spec:
+  # With replicas: 1, minAvailable: 1 blocks EVERY voluntary eviction.
+  # `kubectl drain` hangs, Karpenter refuses to consolidate, the node
+  # upgrade waits. That is the intent: no automated process gets to end a
+  # live broadcast without a human deciding to.
+  #
+  # The cost, which you should write on a sticky note before the next EKS
+  # upgrade: `kubectl drain` will sit there printing "Cannot evict pod as it
+  # would violate the pod's disruption budget" forever until someone passes
+  # --disable-eviction or scales mediamtx to 0 deliberately.
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: mediamtx

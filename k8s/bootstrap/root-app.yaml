@@ -1,0 +1,40 @@
+# The one and only manifest a human ever applies with kubectl.
+#
+#   kubectl apply -f k8s/bootstrap/root-app.yaml
+#
+# From here on, everything is a git commit. This Application's job is to sync
+# the directory of OTHER Applications (k8s/argocd/apps/), which is the
+# "app-of-apps" pattern: adding a new component to the cluster becomes a PR
+# that adds a file, not a kubectl someone runs and forgets to write down.
+#
+# See docs/aws/15-argocd-gitops.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  # Without this finalizer, deleting the root Application orphans every child
+  # Application and everything they created. With it, deletion cascades.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Linkify-Solutions-Inc/kubernetes-streaming.git
+    targetRevision: master
+    path: k8s/argocd/apps
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m

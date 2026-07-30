@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mediamtx
+spec:
+  template:
+    spec:
+      # The stable managed node group from Module 3, not a Karpenter
+      # NodePool. Karpenter nodes are disposable by design; the one pod on
+      # the platform that must not move belongs on the ones that are not.
+      nodeSelector:
+        workload: system
+      securityContext:
+        # Kernel-level TCP keepalives, so a quiet-but-connected RTMP session
+        # keeps the flow alive well inside any load balancer idle timeout.
+        # These three are in the safe sysctl set, so no kubelet flag and no
+        # node configuration is needed.
+        #
+        # If Pod Security Admission rejects them on your cluster version,
+        # drop this block -- raising the NLB listener's tcp.idle_timeout.seconds
+        # (Module 12) is the primary fix and this is belt and braces.
+        sysctls:
+          - name: net.ipv4.tcp_keepalive_time
+            value: "120"
+          - name: net.ipv4.tcp_keepalive_intvl
+            value: "30"
+          - name: net.ipv4.tcp_keepalive_probes
+            value: "3"

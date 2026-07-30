@@ -1,0 +1,86 @@
+# The sweeper closes the hole that commit-on-claim opens.
+#
+# A transcode pod commits its Kafka offset as soon as it wins the Postgres
+# claim, not when the work finishes. That is deliberate (see
+# docs/aws/14-keda-scaledjobs.md) — but it means a pod that dies AFTER the
+# commit and BEFORE the work completes leaves a row claimed with nothing
+# working on it, and Kafka will never redeliver the message.
+#
+# The pod-per-job model makes that far more likely than it was in Compose: spot
+# reclaim, node consolidation, OOMKill, and ephemeral-storage eviction all end
+# a pod without warning.
+#
+# The sweeper looks for claims whose heartbeat has gone stale, un-claims them,
+# and re-emits the trigger message. KEDA then spawns a fresh Job.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: transcode-sweeper
+  namespace: streaming
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  schedule: "*/2 * * * *"
+  # If a run overruns, skip the next one rather than stacking two sweepers that
+  # both re-emit the same rows.
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  startingDeadlineSeconds: 120
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 120
+      template:
+        metadata:
+          labels:
+            app: transcode-sweeper
+        spec:
+          restartPolicy: Never
+          serviceAccountName: transcode-worker
+          # Deliberately NOT on the transcode NodePool. This is a 5-second
+          # Python script; provisioning a c6i.xlarge for it every two minutes
+          # would cost more than the transcodes. It runs on the system node
+          # group, which has no taint.
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: sweeper
+              image: ghcr.io/linkify-solutions-inc/kubernetes-streaming-transcode-worker:latest
+              command: ["python", "sweeper.py"]
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              env:
+                - name: POSTGRES_DSN
+                  valueFrom:
+                    secretKeyRef:
+                      name: streaming-db
+                      key: POSTGRES_DSN
+                - name: KAFKA_BOOTSTRAP_SERVERS
+                  valueFrom:
+                    configMapKeyRef:
+                      name: streaming-config
+                      key: KAFKA_BOOTSTRAP_SERVERS
+                # A live pod heartbeats every 15s. Two minutes is eight missed
+                # beats — long enough that a slow node or a GC pause never
+                # triggers a false sweep, short enough that a viewer's hls.js
+                # has not given up permanently.
+                - name: LIVE_STALE_AFTER
+                  value: "2 minutes"
+                # VOD is more forgiving and more expensive to restart, so give
+                # it much longer before deciding the pod is gone.
+                - name: VOD_STALE_AFTER
+                  value: "10 minutes"
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 128Mi
+                limits:
+                  memory: 128Mi

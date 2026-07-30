@@ -1,0 +1,133 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: upload-api
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: upload-api
+  template:
+    metadata:
+      labels:
+        app: upload-api
+    spec:
+      serviceAccountName: upload-api
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: upload-api
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: upload-api
+      containers:
+        - name: upload-api
+          image: ghcr.io/linkify-solutions-inc/kubernetes-streaming-upload-api
+          ports:
+            - name: http
+              containerPort: 8000
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          env:
+            - name: POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: streaming-db
+                  key: POSTGRES_DSN
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: streaming-config
+                  key: KAFKA_BOOTSTRAP_SERVERS
+            - name: S3_BUCKET
+              valueFrom:
+                configMapKeyRef:
+                  name: streaming-config
+                  key: S3_BUCKET
+            - name: S3_ADDRESSING_STYLE
+              valueFrom:
+                configMapKeyRef:
+                  name: streaming-config
+                  key: S3_ADDRESSING_STYLE
+            - name: MAX_UPLOAD_BYTES
+              valueFrom:
+                configMapKeyRef:
+                  name: streaming-config
+                  key: MAX_UPLOAD_BYTES
+            - name: UPLOAD_RATE_LIMIT_COUNT
+              valueFrom:
+                configMapKeyRef:
+                  name: streaming-config
+                  key: UPLOAD_RATE_LIMIT_COUNT
+            - name: UPLOAD_RATE_LIMIT_WINDOW_MINUTES
+              valueFrom:
+                configMapKeyRef:
+                  name: streaming-config
+                  key: UPLOAD_RATE_LIMIT_WINDOW_MINUTES
+            # Starlette's UploadFile spools to a SpooledTemporaryFile on disk
+            # past ~1 MB. Without TMPDIR it lands in the image's /tmp, which
+            # is read-only here. With it, it lands in the emptyDir below,
+            # which the scheduler knows the size of.
+            - name: TMPDIR
+              value: /tmp
+          startupProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 2
+            failureThreshold: 45
+          # /livez is trivial and always 200. Liveness answers exactly one
+          # question -- is this process wedged such that only a restart fixes
+          # it -- and a dead RDS is not that.
+          livenessProbe:
+            httpGet:
+              path: /livez
+              port: http
+            periodSeconds: 10
+            failureThreshold: 3
+          # /readyz does the real dependency checks and returns 503 when they
+          # fail, so a Postgres or S3 problem takes the pod out of the
+          # Service endpoints without restarting it.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+              ephemeral-storage: 4Gi
+            limits:
+              memory: 1Gi
+              ephemeral-storage: 8Gi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 8Gi

@@ -1,0 +1,138 @@
+# One Kubernetes Job per uploaded video, created by KEDA off consumer-group lag
+# on `upload.events`.
+#
+# Same image, same entrypoint, same claim protocol as transcode-live —
+# TRANSCODE_MODE picks the code path. The differences are all about the fact
+# that nobody is watching a VOD transcode in real time: slower polling, a lower
+# concurrency cap, spot-capable nodes, and a much bigger scratch disk.
+#
+# See docs/aws/14-keda-scaledjobs.md.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: transcode-vod
+  namespace: streaming
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  pollingInterval: 15 # a 15s dispatch delay on a 20-minute job is free
+  minReplicaCount: 0
+  # Pure cost cap. Excess uploads queue in Kafka, which is exactly the right
+  # behaviour here — unlike live, where a queued event means OBS is already
+  # pushing bytes with nothing consuming them.
+  maxReplicaCount: 4
+  successfulJobsHistoryLimit: 5
+  failedJobsHistoryLimit: 20
+  rollout:
+    strategy: gradual
+  scalingStrategy:
+    strategy: accurate
+  jobTargetRef:
+    parallelism: 1
+    completions: 1
+    backoffLimit: 0
+    activeDeadlineSeconds: 7200 # 2h; a 2 GiB source at `medium` fits comfortably
+    ttlSecondsAfterFinished: 3600
+    template:
+      metadata:
+        labels:
+          app: transcode
+          mode: vod
+      # NOTE: no karpenter.sh/do-not-disrupt here. A VOD job is interruptible —
+      # that is the whole reason it runs on spot. The sweeper recovers it.
+      spec:
+        restartPolicy: Never
+        serviceAccountName: transcode-worker
+        terminationGracePeriodSeconds: 30
+        nodeSelector:
+          workload: transcode
+          transcode-mode: vod
+        tolerations:
+          - key: workload
+            operator: Equal
+            value: transcode
+            effect: NoSchedule
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          runAsGroup: 10001
+          fsGroup: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+          - name: transcode
+            image: ghcr.io/linkify-solutions-inc/kubernetes-streaming-transcode-worker:latest
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: [ALL]
+            env:
+              - name: TRANSCODE_MODE
+                value: "vod"
+              - name: TRANSCODE_CONSUMER_GROUP
+                value: "transcode-vod" # == triggers[0].metadata.consumerGroup
+              - name: TRANSCODE_TRIGGER_TOPIC
+                value: "upload.events"
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: POSTGRES_DSN
+                valueFrom:
+                  secretKeyRef:
+                    name: streaming-db
+                    key: POSTGRES_DSN
+              - name: KAFKA_BOOTSTRAP_SERVERS
+                valueFrom:
+                  configMapKeyRef:
+                    name: streaming-config
+                    key: KAFKA_BOOTSTRAP_SERVERS
+              - name: S3_BUCKET
+                valueFrom:
+                  configMapKeyRef:
+                    name: streaming-config
+                    key: S3_BUCKET
+              - name: S3_ADDRESSING_STYLE
+                valueFrom:
+                  configMapKeyRef:
+                    name: streaming-config
+                    key: S3_ADDRESSING_STYLE
+              - name: TMPDIR
+                value: /scratch
+            resources:
+              requests:
+                # 4 cores, not 2.5. VOD uses `-preset medium`, which will happily
+                # consume more than `veryfast` does, and it also caps a
+                # c6i.2xlarge at two concurrent VOD jobs — which is what keeps
+                # 2 x 50Gi of ephemeral-storage inside the node's root volume.
+                cpu: "4000m"
+                memory: 2Gi
+                # transcode_video downloads the whole source (up to
+                # MAX_UPLOAD_BYTES = 2 GiB) AND writes the full HLS ladder into
+                # the same scratch dir. Output tracks duration, not source size:
+                # ~4 GB per hour, and 2 GiB of source can be ~3 hours of video.
+                # Worst case ~2 GiB in + ~12 GB out. See docs/aws/06-karpenter.md.
+                ephemeral-storage: 40Gi
+              limits:
+                memory: 2Gi
+                ephemeral-storage: 50Gi
+            volumeMounts:
+              - name: scratch
+                mountPath: /scratch
+        volumes:
+          - name: scratch
+            emptyDir:
+              sizeLimit: 50Gi
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: streaming-kafka-bootstrap.kafka.svc.cluster.local:9092
+        consumerGroup: transcode-vod
+        topic: upload.events
+        lagThreshold: "1"
+        activationLagThreshold: "0"
+        offsetResetPolicy: latest
+        allowIdleConsumers: "false"
+        excludePersistentLag: "false"
+        scaleToZeroOnInvalidOffset: "true"

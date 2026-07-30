@@ -1,0 +1,82 @@
+---
+# Applies postgres/migrations/*.sql against RDS.
+#
+# RDS has no /docker-entrypoint-initdb.d hook, so postgres/init.sql never runs
+# there. This Job is the replacement. It is re-runnable by design: every file
+# in postgres/migrations/ is applied on every run, in lexical order, and every
+# statement in those files is written with IF NOT EXISTS so re-application is a
+# no-op. See docs/aws/08-rds-postgres.md.
+#
+# The `name` is fixed rather than generated, so re-running means deleting and
+# re-applying (a Job's pod template is immutable once created).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate
+  namespace: streaming
+  labels:
+    app.kubernetes.io/name: db-migrate
+    app.kubernetes.io/part-of: streaming
+  # No argocd.argoproj.io/hook annotation, deliberately. Module 15 gives this
+  # directory its own Application (k8s/argocd/apps/25-db-migrate.yaml) at sync
+  # wave 25, between Kafka and the application — so the ordering is already
+  # guaranteed, and a PreSync hook inside that Application would only add
+  # delete-and-recreate churn on every sync. It has to be a separate
+  # Application rather than a hook inside `streaming` because the
+  # configMapGenerator below reads outside its own root; see that file.
+spec:
+  backoffLimit: 3
+  # Keep a finished Job around long enough to read its logs, then reap it.
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: db-migrate
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: psql
+          # Same major version as the RDS instance, so psql's client and the
+          # server never disagree about syntax.
+          image: postgres:16-alpine
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -eu
+              echo "applying migrations from /migrations"
+              for f in /migrations/*.sql; do
+                echo "--> $(basename "$f")"
+                psql "$POSTGRES_DSN" -v ON_ERROR_STOP=1 --single-transaction -f "$f"
+              done
+              echo "migrations complete"
+              psql "$POSTGRES_DSN" -c '\dt'
+          env:
+            # Written by the ExternalSecret in k8s/infra/secrets/ (Module 7).
+            # Already carries ?sslmode=require, which rds.force_ssl requires.
+            - name: POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: streaming-db
+                  key: POSTGRES_DSN
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 70          # "postgres" in the alpine image
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            # Name is suffixed with a content hash by configMapGenerator, and
+            # Kustomize rewrites this reference. Do not hardcode the suffix.
+            name: db-migrations

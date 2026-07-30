@@ -1,0 +1,71 @@
+# Wave 25 — the database schema. Between Kafka (20) and the application (30),
+# because every pod in wave 30 queries tables this Job creates.
+#
+# WHY THIS IS ITS OWN APPLICATION, and not a PreSync hook inside `streaming`:
+#
+# `k8s/apps/base/db-migrate/` generates its ConfigMap from
+# ../../../../postgres/migrations/*.sql — one copy of the schema, shared with
+# the docker-compose path. Reading a file outside the kustomization root needs
+# `--load-restrictor LoadRestrictionsNone`. Folding this directory into
+# apps/base or overlays/prod would push that requirement onto those roots too,
+# and every plain `kubectl apply -k` in Modules 8 and 11 would start failing
+# with a `security; file ... is not in or below ...` error. Keeping it a
+# separate Application confines the relaxed restrictor to the one directory
+# that actually needs it. ArgoCD's `kustomize.buildOptions` (argocd-cm) is a
+# global setting, so the repo-server can build this; nothing else depends on it.
+#
+# The Job carries no argocd.argoproj.io/hook annotation. A PreSync hook inside
+# its own Application would be redundant — the wave ordering already guarantees
+# the schema lands before wave 30's pods, and a hook would additionally mean the
+# Job is deleted and recreated on every sync of this Application rather than
+# tracked as a normal resource you can inspect afterwards.
+#
+# Re-running it: the Job's name is fixed and a Job's pod template is immutable,
+# so a *changed* migration set produces a new ConfigMap hash and Argo replaces
+# the Job. An *unchanged* one is a no-op. To force a re-run, delete the Job and
+# sync. See docs/aws/08-rds-postgres.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: db-migrate
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "25"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Linkify-Solutions-Inc/kubernetes-streaming.git
+    targetRevision: master
+    path: k8s/apps/base/db-migrate
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: streaming
+  syncPolicy:
+    automated:
+      # NO prune. Pruning here would delete a completed migration Job the moment
+      # it ages out of the desired state, which is noise at best; and `prune`
+      # plus a renamed SQL file is how you would accidentally remove the record
+      # of what ran.
+      prune: false
+      selfHeal: true
+    syncOptions:
+      # The Job is Complete, not Progressing, once it has run. Without this Argo
+      # waits on a health check that will never change again.
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m
+  ignoreDifferences:
+    # The Job controller writes .status (start time, completion count) and the
+    # scheduler stamps generated labels onto the pod template's selector.
+    - group: batch
+      kind: Job
+      jsonPointers:
+        - /status
+        - /spec/selector
+        - /spec/template/metadata/labels

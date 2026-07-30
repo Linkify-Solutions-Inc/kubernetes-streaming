@@ -1,0 +1,51 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# The single-node kubeadm box: in-cluster Postgres and MinIO, ingress-nginx
+# in front, MetalLB handing out 10.50.0.240-254.
+#
+# This overlay exists to keep the base honest. The moment `base/` starts
+# assuming an ALB, an RDS endpoint or an S3 hostname, this overlay stops
+# building -- which is exactly the signal you want.
+#
+# MediaMTX comes from ../../mediamtx rather than from ../../base. On EKS it is
+# its own manually-synced ArgoCD Application, because restarting it drops every
+# live RTMP connection at once -- and two Argo Applications cannot own the same
+# objects, so it cannot also be in the base. That directory is cloud-neutral;
+# the NLB Service and the `workload: system` nodeSelector live in its
+# overlays/aws, which this box does not use and could not satisfy.
+#
+# NOTE: the base Deployments read POSTGRES_DSN from a Secret named
+# `streaming-db`, which on EKS the External Secrets Operator creates. This box
+# has no ESO, so create it by hand once:
+#   kubectl -n streaming create secret generic streaming-db \
+#     --from-literal=POSTGRES_DSN='postgresql://streaming:streaming@postgres.streaming.svc.cluster.local:5432/streaming'
+# The separate `streaming-secrets` Secret this overlay's patches read
+# (MINIO_ROOT_USER / MINIO_ROOT_PASSWORD) is also hand-made and stays.
+
+namespace: streaming
+
+resources:
+  - ../../base
+  - ../../mediamtx/base
+
+configMapGenerator:
+  - name: streaming-config
+    behavior: merge
+    envs:
+      - config.env
+
+# One node, so zone spread constraints are meaningless and two replicas of
+# anything just compete for the same 12 cores. upload-api and
+# transcode-worker also pick up MinIO's endpoint and static credentials
+# here, which EKS deliberately does not set.
+#
+# Each patch names its Deployment and its container explicitly. A
+# strategic-merge patch matches containers by name, and kustomize does not
+# rewrite that name for you -- a placeholder there silently appends a second
+# container to the pod instead of merging into the first.
+patches:
+  - path: patches/web.yaml
+  - path: patches/upload-api.yaml
+  - path: patches/ingest-webhook.yaml
+  - path: patches/transcode-worker.yaml

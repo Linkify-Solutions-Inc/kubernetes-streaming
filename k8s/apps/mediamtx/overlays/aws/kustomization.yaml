@@ -1,0 +1,26 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# MediaMTX on EKS. The portable base plus the two things that only make sense
+# on AWS: the public RTMP NLB, and pinning the pod to the managed node group.
+#
+# This is the path k8s/argocd/apps/40-mediamtx.yaml points at, and it is the
+# ONLY Application in the repo with no automated sync policy. See that file and
+# docs/aws/12-ingress-and-rtmp.md.
+
+namespace: streaming
+
+resources:
+  - ../../base
+  # The public RTMP entrypoint. It MUST be owned by the same Application as the
+  # Deployment above -- an NLB whose target group is filled from the endpoints
+  # of pods a *different*, faster Application can delete and recreate is exactly
+  # the split-brain the manual sync exists to avoid, and recreating it hands you
+  # a brand new NLB hostname.
+  - service-rtmp-nlb.yaml
+
+patches:
+  - path: patches/mediamtx-placement.yaml
+    target:
+      kind: Deployment
+      name: mediamtx

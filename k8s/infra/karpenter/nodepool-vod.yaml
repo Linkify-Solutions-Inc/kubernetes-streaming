@@ -1,0 +1,50 @@
+apiVersion: karpenter.sh/v1
+kind: NodePool
+metadata:
+  name: transcode-vod
+spec:
+  template:
+    metadata:
+      labels:
+        workload: transcode
+        transcode-mode: vod
+    spec:
+      nodeClassRef:
+        group: karpenter.k8s.aws
+        kind: EC2NodeClass
+        name: transcode
+      taints:
+        - key: workload
+          value: transcode
+          effect: NoSchedule
+      requirements:
+        # VOD transcode is a retryable batch job with nobody watching. Spot is
+        # ~65% cheaper; on-demand stays in the list as fallback so a thin spot
+        # pool never leaves a job unschedulable.
+        # PREREQUISITE: transcode-worker's _claim_video has no stuck-job
+        # reaper. On spot, an interruption leaves videos.status='transcoding'
+        # forever. See docs/aws/06-karpenter.md before enabling spot.
+        - key: karpenter.sh/capacity-type
+          operator: In
+          values: ["spot", "on-demand"]
+        - key: karpenter.k8s.aws/instance-category
+          operator: In
+          values: ["c", "m"]
+        - key: karpenter.k8s.aws/instance-generation
+          operator: Gt
+          values: ["5"]
+        - key: karpenter.k8s.aws/instance-cpu
+          operator: In
+          values: ["4", "8", "16"]
+        - key: kubernetes.io/arch
+          operator: In
+          values: ["amd64"]
+      expireAfter: 24h
+      terminationGracePeriod: 10m
+  limits:
+    cpu: "64"
+  disruption:
+    # Repacking a VOD job costs a retry, not a broken stream, so let Karpenter
+    # consolidate aggressively.
+    consolidationPolicy: WhenEmptyOrUnderutilized
+    consolidateAfter: 1m

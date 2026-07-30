@@ -1,0 +1,59 @@
+# Wave 30 — the application. Points at the PROD OVERLAY, which is the directory
+# CI writes image tags into (Module 15).
+#
+# Everything this needs now exists: the streaming-db Secret (wave 10), the
+# schema (wave 25), a Ready Kafka with its topics (wave 20), and KEDA's
+# ScaledJob CRD (wave 0).
+#
+# The schema is NOT in here. It is its own Application at wave 25
+# (k8s/argocd/apps/25-db-migrate.yaml), because its kustomization reads SQL from
+# outside its own root and so needs a relaxed load restrictor that the rest of
+# these manifests must not inherit.
+#
+# Resource-level sync-waves inside this Application order the rollout further:
+#   0        Deployments, Services, ServiceAccounts
+#   1        ScaledJobs, sweeper CronJob
+#   2        Ingress
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: streaming
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "30"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Linkify-Solutions-Inc/kubernetes-streaming.git
+    targetRevision: master
+    path: k8s/apps/overlays/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: streaming
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ApplyOutOfSyncOnly=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m
+  ignoreDifferences:
+    # KEDA writes .status on the ScaledJob (last active time, trigger health).
+    - group: keda.sh
+      kind: ScaledJob
+      jsonPointers:
+        - /status
+    # The AWS Load Balancer Controller writes the provisioned ALB's hostname
+    # into the Ingress status. That is cluster-owned state, not desired state.
+    - group: networking.k8s.io
+      kind: Ingress
+      jsonPointers:
+        - /status

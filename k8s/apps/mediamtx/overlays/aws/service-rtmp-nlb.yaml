@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mediamtx-rtmp
+  annotations:
+    # Deleting and recreating this Service creates a BRAND NEW NLB with a
+    # brand new DNS name. The Route 53 record changes under you and every
+    # OBS user has the old hostname configured. Never let ArgoCD prune it.
+    argocd.argoproj.io/sync-options: Prune=false
+
+    service.beta.kubernetes.io/aws-load-balancer-type: external
+    service.beta.kubernetes.io/aws-load-balancer-nlb-target-type: ip
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+
+    service.beta.kubernetes.io/aws-load-balancer-target-group-attributes: >-
+      preserve_client_ip.enabled=true,
+      deregistration_delay.timeout_seconds=900,
+      deregistration_delay.connection_termination.enabled=false,
+      target_health_state.unhealthy.connection_termination.enabled=false
+
+    # Health check against MediaMTX's HTTP API, not a bare TCP connect on
+    # 1935. A TCP check passes the instant the socket is listening -- before
+    # MediaMTX has read its config -- and keeps passing when it is wedged.
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: HTTP
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "9997"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /v3/config/global/get
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "10"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-healthy-threshold: "2"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-unhealthy-threshold: "3"
+
+    external-dns.alpha.kubernetes.io/hostname: rtmp.k8s.linkifysolutions.com
+
+    # DO NOT ADD:
+    #   service.beta.kubernetes.io/aws-load-balancer-proxy-protocol: "*"
+    # MediaMTX does not parse PROXY protocol on its RTMP listener. The NLB
+    # would prepend a binary header, MediaMTX would read it as the start of
+    # the RTMP handshake, and every single publish would be rejected. That
+    # is a total outage, not a degradation. preserve_client_ip above gets
+    # you the real client IP with no protocol change.
+spec:
+  type: LoadBalancer
+  loadBalancerClass: service.k8s.aws/nlb
+  selector:
+    app: mediamtx
+  ports:
+    - name: rtmp
+      port: 1935
+      targetPort: rtmp
+      protocol: TCP
+
+# preserve_client_ip has one consequence worth writing down: a pod inside
+# the VPC cannot reach this NLB. The hairpin fails because source and
+# destination are both in-VPC and the NLB cannot NAT it. transcode-worker
+# dials the `mediamtx` ClusterIP Service (MEDIAMTX_RTMP_URL), so there is no
+# hairpin today -- but if anyone ever "simplifies" that env var to point at
+# rtmp.k8s.linkifysolutions.com, every transcode fails to connect and
+# nothing in the logs explains why.
+#
+# The listener idle timeout is NOT settable through an annotation. After
+# this NLB exists, raise it out-of-band -- see docs/aws/12-ingress-and-rtmp.md.

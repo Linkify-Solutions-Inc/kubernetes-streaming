@@ -1,0 +1,13 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Applied in this order by kubectl. The Kafka CR will sit NotReady for a
+# minute or two until the KafkaNodePool's pod is up; the KafkaTopics will sit
+# NotReady until the Kafka CR is Ready. Both are expected, not an error.
+resources:
+  - namespace.yaml
+  - nodepool-dual.yaml
+  - kafka.yaml
+  - topics.yaml
+  - networkpolicy.yaml

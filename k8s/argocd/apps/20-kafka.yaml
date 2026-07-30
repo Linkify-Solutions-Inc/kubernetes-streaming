@@ -1,0 +1,44 @@
+# Wave 20 — the Kafka cluster itself: KafkaNodePool, Kafka CR, the five
+# KafkaTopics, the NetworkPolicy, and the consumer-group bootstrap Job.
+#
+# Needs Strimzi's CRDs (wave 0) and the gp3 StorageClass (Module 4), because
+# the Kafka broker's PVC will sit Pending forever without a default class.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kafka
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "20"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Linkify-Solutions-Inc/kubernetes-streaming.git
+    targetRevision: master
+    path: k8s/infra/kafka
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kafka
+  syncPolicy:
+    automated:
+      # prune: false is not a style choice. A pruned KafkaTopic takes the topic
+      # and its data with it, and a pruned Kafka CR takes the whole broker.
+      # There is no undo. Deletions here are deliberate, manual acts.
+      prune: false
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+  ignoreDifferences:
+    # Strimzi's operator continuously rewrites .status on all of its CRs, and
+    # sets defaults on the Kafka spec that were never in git.
+    - group: kafka.strimzi.io
+      kind: Kafka
+      jsonPointers:
+        - /status
+    - group: kafka.strimzi.io
+      kind: KafkaTopic
+      jsonPointers:
+        - /status

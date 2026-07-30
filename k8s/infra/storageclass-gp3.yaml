@@ -1,0 +1,19 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: gp3
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+provisioner: ebs.csi.aws.com
+# Do not create the EBS volume until a pod that wants it has been scheduled.
+# EBS volumes are single-AZ; binding early pins the pod to whichever AZ the
+# volume happened to land in. See docs/aws/04-addons-and-storage.md.
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+reclaimPolicy: Delete
+parameters:
+  type: gp3
+  iops: "3000" # free gp3 baseline
+  throughput: "125" # free gp3 baseline, MB/s
+  encrypted: "true"
+  fsType: ext4

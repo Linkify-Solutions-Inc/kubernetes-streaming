@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mediamtx
+spec:
+  # ---------------------------------------------------------------------
+  # replicas: 1 IS A CORRECTNESS CONSTRAINT, NOT A COST DECISION.
+  #
+  # MediaMTX has no clustering. A stream published to pod A exists only in
+  # pod A's memory. transcode-worker dials the `mediamtx` ClusterIP Service,
+  # which round-robins across endpoints -- with two replicas, roughly half
+  # of all transcodes connect to the replica that has never heard of that
+  # path and get an empty stream or an immediate exit. Meanwhile the NLB is
+  # independently round-robining OBS clients across both.
+  #
+  # The failure looks like "ffmpeg exited immediately", not like a load
+  # balancing bug, which is why this comment is here. "Scale it up for HA"
+  # is the obvious wrong instinct.
+  # ---------------------------------------------------------------------
+  replicas: 1
+  # Recreate, not RollingUpdate. RollingUpdate on a single replica pretends
+  # there is a safe path and there is not; it also opens a window where two
+  # pods are alive and transcode-worker can dial the wrong one. Recreate
+  # makes the outage explicit.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: mediamtx
+  template:
+    metadata:
+      labels:
+        app: mediamtx
+      annotations:
+        # Karpenter consolidation will otherwise evict this pod to save a
+        # few cents an hour and kill every live stream on the platform.
+        karpenter.sh/do-not-disrupt: "true"
+    spec:
+      automountServiceAccountToken: false
+      # MediaMTX exits promptly on SIGTERM; it does not drain. The long
+      # grace period is not there to let streams finish -- it is there to
+      # stop the kubelet SIGKILLing during the flush, and to make an
+      # accidental `kubectl rollout restart` obviously slow rather than
+      # silently destructive.
+      terminationGracePeriodSeconds: 1800
+      securityContext:
+        # The bluenviron image ships no USER, so runAsUser must be set
+        # explicitly or the kubelet refuses the pod with
+        # "container has runAsNonRoot and image will run as root".
+        # Both listeners are above 1024, so non-root is fine.
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mediamtx
+          # PIN IT. `latest-ffmpeg` means any node replacement can pull a
+          # different MediaMTX with different config semantics -- and this
+          # config depends on the runOnReady/runOnNotReady field names in
+          # this image's schema.
+          image: bluenviron/mediamtx:1.15.1-ffmpeg
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          ports:
+            - name: rtmp
+              containerPort: 1935
+            - name: api
+              containerPort: 9997
+            - name: metrics
+              containerPort: 9998
+          readinessProbe:
+            httpGet:
+              path: /v3/config/global/get
+              port: api
+            periodSeconds: 5
+            failureThreshold: 2
+          livenessProbe:
+            httpGet:
+              path: /v3/paths/list
+              port: api
+            periodSeconds: 15
+            failureThreshold: 4
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              # writeQueueSize: 65536 is a real memory budget, not a free
+              # setting. This limit is sized for it.
+              memory: 1Gi
+          volumeMounts:
+            - name: config
+              mountPath: /mediamtx.yml
+              subPath: mediamtx.yml
+            - name: tmp
+              mountPath: /tmp
+          lifecycle:
+            preStop:
+              exec:
+                # Give the load balancer time to observe the endpoint going
+                # away and stop handing it new connections before the
+                # process gets SIGTERM.
+                command: ["sleep", "20"]
+      volumes:
+        - name: config
+          configMap:
+            name: mediamtx-config
+        - name: tmp
+          emptyDir:
+            sizeLimit: 64Mi

@@ -1,0 +1,57 @@
+---
+# One node that is both a KRaft controller and a broker.
+#
+# API VERSION WARNING: this file says v1beta2, which is right for Strimzi
+# 0.4x. Strimzi 1.0 dropped v1beta2 in favour of kafka.strimzi.io/v1. Never
+# guess — after installing the operator, ask the CRD which version it serves:
+#
+#   kubectl get crd kafkanodepools.kafka.strimzi.io \
+#     -o jsonpath='{range .spec.versions[*]}{.name}{" served="}{.served}{" storage="}{.storage}{"\n"}{end}'
+#
+# and use the one with storage=true. See docs/aws/10-kafka-strimzi.md.
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaNodePool
+metadata:
+  name: dual
+  namespace: kafka
+  labels:
+    # MUST equal the Kafka CR's metadata.name. If it does not, the operator
+    # silently ignores this pool and the Kafka CR never gets a broker.
+    strimzi.io/cluster: streaming
+spec:
+  replicas: 1
+  # Combined roles: one pod is the whole cluster. Split roles need >= 3 nodes
+  # to be worth anything, and this is a learning cluster.
+  roles:
+    - controller
+    - broker
+  storage:
+    # JBOD is the only storage type that accepts multiple volumes, and it is
+    # what Strimzi's own examples use even for a single volume. A bare
+    # persistent-claim also works on 0.4x but is the deprecated shape.
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim
+        size: 20Gi
+        class: gp3            # from Module 4. EKS ships gp2 only.
+        deleteClaim: false    # deleting the pool must not delete the data
+        kraftMetadata: shared # the KRaft metadata log lives on this volume
+  resources:
+    requests:
+      cpu: 500m
+      memory: 2Gi
+    limits:
+      memory: 2Gi             # deliberately no CPU limit: throttling a broker
+                              # turns a latency problem into a liveness problem
+  jvmOptions:
+    -Xms: 1024m
+    -Xmx: 1024m               # leave the other ~1Gi for page cache and off-heap
+  template:
+    pod:
+      metadata:
+        annotations:
+          # Karpenter must not consolidate the broker away. A single-broker
+          # cluster has no failover; a "helpful" node consolidation is a full
+          # Kafka outage mid-stream.
+          karpenter.sh/do-not-disrupt: "true"

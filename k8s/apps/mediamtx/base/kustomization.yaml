@@ -1,0 +1,59 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# MediaMTX, portable. Deployment + ClusterIP Service + PDB + the mediamtx.yml
+# ConfigMap generator, and nothing that names a cloud.
+#
+# This is a SEPARATE kustomize root from k8s/apps/base/ rather than a directory
+# inside it, and that is an operational decision, not a filing one. MediaMTX
+# holds long-lived RTMP connections: restarting the pod ends every live
+# broadcast on the platform at once, and OBS does not silently reconnect. So on
+# EKS it gets its own manually-synced ArgoCD Application
+# (k8s/argocd/apps/40-mediamtx.yaml). Two Argo Applications cannot own the same
+# objects, so the manual gate only means anything if the auto-synced
+# `streaming` Application does not also render these manifests.
+#
+# Consumers:
+#   ../overlays/aws         -> adds the public RTMP NLB and the node placement
+#                              patch. That is what the wave-40 Application
+#                              points at.
+#   k8s/apps/overlays/dev   -> references THIS directory directly. The kubeadm
+#                              box has no NLB and no `workload: system` node
+#                              label, so it takes the portable half and nothing
+#                              else.
+#
+# The overlay is a SIBLING of this directory, not a child, and it has to be:
+# kustomize refuses a root that references its own parent ("cycle detected"),
+# so `mediamtx/overlays/aws` cannot point at `mediamtx/` itself.
+#
+# Keep this directory cloud-neutral. If you find yourself typing an ARN, an
+# account id or a *.amazonaws.com hostname here, it belongs in ../overlays/aws.
+#
+# See docs/aws/15-argocd-gitops.md.
+
+namespace: streaming
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: streaming
+    # Same reason as apps/base: folding these into the selectors would make
+    # every later apply fail with "field is immutable".
+    includeSelectors: false
+
+resources:
+  - deployment.yaml
+  - service.yaml
+  - pdb.yaml
+
+configMapGenerator:
+  # Declared here rather than in apps/base deliberately. A generator can only
+  # be rendered by the kustomize root that declares it, and the hashed name is
+  # what rolls the pod -- so the ConfigMap has to be produced by the same
+  # Application that is allowed to restart MediaMTX, or a config edit would
+  # restart it through the auto-synced Application and walk around the gate.
+  - name: mediamtx-config
+    files:
+      - mediamtx.yml
+
+generatorOptions:
+  disableNameSuffixHash: false

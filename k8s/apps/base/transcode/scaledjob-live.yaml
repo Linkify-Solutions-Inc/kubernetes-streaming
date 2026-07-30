@@ -1,0 +1,166 @@
+# One Kubernetes Job per live stream, created by KEDA off consumer-group lag
+# on `stream.start.requests`.
+#
+# KEDA does NOT hand the Kafka message to the pod. It counts lag and creates
+# Jobs from this static template. The pod consumes its own message to learn
+# which stream it owns. See docs/aws/14-keda-scaledjobs.md.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: transcode-live
+  namespace: streaming
+  annotations:
+    # Sync after the Deployments and Services. If KEDA starts creating
+    # transcode pods before mediamtx and RDS are reachable, every one of them
+    # fails its claim or its RTMP read and burns a node provisioning cycle.
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  pollingInterval: 5 # seconds between Kafka lag checks
+  minReplicaCount: 0
+  # KEEP IN SYNC with MAX_CONCURRENT_LIVE_STREAMS in k8s/apps/base/config.env.
+  # scripts/check_ceiling_sync.sh asserts this in CI. Also capped in practice by
+  # the 8 partitions on stream.start.requests (allowIdleConsumers: false below).
+  maxReplicaCount: 8
+  successfulJobsHistoryLimit: 5
+  # Asymmetric on purpose: successes are noise, failures are what you debug.
+  failedJobsHistoryLimit: 20
+  rollout:
+    # CRITICAL. The default strategy terminates every RUNNING Job when this
+    # spec changes — and CI changes it on every transcode-worker push, so the
+    # default would kill every live stream on the platform on every deploy.
+    strategy: gradual
+  scalingStrategy:
+    # `default` computes maxScale - runningJobCount and over-spawns during the
+    # 60-100s window where a Job is pending on a cold Karpenter node but the
+    # offset is not yet committed. `accurate` counts pending Jobs too.
+    strategy: accurate
+  jobTargetRef:
+    parallelism: 1
+    completions: 1
+    # A failed pod must NOT be replaced by the Job controller. The replacement
+    # would lose the Postgres claim and exit for nothing. Recovery is the
+    # sweeper CronJob's job, not the Job controller's.
+    backoffLimit: 0
+    activeDeadlineSeconds: 21600 # 6h hard cap — bounds a wedged pod's AWS bill
+    ttlSecondsAfterFinished: 3600
+    template:
+      metadata:
+        labels:
+          app: transcode
+          mode: live
+        annotations:
+          # Karpenter must never drain this node to consolidate or to apply
+          # drift. Doing so is a self-inflicted spot interruption mid-stream.
+          karpenter.sh/do-not-disrupt: "true"
+      spec:
+        restartPolicy: Never
+        serviceAccountName: transcode-worker
+        # ffmpeg needs time to finalize the playlist (EXT-X-ENDLIST) and the
+        # uploader needs a final pass after SIGTERM.
+        terminationGracePeriodSeconds: 60
+        # Both are required: nodeSelector alone doesn't stop other pods landing
+        # on the node, the taint alone doesn't stop this pod landing elsewhere.
+        # Matches k8s/infra/karpenter/nodepool-live.yaml (Module 6).
+        nodeSelector:
+          workload: transcode
+          transcode-mode: live
+        tolerations:
+          - key: workload
+            operator: Equal
+            value: transcode
+            effect: NoSchedule
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10001
+          runAsGroup: 10001
+          fsGroup: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+          - name: transcode
+            image: ghcr.io/linkify-solutions-inc/kubernetes-streaming-transcode-worker:latest
+            securityContext:
+              allowPrivilegeEscalation: false
+              # Safe because every write goes to the /scratch emptyDir below,
+              # which is what TMPDIR points at.
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop: [ALL]
+            env:
+              - name: TRANSCODE_MODE
+                value: "live"
+              # MUST equal triggers[0].metadata.consumerGroup below. If these
+              # drift, KEDA measures lag on a group nobody commits to, lag grows
+              # forever, and it spawns Jobs at maxReplicaCount until you notice.
+              - name: TRANSCODE_CONSUMER_GROUP
+                value: "transcode-live"
+              - name: TRANSCODE_TRIGGER_TOPIC
+                value: "stream.start.requests"
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: POSTGRES_DSN
+                valueFrom:
+                  secretKeyRef:
+                    name: streaming-db
+                    key: POSTGRES_DSN
+              - name: KAFKA_BOOTSTRAP_SERVERS
+                valueFrom:
+                  configMapKeyRef:
+                    name: streaming-config
+                    key: KAFKA_BOOTSTRAP_SERVERS
+              - name: MEDIAMTX_RTMP_URL
+                valueFrom:
+                  configMapKeyRef:
+                    name: streaming-config
+                    key: MEDIAMTX_RTMP_URL
+              - name: S3_BUCKET
+                valueFrom:
+                  configMapKeyRef:
+                    name: streaming-config
+                    key: S3_BUCKET
+              - name: S3_ADDRESSING_STYLE
+                valueFrom:
+                  configMapKeyRef:
+                    name: streaming-config
+                    key: S3_ADDRESSING_STYLE
+              # Python's tempfile honours TMPDIR, so mkdtemp() lands on the
+              # emptyDir instead of the container's overlay filesystem.
+              - name: TMPDIR
+                value: /scratch
+            resources:
+              requests:
+                # Benchmark is ~2.3 cores for a 3-rendition ABR encode at
+                # `veryfast`; 2500m leaves headroom for the boto3 upload threads
+                # and the stall watchdog. Module 6's NodePool sizing assumes
+                # this number.
+                cpu: "2500m"
+                memory: 2Gi
+                ephemeral-storage: 5Gi
+              limits:
+                # NO cpu limit, deliberately. A CPU limit means CFS throttling:
+                # the cgroup exhausts its quota inside the 100ms period and is
+                # hard-stopped until the next one. For x264 that is dropped
+                # frames and a visibly stuttering live stream on an idle node.
+                memory: 2Gi # == request, so the pod is Guaranteed and not evicted
+                ephemeral-storage: 8Gi
+            volumeMounts:
+              - name: scratch
+                mountPath: /scratch
+        volumes:
+          - name: scratch
+            emptyDir:
+              sizeLimit: 8Gi
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: streaming-kafka-bootstrap.kafka.svc.cluster.local:9092
+        consumerGroup: transcode-live # == container env TRANSCODE_CONSUMER_GROUP
+        topic: stream.start.requests
+        lagThreshold: "1" # one pending message == one Job
+        activationLagThreshold: "0"
+        offsetResetPolicy: latest # == the consumer's auto.offset.reset in main.py
+        allowIdleConsumers: "false" # caps replicas at the partition count (8)
+        excludePersistentLag: "false"
+        scaleToZeroOnInvalidOffset: "true"
