@@ -146,6 +146,10 @@ jobs:
 
       - name: Install kustomize
         run: |
+          # ubuntu-latest ships its own /usr/local/bin/kustomize; the pinned
+          # installer below refuses to overwrite it ("exists. Remove it
+          # first."), so clear it first to get our pinned version instead.
+          sudo rm -f /usr/local/bin/kustomize
           curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s -- 5.4.3 /usr/local/bin
 
       - name: Set image tags in the prod overlay
@@ -179,6 +183,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install kustomize, kubeconform and yq
         run: |
+          # ubuntu-latest ships its own /usr/local/bin/kustomize; the pinned
+          # installer below refuses to overwrite it ("exists. Remove it
+          # first."), so clear it first to get our pinned version instead.
+          sudo rm -f /usr/local/bin/kustomize
           curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s -- 5.4.3 /usr/local/bin
           curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz -C /usr/local/bin kubeconform
           curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
