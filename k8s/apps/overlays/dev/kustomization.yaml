@@ -48,4 +48,5 @@ patches:
   - path: patches/web.yaml
   - path: patches/upload-api.yaml
   - path: patches/ingest-webhook.yaml
-  - path: patches/transcode-worker.yaml
+  - path: patches/transcode-live.yaml
+  - path: patches/transcode-vod.yaml

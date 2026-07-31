@@ -48,6 +48,17 @@ spec:
       # 1-partition topic that KEDA can then never scale past 1.
       auto.create.topics.enable: "false"
       log.retention.hours: 168
+    # Strimzi's built-in JMX Prometheus exporter -- the broker exposes
+    # metrics on port 9404 using the rules in the kafka-metrics ConfigMap
+    # (k8s/infra/kafka/kafka-metrics-configmap.yaml). This is most of the
+    # Kafka observability in Module 16 for one YAML block, because Strimzi
+    # ships ready-made Grafana dashboards for exactly these metrics.
+    metricsConfig:
+      type: jmxPrometheusExporter
+      valueFrom:
+        configMapKeyRef:
+          name: kafka-metrics
+          key: kafka-metrics-config.yml
   entityOperator:
     # Without the Topic Operator the KafkaTopic CRs are inert YAML.
     topicOperator: {}

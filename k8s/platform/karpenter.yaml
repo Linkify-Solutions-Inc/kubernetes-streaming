@@ -1,0 +1,59 @@
+# Karpenter -- provisions and consolidates the nodes k8s/infra/karpenter/'s
+# NodePools describe. Sync-wave 0: the NodePool/EC2NodeClass CRDs it installs
+# must exist before wave 10's karpenter-pools Application syncs.
+#
+# Installed as an Argo Application wrapping the upstream OCI Helm chart, not
+# by `helm install`. See docs/aws/06-karpenter.md.
+#
+# One-time manual step this Application depends on: Karpenter's chart is
+# published as an OCI artifact, and ArgoCD needs that registry registered
+# before it will resolve `chart:`/`repoURL:` below --
+#   argocd repo add public.ecr.aws/karpenter --type helm --name karpenter --enable-oci
+# (or the equivalent `argocd-cm` `repositories` entry). Regular Helm HTTP
+# repos (every other Application in this directory) don't need this.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: karpenter
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: public.ecr.aws/karpenter
+    chart: karpenter
+    targetRevision: 1.13.0
+    helm:
+      values: |
+        settings:
+          clusterName: streaming
+          interruptionQueue: Karpenter-streaming
+        # eksctl already created this ServiceAccount with the IRSA
+        # annotation attached. Letting Helm create its own produces a
+        # controller with no AWS permissions.
+        serviceAccount:
+          create: false
+          name: karpenter
+        controller:
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              memory: 512Mi
+  destination:
+    namespace: kube-system
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m

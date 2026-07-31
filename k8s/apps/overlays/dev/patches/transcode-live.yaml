@@ -1,0 +1,75 @@
+# Module 14 replaced the transcode-worker Deployment with two ScaledJobs
+# (see ../../../base/transcode/). Same MinIO override this box has always
+# needed -- EKS gets these from Pod Identity instead (unset here on purpose).
+#
+# ScaledJob is a CRD kustomize has no OpenAPI schema for, so a patch here is
+# a JSON merge, not a strategic merge: the `env` list below REPLACES the
+# base container's env wholesale rather than merging by name. It has to
+# repeat every entry from k8s/apps/base/transcode/scaledjob-live.yaml's
+# container, not just the three new ones.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledJob
+metadata:
+  name: transcode-live
+  namespace: streaming
+spec:
+  jobTargetRef:
+    template:
+      spec:
+        # One node, and it carries none of Module 6's Karpenter labels/taints
+        # (workload: transcode, transcode-mode: live) -- leaving these in
+        # place would leave every Job pod Pending forever.
+        nodeSelector: null
+        tolerations: null
+        containers:
+          - name: transcode
+            env:
+              - name: TRANSCODE_MODE
+                value: "live"
+              - name: TRANSCODE_CONSUMER_GROUP
+                value: "transcode-live"
+              - name: TRANSCODE_TRIGGER_TOPIC
+                value: "stream.start.requests"
+              - name: POD_NAME
+                valueFrom:
+                  fieldRef:
+                    fieldPath: metadata.name
+              - name: POSTGRES_DSN
+                valueFrom:
+                  secretKeyRef:
+                    name: streaming-db
+                    key: POSTGRES_DSN
+              - name: KAFKA_BOOTSTRAP_SERVERS
+                valueFrom:
+                  configMapKeyRef:
+                    name: streaming-config
+                    key: KAFKA_BOOTSTRAP_SERVERS
+              - name: MEDIAMTX_RTMP_URL
+                valueFrom:
+                  configMapKeyRef:
+                    name: streaming-config
+                    key: MEDIAMTX_RTMP_URL
+              - name: S3_BUCKET
+                valueFrom:
+                  configMapKeyRef:
+                    name: streaming-config
+                    key: S3_BUCKET
+              - name: S3_ADDRESSING_STYLE
+                valueFrom:
+                  configMapKeyRef:
+                    name: streaming-config
+                    key: S3_ADDRESSING_STYLE
+              - name: TMPDIR
+                value: /scratch
+              - name: S3_ENDPOINT
+                value: http://minio.streaming.svc.cluster.local:9000
+              - name: S3_ACCESS_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: streaming-secrets
+                    key: MINIO_ROOT_USER
+              - name: S3_SECRET_KEY
+                valueFrom:
+                  secretKeyRef:
+                    name: streaming-secrets
+                    key: MINIO_ROOT_PASSWORD

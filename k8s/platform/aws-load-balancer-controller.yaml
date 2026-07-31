@@ -1,0 +1,61 @@
+# AWS Load Balancer Controller -- watches Ingress/Service objects and
+# provisions the ALB (Module 12's ingress-alb.yaml) and the MediaMTX NLB
+# (k8s/apps/mediamtx/overlays/aws/service-rtmp-nlb.yaml). Sync-wave 0, ahead
+# of everything that creates those objects.
+#
+# Installed as an Argo Application wrapping the upstream Helm chart, not by
+# `helm install`. See docs/aws/05-dns-and-certificates.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: aws-load-balancer-controller
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://aws.github.io/eks-charts
+    chart: aws-load-balancer-controller
+    # CONFIRM before first apply: run
+    #   helm repo add eks https://aws.github.io/eks-charts
+    #   helm search repo eks/aws-load-balancer-controller --versions | head -5
+    # and pin whatever that reports. docs/aws/05-dns-and-certificates.md's own
+    # `helm install` walkthrough doesn't pin a version either, for the same
+    # reason -- writing one down here would already be stale by the time you
+    # read it.
+    targetRevision: "<lbc-chart-version>"
+    helm:
+      values: |
+        clusterName: streaming
+        region: us-east-1
+        # vpcId set explicitly -- not cosmetic. The controller can
+        # auto-discover both region and vpcId from instance metadata, but
+        # that discovery fails intermittently on nodes with the secure
+        # default httpPutResponseHopLimit=1, and the resulting
+        # "failed to introspect vpcID" error doesn't mention IMDS or hop
+        # limits anywhere you could search for productively.
+        vpcId: "<vpc-id>" # from Module 2 -- k8s/apps/overlays/prod also needs it
+        # eksctl already created this ServiceAccount with the IRSA
+        # annotation attached (Module 5, "create the IRSA-backed
+        # ServiceAccount"). Letting Helm create its own here produces a
+        # controller with no AWS permissions at all.
+        serviceAccount:
+          create: false
+          name: aws-load-balancer-controller
+        replicaCount: 2
+  destination:
+    namespace: kube-system
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m

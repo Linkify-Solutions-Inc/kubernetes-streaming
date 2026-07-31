@@ -1,8 +1,11 @@
+import http.server
 import json
 import logging
-import os
+import threading
+import time
 
 import psycopg
+from config import require, seal
 from confluent_kafka import Consumer
 
 logging.basicConfig(level=logging.INFO)
@@ -10,9 +13,35 @@ log = logging.getLogger("analytics-worker")
 
 TOPICS = ["viewer.analytics", "transcode.status"]
 
+KAFKA_BOOTSTRAP_SERVERS = require("KAFKA_BOOTSTRAP_SERVERS")
+POSTGRES_DSN = require("POSTGRES_DSN")
+seal()
+
+# This process has no HTTP API of its own -- this thread exists solely to
+# give Kubernetes something to probe. A Kafka consumer that quietly stops
+# polling (rebalance storm, broker gone, an exception swallowed in a loop)
+# is a real failure mode a probe-less Deployment would never notice. See
+# docs/aws/11-workloads.md.
+LAST_POLL = time.time()
+
+
+class _HealthHandler(http.server.BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200 if time.time() - LAST_POLL < 60 else 503)
+        self.end_headers()
+
+    def log_message(self, *args):
+        pass
+
+
+threading.Thread(
+    target=lambda: http.server.HTTPServer(("", 8000), _HealthHandler).serve_forever(),
+    daemon=True,
+).start()
+
 
 def pg_connect():
-    return psycopg.connect(os.environ["POSTGRES_DSN"], connect_timeout=3)
+    return psycopg.connect(POSTGRES_DSN, connect_timeout=3)
 
 
 def handle_viewer_analytics(data: dict) -> None:
@@ -34,9 +63,10 @@ def handle_viewer_analytics(data: dict) -> None:
 
 
 def main() -> None:
+    global LAST_POLL
     consumer = Consumer(
         {
-            "bootstrap.servers": os.environ["KAFKA_BOOTSTRAP_SERVERS"],
+            "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
             "group.id": "analytics-worker",
             "auto.offset.reset": "earliest",
         }
@@ -47,6 +77,7 @@ def main() -> None:
     try:
         while True:
             msg = consumer.poll(1.0)
+            LAST_POLL = time.time()
             if msg is None:
                 continue
             if msg.error():

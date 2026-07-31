@@ -1,7 +1,7 @@
 -- Minimal Phase 1 schema. Auth is stream-keys-only (see SPEC.md) — no
 -- password/login system, so "streamers" is the only account concept.
 
-CREATE TABLE streamers (
+CREATE TABLE IF NOT EXISTS streamers (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     display_name TEXT NOT NULL,
     stream_key TEXT NOT NULL UNIQUE,
@@ -9,7 +9,7 @@ CREATE TABLE streamers (
 );
 
 -- One row per live publish/unpublish cycle.
-CREATE TABLE streams (
+CREATE TABLE IF NOT EXISTS streams (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     streamer_id UUID NOT NULL REFERENCES streamers(id),
     -- The MediaMTX path (== the stream key today — see
@@ -23,7 +23,7 @@ CREATE TABLE streams (
 );
 
 -- Uploaded VOD files, separate from live streams.
-CREATE TABLE videos (
+CREATE TABLE IF NOT EXISTS videos (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     streamer_id UUID NOT NULL REFERENCES streamers(id),
     title TEXT NOT NULL,
@@ -36,7 +36,7 @@ CREATE TABLE videos (
 -- player yet to send finer-grained heartbeat/progress events). Aggregate
 -- counts are derived with GROUP BY rather than kept in a running counter
 -- column, so the raw log stays the source of truth.
-CREATE TABLE view_events (
+CREATE TABLE IF NOT EXISTS view_events (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     content_type TEXT NOT NULL CHECK (content_type IN ('stream', 'video')),
     content_id UUID NOT NULL,

@@ -10,7 +10,8 @@ import time
 import boto3
 import psycopg
 from botocore.config import Config
-from confluent_kafka import Consumer, Producer
+from config import require, seal
+from confluent_kafka import OFFSET_END, Consumer, Producer, TopicPartition
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger("transcode-worker")
@@ -28,36 +29,58 @@ GOP_SECONDS = 2  # 2 keyframes/segment -> GOP is an integer divisor of segment l
 OUTPUT_FPS = 30
 LIVE_LIST_SIZE = 30  # segments kept in the live sliding window (30 * 4s = ~2min DVR range)
 MEDIAMTX_RTMP_BASE = os.environ.get("MEDIAMTX_RTMP_URL", "rtmp://mediamtx:1935")
-BUCKET = "media"
+# Defaults to "media" so docker compose (which never sets S3_BUCKET) keeps
+# working unchanged -- on EKS this is set to the globally-unique bucket name
+# (see docs/aws/00-preflight-code-changes.md).
+BUCKET = os.environ.get("S3_BUCKET", "media")
+
+KAFKA_BOOTSTRAP_SERVERS = require("KAFKA_BOOTSTRAP_SERVERS")
+POSTGRES_DSN = require("POSTGRES_DSN")
+# TRANSCODE_MODE picks the code path this pod runs: "live" | "vod". Same
+# image, both modes (see docs/aws/14-keda-scaledjobs.md).
+MODE = require("TRANSCODE_MODE")
+# MUST be byte-identical to the ScaledJob trigger's consumerGroup. If they
+# differ, KEDA measures lag on a group nobody commits to and spawns Jobs at
+# maxReplicaCount forever, quietly.
+GROUP = require("TRANSCODE_CONSUMER_GROUP")
+TOPIC = require("TRANSCODE_TRIGGER_TOPIC")
+POD_NAME = require("POD_NAME")
+seal()
+
+BOOTSTRAP = KAFKA_BOOTSTRAP_SERVERS
+CLAIM_DEADLINE_S = int(os.environ.get("CLAIM_DEADLINE_SECONDS", "120"))
+HEARTBEAT_S = 15
 
 status_producer = Producer({
-    "bootstrap.servers": os.environ["KAFKA_BOOTSTRAP_SERVERS"],
+    "bootstrap.servers": BOOTSTRAP,
     "enable.idempotence": True,
 })
 
-# path -> {"stop_event", "done_event"} for currently-live streams, so an
-# "ended" event can find and stop the right job. A value of None means the
-# path has been claimed (a "started" event was just dispatched) but
-# start_live_transcode hasn't filled in the real entry yet -- see
-# handle_stream_lifecycle's dedup guard.
-active_streams: dict[str, dict | None] = {}
-active_streams_lock = threading.Lock()
-
 
 def s3_client():
-    # path-style addressing is required for MinIO; S3 in prod also accepts it,
-    # so this client code doesn't need to change between dev and prod.
-    return boto3.client(
-        "s3",
-        endpoint_url=os.environ["S3_ENDPOINT"],
-        aws_access_key_id=os.environ["S3_ACCESS_KEY"],
-        aws_secret_access_key=os.environ["S3_SECRET_KEY"],
-        config=Config(s3={"addressing_style": "path"}),
-    )
+    # Endpoint and static credentials are set for MinIO under docker compose
+    # and unset on AWS, where boto3 resolves the region from AWS_REGION and
+    # picks up credentials from the EKS Pod Identity agent. Passing explicit
+    # keys would make boto3 ignore that role entirely.
+    kwargs = {
+        "config": Config(
+            s3={"addressing_style": os.environ.get("S3_ADDRESSING_STYLE", "path")},
+            retries={"max_attempts": 5, "mode": "adaptive"},
+        )
+    }
+    endpoint = os.environ.get("S3_ENDPOINT")
+    if endpoint:
+        kwargs["endpoint_url"] = endpoint
+    access_key = os.environ.get("S3_ACCESS_KEY")
+    secret_key = os.environ.get("S3_SECRET_KEY")
+    if access_key and secret_key:
+        kwargs["aws_access_key_id"] = access_key
+        kwargs["aws_secret_access_key"] = secret_key
+    return boto3.client("s3", **kwargs)
 
 
 def pg_connect():
-    return psycopg.connect(os.environ["POSTGRES_DSN"], connect_timeout=3)
+    return psycopg.connect(POSTGRES_DSN, connect_timeout=3)
 
 
 def emit_status(event: str, **fields) -> None:
@@ -235,30 +258,16 @@ def _watch_for_stall(output_dir: str, stop_event: threading.Event, stalled_event
             return
 
 
-# ── Live streams (stream.lifecycle) ─────────────────────────────────────
-def start_live_transcode(path: str, stream_id: str | None) -> None:
-    if stream_id is None:
-        # Shouldn't happen — ingest-webhook always creates the streams row
-        # (and includes stream_id in the event) before emitting "started".
-        log.error("no stream_id for path=%s, refusing to start (can't pick a safe MinIO prefix)", path)
-        # handle_stream_lifecycle already claimed this path with a None
-        # placeholder before spawning us -- release it, or this path can
-        # never start a transcode again (it'd look permanently "active").
-        with active_streams_lock:
-            if active_streams.get(path) is None:
-                active_streams.pop(path, None)
-        return
-
+# ── Live streams ─────────────────────────────────────────────────────────
+# One pod owns exactly one stream now (see docs/aws/14-keda-scaledjobs.md),
+# so the in-memory active_streams routing table this used to need is gone:
+# "which ffmpeg does this event belong to" collapses to "is it my path".
+def start_live_transcode(path: str, stream_id: str, stop_event: threading.Event) -> None:
     input_url = f"{MEDIAMTX_RTMP_BASE}/{path}"
     # Keyed by stream_id (public-safe UUID), NOT path — path is the same
     # value as the stream's secret auth key (see research_validated_architecture
     # memory), so it must never end up in a URL a viewer's browser sees.
     s3_prefix = f"hls/live/{stream_id}"
-
-    stop_event = threading.Event()  # set by stop_live_transcode: stop, don't restart
-    done_event = threading.Event()  # set once this function has fully torn down
-    with active_streams_lock:
-        active_streams[path] = {"stop_event": stop_event, "done_event": done_event}
 
     emit_status("live_transcode_started", path=path, stream_id=stream_id)
 
@@ -323,67 +332,84 @@ def start_live_transcode(path: str, stream_id: str | None) -> None:
             log.error("ffmpeg exited %s for path=%s: %s", returncode, path, stderr_tail)
         break
 
-    with active_streams_lock:
-        if active_streams.get(path, {}).get("stop_event") is stop_event:
-            active_streams.pop(path, None)
-    done_event.set()
+
+# ── KEDA claim protocol ──────────────────────────────────────────────────
+# KEDA counts consumer-group lag and creates Jobs from a fixed template — it
+# never hands the pod a message. So the pod has to consume its own trigger
+# message to learn what it owns, and the Postgres claim (not the Kafka
+# offset commit) is what makes ownership durable and exclusive. See
+# docs/aws/14-keda-scaledjobs.md for the full reasoning.
+def claim_one(topic: str, group: str, try_claim) -> dict | None:
+    """Consume until one message is successfully claimed, or the deadline expires.
+
+    Returns the claimed payload, or None meaning "there is nothing here for me"
+    — which is a normal, successful outcome, not an error.
+    """
+    c = Consumer({
+        "bootstrap.servers": BOOTSTRAP,
+        "group.id": group,
+        # MUST match the ScaledJob trigger's offsetResetPolicy. If this says
+        # "earliest" and the group has no committed offset, the first pod ever
+        # to run replays the whole topic and starts a transcode for every
+        # stream that has ever existed.
+        "auto.offset.reset": "latest",
+        # Auto-commit would fire on a 5s timer regardless of whether we claimed
+        # anything, silently dropping work when the pod exits before claiming.
+        "enable.auto.commit": False,
+        "partition.assignment.strategy": "cooperative-sticky",
+        "session.timeout.ms": 45000,
+    })
+    c.subscribe([topic])
+    deadline = time.monotonic() + CLAIM_DEADLINE_S
+    try:
+        while time.monotonic() < deadline:
+            msg = c.poll(1.0)
+            if msg is None or msg.error():
+                continue
+            try:
+                data = json.loads(msg.value())
+            except (json.JSONDecodeError, TypeError):
+                log.error("unparseable message on %s: %r", topic, msg.value())
+                c.commit(message=msg, asynchronous=False)  # poison pill: skip it
+                continue
+
+            won = try_claim(data)
+            # Commit EITHER WAY. A lost claim still means the message has an
+            # owner. Not committing means infinite redelivery and infinite
+            # Job creation.
+            c.commit(message=msg, asynchronous=False)
+            if won:
+                return data
+            log.info("lost claim for %s, looking for other work", data)
+        return None
+    finally:
+        c.close()
 
 
-def stop_live_transcode(path: str) -> None:
-    with active_streams_lock:
-        entry = active_streams.get(path)
-    if entry is None:
-        log.warning("no active live transcode for path=%s (already stopped, or never started)", path)
-        return
-
-    entry["stop_event"].set()
-    entry["done_event"].wait(timeout=30)
-
-
-def handle_stream_lifecycle(data: dict) -> None:
-    path = data.get("path")
-    if not path:
-        return
-    if data.get("event") == "started":
-        with active_streams_lock:
-            # Redelivered/duplicate "started" (Kafka at-least-once delivery,
-            # or ingest-webhook's own duplicate-hook guard missing a race) --
-            # claim the path here, synchronously, rather than leaving it to
-            # start_live_transcode to set active_streams[path] itself, since
-            # that happens in the spawned thread and a second "started"
-            # dispatched immediately after could otherwise land before the
-            # first thread claims it. Note this only guards against
-            # redelivery within one transcode-worker process's lifetime --
-            # a container restart wipes active_streams entirely, but a
-            # restart also tears down any in-flight ffmpeg child with it
-            # (same PID namespace), so there's no orphaned process to race.
-            if path in active_streams:
-                log.warning("duplicate 'started' for path=%s, already transcoding, ignoring", path)
-                return
-            active_streams[path] = None
-        threading.Thread(target=start_live_transcode, args=(path, data.get("stream_id")), daemon=True).start()
-    elif data.get("event") == "ended":
-        threading.Thread(target=stop_live_transcode, args=(path,), daemon=True).start()
-
-
-# ── VOD uploads (upload.events) ─────────────────────────────────────────
-def set_video_status(video_id: str, status: str) -> None:
+def _claim_stream(stream_id: str) -> str | None:
+    """Atomically claim a live stream. Returns its path, or None if lost."""
     with pg_connect() as conn:
-        conn.execute("UPDATE videos SET status = %s WHERE id = %s", (status, video_id))
+        row = conn.execute(
+            """
+            UPDATE streams
+               SET transcode_status = 'claimed', transcode_heartbeat = now()
+             WHERE id = %s AND transcode_status = 'pending' AND status = 'live'
+            RETURNING path
+            """,
+            (stream_id,),
+        ).fetchone()
         conn.commit()
+    return row[0] if row else None
 
 
 def _claim_video(video_id: str) -> bool:
-    # Atomic claim, backed by Postgres rather than the in-memory
-    # active_streams-style tracking used for live streams -- a redelivered
-    # "uploaded" event (Kafka at-least-once delivery) needs to be a no-op
-    # even across a transcode-worker restart, since a fresh process has no
-    # memory of what it was already working on. Only a video still in
-    # "uploaded" gets claimed; one already "transcoding"/"ready"/"failed" is
-    # left alone. Trade-off: if a worker crashes mid-transcode, the video is
-    # stuck at status='transcoding' forever (a redelivered event won't match
-    # this WHERE clause and retry it) -- safe against duplicates, but a
-    # stuck-job sweep is a separate concern, not attempted here.
+    # Atomic claim, backed by Postgres rather than in-memory tracking -- a
+    # redelivered "uploaded" event (Kafka at-least-once delivery) needs to be
+    # a no-op even across a pod restart, since a fresh pod has no memory of
+    # what it was already working on. Only a video still in "uploaded" gets
+    # claimed; one already "transcoding"/"ready"/"failed" is left alone.
+    # Trade-off: if a pod crashes mid-transcode, the video is stuck at
+    # status='transcoding' until the sweeper's heartbeat check re-queues it.
     with pg_connect() as conn:
         row = conn.execute(
             "UPDATE videos SET status = 'transcoding' WHERE id = %s AND status = 'uploaded' RETURNING id",
@@ -391,6 +417,83 @@ def _claim_video(video_id: str) -> bool:
         ).fetchone()
         conn.commit()
     return row is not None
+
+
+def heartbeat_thread(table: str, row_id: str, stop_event: threading.Event) -> None:
+    """Renew the claim lease every 15s, and notice if the stream ended.
+
+    The lease is what the sweeper reads. If this thread stops (pod killed,
+    node reclaimed), the heartbeat goes stale and the sweeper re-queues the
+    work. That is the entire recovery mechanism for a crash after commit.
+    """
+    while not stop_event.wait(HEARTBEAT_S):
+        try:
+            with pg_connect() as conn:
+                conn.execute(
+                    f"UPDATE {table} SET transcode_heartbeat = now() WHERE id = %s",
+                    (row_id,),
+                )
+                if table == "streams":
+                    # Tertiary teardown path: covers an 'ended' event we never
+                    # saw on Kafka (broker restart mid-stream).
+                    status = conn.execute(
+                        "SELECT status FROM streams WHERE id = %s", (row_id,)
+                    ).fetchone()
+                    if status and status[0] != "live":
+                        log.info("stream %s is no longer live in the DB, stopping", row_id)
+                        stop_event.set()
+                conn.commit()
+        except Exception:
+            # A transient RDS blip must not kill the transcode. Missing one
+            # beat is fine — the sweeper's threshold is eight beats wide.
+            log.exception("heartbeat failed for %s=%s", table, row_id)
+
+
+def watch_for_end(path: str, stop_event: threading.Event, started_at: float) -> None:
+    c = Consumer({
+        "bootstrap.servers": BOOTSTRAP,
+        # Throwaway and unique per pod. confluent-kafka requires group.id to be
+        # set, but we never commit and never join a group — see assign() below.
+        "group.id": f"live-watch-{POD_NAME}",
+        "enable.auto.commit": False,
+    })
+    md = c.list_topics("stream.lifecycle", timeout=10)
+    parts = list(md.topics["stream.lifecycle"].partitions)
+
+    # Start ~60s before this Job began, not at the tail. For a very short
+    # stream the 'ended' event can land while this pod is still pulling its
+    # image, and OFFSET_END would miss it forever.
+    since_ms = int((started_at - 60) * 1000)
+    tps = c.offsets_for_times(
+        [TopicPartition("stream.lifecycle", p, since_ms) for p in parts], timeout=10
+    )
+    for tp in tps:
+        if tp.offset < 0:            # no message at or after that timestamp
+            tp.offset = OFFSET_END
+    c.assign(tps)                    # NOT subscribe() — see below
+
+    try:
+        while not stop_event.is_set():
+            msg = c.poll(1.0)
+            if msg is None or msg.error():
+                continue
+            try:
+                d = json.loads(msg.value())
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if d.get("path") == path and d.get("event") == "ended":
+                log.info("received 'ended' for path=%s, stopping", path)
+                stop_event.set()
+                return
+    finally:
+        c.close()
+
+
+# ── VOD uploads (upload.events) ─────────────────────────────────────────
+def set_video_status(video_id: str, status: str) -> None:
+    with pg_connect() as conn:
+        conn.execute("UPDATE videos SET status = %s WHERE id = %s", (status, video_id))
+        conn.commit()
 
 
 def transcode_video(video_id: str, object_key: str) -> None:
@@ -427,57 +530,68 @@ def transcode_video(video_id: str, object_key: str) -> None:
     emit_status("transcode_ready", video_id=video_id)
 
 
-def handle_upload_event(data: dict) -> None:
-    if data.get("event") != "uploaded":
-        return
-    video_id = data["video_id"]
-    if not _claim_video(video_id):
-        log.warning(
-            "video_id=%s not in 'uploaded' status, ignoring duplicate/redelivered event", video_id
-        )
-        return
-    threading.Thread(
-        target=transcode_video, args=(video_id, data["object_key"]), daemon=True
-    ).start()
-
-
-# ── Kafka consume loop ───────────────────────────────────────────────────
+# ── Entrypoint — a dispatcher, not a loop ────────────────────────────────
+# KEDA creates one Job per unit of work; this process claims exactly one
+# message, does the work (or discovers someone else already has it), and
+# exits. See docs/aws/14-keda-scaledjobs.md.
 def main() -> None:
-    consumer = Consumer(
-        {
-            "bootstrap.servers": os.environ["KAFKA_BOOTSTRAP_SERVERS"],
-            "group.id": "transcode-worker",
-            "auto.offset.reset": "earliest",
-        }
-    )
-    # transcode-worker consumes stream.lifecycle/upload.events directly —
-    # no separate dispatcher stage onto `transcode.jobs` (settled JIT
-    # question, see SPEC.md). That topic still exists in Kafka in case a
-    # dispatcher turns out to be worth adding later.
-    consumer.subscribe(["stream.lifecycle", "upload.events"])
-    log.info("transcode-worker up, watching stream.lifecycle + upload.events")
+    started_at = time.time()
 
-    try:
-        while True:
-            msg = consumer.poll(1.0)
-            if msg is None:
-                continue
-            if msg.error():
-                log.error("consumer error: %s", msg.error())
-                continue
+    if MODE == "live":
+        claimed = {}
 
-            try:
-                data = json.loads(msg.value())
-            except (json.JSONDecodeError, TypeError):
-                log.error("unparseable message on %s: %r", msg.topic(), msg.value())
-                continue
+        def try_claim(data: dict) -> bool:
+            stream_id = data.get("stream_id")
+            if not stream_id:
+                log.error("no stream_id in %s, skipping", data)
+                return False
+            path = _claim_stream(stream_id)
+            if path is None:
+                return False
+            claimed.update(stream_id=stream_id, path=path)
+            return True
 
-            if msg.topic() == "stream.lifecycle":
-                handle_stream_lifecycle(data)
-            elif msg.topic() == "upload.events":
-                handle_upload_event(data)
-    finally:
-        consumer.close()
+        if claim_one(TOPIC, GROUP, try_claim) is None:
+            log.info("no live work available within the deadline, exiting cleanly")
+            return  # exit 0, NOT an error
+
+        stop_event = threading.Event()
+        threading.Thread(
+            target=watch_for_end, args=(claimed["path"], stop_event, started_at), daemon=True
+        ).start()
+        threading.Thread(
+            target=heartbeat_thread, args=("streams", claimed["stream_id"], stop_event), daemon=True
+        ).start()
+        # start_live_transcode keeps its retry/stall/upload logic verbatim; it
+        # takes stop_event from the caller and no longer touches active_streams.
+        start_live_transcode(claimed["path"], claimed["stream_id"], stop_event)
+
+    elif MODE == "vod":
+        claimed = {}
+
+        def try_claim(data: dict) -> bool:
+            if data.get("event") != "uploaded":
+                return False  # committed, then skipped
+            if not _claim_video(data["video_id"]):
+                return False
+            claimed.update(video_id=data["video_id"], object_key=data["object_key"])
+            return True
+
+        if claim_one(TOPIC, GROUP, try_claim) is None:
+            log.info("no VOD work available within the deadline, exiting cleanly")
+            return
+
+        stop_event = threading.Event()
+        threading.Thread(
+            target=heartbeat_thread, args=("videos", claimed["video_id"], stop_event), daemon=True
+        ).start()
+        try:
+            transcode_video(claimed["video_id"], claimed["object_key"])
+        finally:
+            stop_event.set()
+
+    else:
+        raise SystemExit(f"unknown TRANSCODE_MODE {MODE!r}")
 
 
 if __name__ == "__main__":

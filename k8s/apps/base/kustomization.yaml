@@ -31,7 +31,7 @@ resources:
   - ingest-webhook/networkpolicy.yaml
   - analytics-worker/deployment.yaml
   - transcode-worker/serviceaccount.yaml
-  - transcode-worker/deployment.yaml
+  - transcode/
 
 # MediaMTX is deliberately NOT here. It lives in k8s/apps/mediamtx/ as its own
 # kustomize root, owned by its own manual-sync ArgoCD Application, because

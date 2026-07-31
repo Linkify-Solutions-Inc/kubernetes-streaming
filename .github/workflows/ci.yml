@@ -66,6 +66,7 @@ jobs:
           UPLOAD_API_URL: http://upload-api.test
           MINIO_PUBLIC_URL: http://minio.test
           RTMP_PUBLIC_URL: rtmp://rtmp.test
+          MAX_CONCURRENT_LIVE_STREAMS: "8"
 
   changes:
     runs-on: ubuntu-latest
@@ -128,30 +129,67 @@ jobs:
             ghcr.io/${{ env.REPO_LC }}-${{ matrix.service }}:sha-${{ env.SHA_SHORT }}
             ghcr.io/${{ env.REPO_LC }}-${{ matrix.service }}:latest
 
-  # Phase 1 CD (see SPEC.md): runs on the self-hosted runner installed on
-  # the dev box itself, so no SSH key or network hop is needed to reach it.
-  # Only redeploys the services paths-filter actually rebuilt above --
-  # everything else keeps running its existing container untouched.
-  deploy:
+  # GitOps CD (see docs/aws/15-argocd-gitops.md): CI never touches the
+  # cluster, never holds a kubeconfig, and needs no network path into the
+  # VPC. It writes the new image tag into the prod overlay and pushes; Argo
+  # notices the commit and syncs it. This replaced a `deploy` job that ran
+  # `docker compose pull/up` on a self-hosted runner installed on the old
+  # dev box -- that runner and box are out of the deploy path entirely now.
+  bump-manifests:
     needs: [changes, build]
     if: needs.changes.outputs.services != '[]' && github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: [self-hosted]
+    runs-on: ubuntu-latest # no longer self-hosted; the dev box is out of the loop
+    permissions:
+      contents: write # to push the manifest commit
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy changed services via docker compose
+      - name: Install kustomize
         run: |
-          # docker-compose.yml's env_file: .env and ${VAR} substitutions
-          # both resolve relative to the compose project directory (this
-          # fresh checkout), which never has the real, gitignored secrets
-          # file -- symlink it in from where it persists on this box instead
-          # of copying it (copying would drift out of sync silently).
-          ln -sf /home/gha-runner/streaming-project.env .env
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s -- 5.4.3 /usr/local/bin
 
-          export IMAGE_TAG=sha-$(git rev-parse --short=7 HEAD)
-          SERVICES='${{ needs.changes.outputs.services }}'
-          SERVICE_LIST=$(echo "$SERVICES" | tr -d '[]"' | tr ',' ' ')
-          echo "Deploying: $SERVICE_LIST (tag=$IMAGE_TAG)"
+      - name: Set image tags in the prod overlay
+        run: |
+          set -eu
+          SHA_SHORT=$(git rev-parse --short=7 HEAD)
+          REPO_LC=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')
+          cd k8s/apps/overlays/prod
+          for svc in $(echo '${{ needs.changes.outputs.services }}' | jq -r '.[]'); do
+            IMG="ghcr.io/${REPO_LC}-${svc}"
+            kustomize edit set image "${IMG}=${IMG}:sha-${SHA_SHORT}"
+          done
 
-          docker compose pull $SERVICE_LIST
-          docker compose up -d $SERVICE_LIST
+      - name: Commit and push
+        run: |
+          # Pushed with the default GITHUB_TOKEN, not a PAT -- commits made
+          # with GITHUB_TOKEN do NOT retrigger workflow runs, which is what
+          # keeps this from looping forever on its own push. Swapping in a
+          # PAT here re-enables the loop.
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add k8s/apps/overlays/prod/kustomization.yaml
+          git diff --staged --quiet || git commit -m "deploy: sha-$(git rev-parse --short=7 HEAD)"
+          git push
+
+  # Runs on every PR -- catches the class of problem that otherwise only
+  # shows up as a failed ArgoCD sync (see docs/aws/15-argocd-gitops.md).
+  manifest-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install kustomize, kubeconform and yq
+        run: |
+          curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash -s -- 5.4.3 /usr/local/bin
+          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz -C /usr/local/bin kubeconform
+          curl -sL https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 -o /usr/local/bin/yq
+          chmod +x /usr/local/bin/yq
+      - run: kustomize build k8s/apps/overlays/prod > /tmp/prod.yaml
+      - run: kustomize build k8s/apps/mediamtx/overlays/aws > /tmp/mediamtx.yaml
+      # The db-migrate root reads SQL from postgres/migrations/, outside its own
+      # tree, so it needs the same relaxed restrictor ArgoCD is given (Module 15).
+      - run: kustomize build --load-restrictor LoadRestrictionsNone k8s/apps/base/db-migrate > /tmp/migrate.yaml
+      - run: |
+          kubeconform -strict -summary -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+            /tmp/prod.yaml /tmp/mediamtx.yaml /tmp/migrate.yaml
+      - run: scripts/check_ceiling_sync.sh /tmp/prod.yaml # Module 14

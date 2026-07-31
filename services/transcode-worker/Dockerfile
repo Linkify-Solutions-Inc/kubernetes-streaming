@@ -12,4 +12,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
+# Matches the ScaledJob/sweeper pod securityContext's runAsUser (Module 14) --
+# set here too so runAsNonRoot is satisfied under plain `docker run` as well.
+USER 10001
 CMD ["python", "main.py"]

@@ -9,5 +9,11 @@ resources:
   - namespace.yaml
   - nodepool-dual.yaml
   - kafka.yaml
+  - kafka-metrics-configmap.yaml
   - topics.yaml
   - networkpolicy.yaml
+  - consumer-group-bootstrap-job.yaml
+  # PodMonitor needs the `monitoring` namespace (Module 16), created by
+  # k8s/platform/kube-prometheus-stack.yaml in wave 0 -- ahead of this
+  # Application's wave 20.
+  - podmonitor-kafka.yaml

@@ -1,0 +1,53 @@
+# Strimzi's cluster operator -- provides the Kafka/KafkaNodePool/KafkaTopic
+# CRDs. Sync-wave 0: those CRDs must exist before k8s/infra/kafka/ is synced
+# in wave 20, or Argo's dry-run fails with `no matches for kind "Kafka"`, and
+# a worse consequence follows -- the Kafka CR applies but the KafkaTopics in
+# the same failed sync don't, so you get a broker with no topics and every
+# service crash-looping on an unknown topic.
+#
+# Installed as an Argo Application wrapping the upstream Helm chart, not by
+# `helm install`. Pinned to 0.49.x / v1beta2 deliberately -- the whole
+# ecosystem's examples still match v1beta2; moving to Strimzi 1.x and
+# kafka.strimzi.io/v1 is a separate, deliberate task. See
+# docs/aws/10-kafka-strimzi.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: strimzi-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://strimzi.io/charts/
+    chart: strimzi-kafka-operator
+    targetRevision: 0.49.0
+    helm:
+      values: |
+        # Only reconciles resources in the `kafka` namespace, which is where
+        # all of them live. Widening it later is one `helm upgrade` (one
+        # commit, here).
+        watchAnyNamespace: false
+        resources:
+          requests:
+            cpu: 200m
+            memory: 384Mi
+          limits:
+            memory: 384Mi
+  destination:
+    namespace: kafka
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m

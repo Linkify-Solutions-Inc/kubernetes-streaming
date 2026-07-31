@@ -22,6 +22,7 @@ configMapGenerator:
   - name: db-migrations
     files:
       - ../../../../postgres/migrations/001_baseline.sql
+      - ../../../../postgres/migrations/002_transcode_claim.sql
     options:
       # New SQL file -> new ConfigMap hash -> the Job's pod template changes,
       # which is what makes ArgoCD notice there is something to apply.

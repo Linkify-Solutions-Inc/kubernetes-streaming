@@ -1,0 +1,70 @@
+# Prometheus operator + Prometheus + Alertmanager + Grafana + node-exporter +
+# kube-state-metrics, pre-wired. Sync-wave 0: its ServiceMonitor/PodMonitor
+# CRDs and the `monitoring` namespace must exist before
+# k8s/infra/kafka/podmonitor-kafka.yaml is synced in wave 20.
+#
+# Installed as an Argo Application wrapping the upstream Helm chart. Module
+# 16's own walkthrough installs this by hand first (`helm upgrade --install`)
+# to get Grafana running sooner; once this Application exists, Argo adopts
+# that release rather than reinstalling it. See
+# docs/aws/16-monitoring-cost-teardown.md.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 78.1.0
+    helm:
+      values: |
+        grafana:
+          # Set once, by hand, before the first sync:
+          #   argocd app set kube-prometheus-stack --helm-set grafana.adminPassword='<pick-one>'
+          # or move it to an ExternalSecret + valueFrom if you'd rather not
+          # have even a placeholder here. Left unset intentionally rather
+          # than committing a real password to git.
+          adminPassword: "<grafana-admin-password>"
+        prometheus:
+          prometheusSpec:
+            retention: 7d
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: gp3
+                  resources:
+                    requests:
+                      storage: 20Gi
+            # Without these two, the chart only scrapes ServiceMonitors and
+            # PodMonitors carrying its own release label -- every one you
+            # write yourself, and every one Strimzi/KEDA generate, gets
+            # silently ignored. The single most common "I installed
+            # Prometheus and it scrapes nothing" cause.
+            podMonitorSelectorNilUsesHelmValues: false
+            serviceMonitorSelectorNilUsesHelmValues: false
+        # No receivers configured and nobody on call -- an Alertmanager with
+        # nothing to route to just burns memory. Turning it on later is one
+        # flag.
+        alertmanager:
+          enabled: false
+  destination:
+    namespace: monitoring
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m

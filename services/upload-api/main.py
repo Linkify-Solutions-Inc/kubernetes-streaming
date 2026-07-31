@@ -7,16 +7,27 @@ import uuid
 import boto3
 import psycopg
 from botocore.config import Config
+from config import require, seal
 from confluent_kafka import Producer
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Response, UploadFile
 from psycopg.rows import dict_row
 from pydantic import BaseModel
 
 app = FastAPI()
+
+KAFKA_BOOTSTRAP_SERVERS = require("KAFKA_BOOTSTRAP_SERVERS")
+POSTGRES_DSN = require("POSTGRES_DSN")
+seal()
+
+# Defaults to "media" so docker compose (which never sets S3_BUCKET) keeps
+# working unchanged -- on EKS this is set to the globally-unique bucket name
+# (see docs/aws/00-preflight-code-changes.md).
+BUCKET = os.environ.get("S3_BUCKET", "media")
+
 # enable.idempotence: a produce-request retry (broker restart, network blip)
 # would otherwise risk landing the same "uploaded"/"view" event twice.
 producer = Producer({
-    "bootstrap.servers": os.environ["KAFKA_BOOTSTRAP_SERVERS"],
+    "bootstrap.servers": KAFKA_BOOTSTRAP_SERVERS,
     "enable.idempotence": True,
 })
 
@@ -31,20 +42,30 @@ UPLOAD_RATE_LIMIT_WINDOW_MINUTES = int(os.environ.get("UPLOAD_RATE_LIMIT_WINDOW_
 
 def pg_connect():
     return psycopg.connect(
-        os.environ["POSTGRES_DSN"], connect_timeout=3, row_factory=dict_row
+        POSTGRES_DSN, connect_timeout=3, row_factory=dict_row
     )
 
 
 def s3_client():
-    # path-style addressing is required for MinIO; S3 in prod also accepts it,
-    # so this client code doesn't need to change between dev and prod.
-    return boto3.client(
-        "s3",
-        endpoint_url=os.environ["S3_ENDPOINT"],
-        aws_access_key_id=os.environ["S3_ACCESS_KEY"],
-        aws_secret_access_key=os.environ["S3_SECRET_KEY"],
-        config=Config(s3={"addressing_style": "path"}),
-    )
+    # Endpoint and static credentials are set for MinIO under docker compose
+    # and unset on AWS, where boto3 resolves the region from AWS_REGION and
+    # picks up credentials from the EKS Pod Identity agent. Passing explicit
+    # keys would make boto3 ignore that role entirely.
+    kwargs = {
+        "config": Config(
+            s3={"addressing_style": os.environ.get("S3_ADDRESSING_STYLE", "path")},
+            retries={"max_attempts": 5, "mode": "adaptive"},
+        )
+    }
+    endpoint = os.environ.get("S3_ENDPOINT")
+    if endpoint:
+        kwargs["endpoint_url"] = endpoint
+    access_key = os.environ.get("S3_ACCESS_KEY")
+    secret_key = os.environ.get("S3_SECRET_KEY")
+    if access_key and secret_key:
+        kwargs["aws_access_key_id"] = access_key
+        kwargs["aws_secret_access_key"] = secret_key
+    return boto3.client("s3", **kwargs)
 
 
 @app.get("/health")
@@ -59,11 +80,41 @@ def health():
         checks["postgres"] = f"error: {exc}"
 
     try:
-        s3_client().head_bucket(Bucket="media")
+        s3_client().head_bucket(Bucket=BUCKET)
         checks["minio"] = "ok"
     except Exception as exc:  # noqa: BLE001
         checks["minio"] = f"error: {exc}"
 
+    return checks
+
+
+# /health above answers 200 unconditionally and does real dependency checks
+# -- fine for a human with curl, wrong for both Kubernetes probes: wired to
+# liveness it turns a brief RDS blip into a restart storm; wired to
+# readiness it can never actually fail. /livez and /readyz split the two
+# questions a probe can ask ("is this process wedged" vs "should it get
+# traffic right now") -- see docs/aws/11-workloads.md.
+@app.get("/livez")
+def livez():
+    return {"status": "ok"}
+
+
+@app.get("/readyz")
+def readyz(response: Response):
+    checks, ok = {}, True
+    try:
+        with pg_connect() as conn:
+            conn.execute("SELECT 1")
+        checks["postgres"] = "ok"
+    except Exception as exc:  # noqa: BLE001
+        checks["postgres"], ok = f"error: {exc}", False
+    try:
+        s3_client().head_bucket(Bucket=BUCKET)
+        checks["s3"] = "ok"
+    except Exception as exc:  # noqa: BLE001
+        checks["s3"], ok = f"error: {exc}", False
+    if not ok:
+        response.status_code = 503
     return checks
 
 
@@ -222,7 +273,7 @@ def upload_video(
 
         try:
             s3_client().upload_fileobj(
-                _SizeLimitedReader(file.file, MAX_UPLOAD_BYTES), "media", object_key
+                _SizeLimitedReader(file.file, MAX_UPLOAD_BYTES), BUCKET, object_key
             )
         except _UploadTooLarge:
             # Confirmed empirically (both the single-put and multipart code

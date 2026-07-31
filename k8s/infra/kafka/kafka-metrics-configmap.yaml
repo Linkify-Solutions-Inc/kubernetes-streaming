@@ -1,0 +1,26 @@
+# PLACEHOLDER -- fill in before Module 16's Kafka metrics wiring works.
+#
+# The `data` key below must come verbatim from the pinned Strimzi release's
+# own example, not be hand-written (JMX Prometheus exporter rules are dense
+# and easy to get subtly wrong). Fetch the one matching kafka.yaml's pinned
+# Strimzi version (see k8s/platform/strimzi-operator.yaml, currently 0.49.0):
+#
+#   curl -fsSL -o /tmp/kafka-metrics.yaml \
+#     https://raw.githubusercontent.com/strimzi/strimzi-kafka-operator/0.49.0/examples/metrics/kafka-metrics.yaml
+#
+# That file already has this exact shape (a ConfigMap named `kafka-metrics`
+# with a `kafka-metrics-config.yml` key in the `kafka` namespace) -- replace
+# this whole file with it, unchanged. See docs/aws/16-monitoring-cost-teardown.md.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kafka-metrics
+  namespace: kafka
+  labels:
+    app: strimzi
+data:
+  kafka-metrics-config.yml: |
+    # REPLACE with the contents of examples/metrics/kafka-metrics.yaml from
+    # the pinned Strimzi release (see the curl command above). Left empty
+    # rather than guessed at, so a missing fetch fails loudly (no metrics)
+    # instead of silently shipping wrong JMX rules.

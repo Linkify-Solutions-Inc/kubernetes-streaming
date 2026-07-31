@@ -22,13 +22,20 @@ REPLICATION=1
 # so it should scale with the same box capacity.
 STREAM_PARTITIONS=8
 
-# transcode.jobs is unused (no dispatcher consumes it -- see SPEC.md), and
+# stream.start.requests is the KEDA trigger topic (docs/aws/14-keda-scaledjobs.md):
+# "started"-only, separate from stream.lifecycle, because KEDA's Kafka scaler
+# can't inspect message contents and would spawn a transcode Job for "ended"
+# events too if pointed at the mixed topic. Same partition count as
+# stream.lifecycle -- it's the same concurrency ceiling.
+#
 # transcode.status/viewer.analytics are only ever consumed by a single
-# analytics-worker instance with no horizontal-scaling plan, so none of the
-# three benefit from more than a minimal partition count.
+# analytics-worker instance with no horizontal-scaling plan, so they don't
+# benefit from more than a minimal partition count. transcode.jobs is gone --
+# it survived from an earlier dispatcher design KEDA replaced, and nothing
+# ever produced to or consumed it.
 OTHER_PARTITIONS=3
 
-for topic in stream.lifecycle upload.events; do
+for topic in stream.lifecycle upload.events stream.start.requests; do
   /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" \
     --create --if-not-exists \
     --topic "$topic" \
@@ -36,7 +43,7 @@ for topic in stream.lifecycle upload.events; do
     --replication-factor "$REPLICATION"
 done
 
-for topic in transcode.jobs transcode.status viewer.analytics; do
+for topic in transcode.status viewer.analytics; do
   /opt/kafka/bin/kafka-topics.sh --bootstrap-server "$BOOTSTRAP" \
     --create --if-not-exists \
     --topic "$topic" \

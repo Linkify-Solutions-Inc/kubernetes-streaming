@@ -1,0 +1,19 @@
+# Tells kube-prometheus-stack's Prometheus (k8s/platform/kube-prometheus-stack.yaml)
+# to scrape the JMX exporter kafka.yaml's metricsConfig turns on. Namespaced
+# to `monitoring`, not `kafka` -- PodMonitor selects pods across namespaces
+# via namespaceSelector, it doesn't need to live alongside its target.
+# See docs/aws/16-monitoring-cost-teardown.md.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: kafka-resources
+  namespace: monitoring
+spec:
+  selector:
+    matchLabels:
+      strimzi.io/kind: Kafka
+  namespaceSelector:
+    matchNames: [kafka]
+  podMetricsEndpoints:
+    - path: /metrics
+      port: tcp-prometheus

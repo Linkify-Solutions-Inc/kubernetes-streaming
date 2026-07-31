@@ -1,0 +1,35 @@
+# Seeds committed offsets for the transcode-live/transcode-vod consumer
+# groups before anything runs.
+#
+# Both ScaledJob triggers use offsetResetPolicy: latest. If a group has
+# NEVER committed an offset for a partition, KEDA has nothing to subtract
+# and treats the lag as 0 -- so the very first stream after a fresh deploy
+# never creates a Job. This Job resets both groups to the tail once, so
+# every partition has a committed offset before the first real message
+# arrives. See docs/aws/14-keda-scaledjobs.md.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-consumer-group-bootstrap
+  namespace: kafka
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: bootstrap
+          image: quay.io/strimzi/kafka:0.49.0-kafka-3.9.0
+          command: [/bin/sh, -c]
+          args:
+            - |
+              set -eu
+              B=streaming-kafka-bootstrap.kafka.svc.cluster.local:9092
+              for pair in "transcode-live stream.start.requests" "transcode-vod upload.events"; do
+                set -- $pair
+                bin/kafka-consumer-groups.sh --bootstrap-server "$B" \
+                  --group "$1" --topic "$2" --reset-offsets --to-latest --execute
+              done
