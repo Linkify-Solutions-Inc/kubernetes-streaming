@@ -24,7 +24,7 @@ spec:
     # `helm install` walkthrough doesn't pin a version either, for the same
     # reason -- writing one down here would already be stale by the time you
     # read it.
-    targetRevision: "<lbc-chart-version>"
+    targetRevision: "3.5.0" # pinned from `helm search repo eks/aws-load-balancer-controller` 2026-08-10
     helm:
       values: |
         clusterName: streaming
@@ -35,7 +35,11 @@ spec:
         # default httpPutResponseHopLimit=1, and the resulting
         # "failed to introspect vpcID" error doesn't mention IMDS or hop
         # limits anywhere you could search for productively.
-        vpcId: "<vpc-id>" # from Module 2 -- k8s/apps/overlays/prod also needs it
+        # REBUILD-SENSITIVE: this ID dies with the cluster. After any rebuild,
+        # rediscover and re-substitute before syncing:
+        #   aws ec2 describe-vpcs --filters Name=tag:alpha.eksctl.io/cluster-name,Values=streaming \
+        #     --query 'Vpcs[0].VpcId' --output text
+        vpcId: "vpc-0b9b51a48ccc5bcc6"
         # eksctl already created this ServiceAccount with the IRSA
         # annotation attached (Module 5, "create the IRSA-backed
         # ServiceAccount"). Letting Helm create its own here produces a

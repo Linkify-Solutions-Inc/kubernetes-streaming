@@ -12,6 +12,8 @@ Account: 242626138899 · Region: us-east-1 · CLI profile: `streaming-admin`
 |---|---------|----------|------|----------------|
 | 1 | 2026-08-10 23:23–23:47 | EKS cluster `streaming` COMPLETE: control plane + VPC (10.42.0.0/16, us-east-1a/1f) + single NAT gateway + access entry (StreamingDeploy) + nodegroup `system` (2× t3.medium, Ready) + add-ons (vpc-cni, coredns, kube-proxy, pod-identity-agent, metrics-server, aws-ebs-csi-driver incl. its pod-identity IAM role stack) | ~$0.25/hr (~$180/mo): control plane $0.10 + NAT ~$0.05 + 2 nodes ~$0.08 + EBS ~$0.01 | `AWS_PROFILE=streaming-admin eksctl delete cluster -f infra/eks/cluster.yaml --disable-nodegroup-eviction --wait` (equivalent: `eksctl delete cluster --region=us-east-1 --name=streaming`; removes all eksctl-* CFN stacks incl. addon/pod-identity roles) |
 
+| 2 | 2026-08-10 23:52 | S3 gateway VPC endpoint `vpce-0ac14676c318b7158` (free — exists to avoid NAT $0.045/GB on S3 traffic) + `karpenter.sh/discovery=streaming` tags on private subnets and cluster SG | $0 | **Delete BEFORE cluster teardown** or the VPC's CloudFormation delete fails on the non-stack resource: `AWS_PROFILE=streaming-admin aws ec2 delete-vpc-endpoints --region us-east-1 --vpc-endpoint-ids vpce-0ac14676c318b7158` (tags die with their resources) |
+
 Nothing else billable exists yet. When cluster deletion finishes, verify with:
 `AWS_PROFILE=streaming-admin aws cloudformation list-stacks --query 'StackSummaries[?starts_with(StackName,`eksctl-streaming`)&&StackStatus!=`DELETE_COMPLETE`].[StackName,StackStatus]' --output table`
 (should be empty) and check for stray load balancers / EBS volumes:
@@ -29,6 +31,8 @@ k8s Service/Ingress/PVC objects first, or delete these by hand after.)
 | 2026-08-10 | Permission set `StreamingDeploy` (`ps-722337c324741b45`) = PowerUserAccess + inline eksctl-IAM policy, assigned to user `fatima` | dies with instance; or `aws sso-admin delete-permission-set` |
 | 2026-08-10 | Identity Center users `aayush` (04e89428-3021-703d-158a-8eeb19e9ca4d), `fatima` (246814d8-9021-70dd-4b0d-0f4373bd99b7) | die with instance; or `aws identitystore delete-user` |
 | 2026-08-10 | SSO-provisioned IAM roles `AWSReservedSSO_AdminAccess_8d36146d2e13acf4`, `AWSReservedSSO_StreamingDeploy_c76ab22657ecbba5` | auto-removed when assignments/instance deleted |
+| 2026-08-10 | IAM policy `AWSLoadBalancerControllerIAMPolicy` (`arn:aws:iam::242626138899:policy/AWSLoadBalancerControllerIAMPolicy`) | survives cluster deletion: `aws iam delete-policy --policy-arn arn:aws:iam::242626138899:policy/AWSLoadBalancerControllerIAMPolicy` (after the IRSA role is gone) |
+| 2026-08-10 | IRSA role + ServiceAccount `kube-system/aws-load-balancer-controller` (CFN stack `eksctl-streaming-addon-iamserviceaccount-kube-system-aws-load-balancer-controller`) | removed by `eksctl delete cluster`; standalone: `eksctl delete iamserviceaccount --cluster streaming --namespace kube-system --name aws-load-balancer-controller` |
 | 2026-08-10 | Billing setting: "IAM user and role access to Billing information" activated | account setting, free, leave on |
 
 ## DELETED / no longer exists

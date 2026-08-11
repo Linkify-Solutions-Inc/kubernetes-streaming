@@ -96,4 +96,57 @@ kubectl get pods -A           # aws-node, coredns, kube-proxy, pod-identity, met
 kubectl top nodes             # proves metrics-server works
 ```
 
-## Phase 5 — VPC hardening (next)
+## Phase 5 — VPC hardening
+
+Discovery (values differ per build — rediscover, never copy IDs):
+```
+export AWS_PROFILE=streaming-admin AWS_REGION=us-east-1
+VPC=$(aws ec2 describe-vpcs --filters Name=tag:alpha.eksctl.io/cluster-name,Values=streaming --query 'Vpcs[0].VpcId' --output text)
+aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC --query 'RouteTables[].[RouteTableId,Tags[?Key==`Name`].Value|[0]]' --output text
+aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC --query 'Subnets[].[SubnetId,AvailabilityZone,Tags[?Key==`Name`].Value|[0]]' --output text
+CSG=$(aws eks describe-cluster --name streaming --query 'cluster.resourcesVpcConfig.clusterSecurityGroupId' --output text)
+```
+Actions (substitute the *Private* route tables / *Private* subnets found above):
+```
+aws ec2 create-vpc-endpoint --vpc-id $VPC --service-name com.amazonaws.us-east-1.s3 \
+  --vpc-endpoint-type Gateway --route-table-ids <rtb-privA> <rtb-privB> \
+  --tag-specifications 'ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=streaming-s3-gateway},{Key=Project,Value=streaming}]'
+aws ec2 create-tags --resources <subnet-privA> <subnet-privB> $CSG --tags Key=karpenter.sh/discovery,Value=streaming
+```
+Why: gateway endpoint (free) routes all S3 traffic from private subnets past
+the NAT gateway ($0.045/GB) — the transcoder writes every HLS segment to S3,
+so this is the single biggest cost lever in the design. The discovery tags are
+how Karpenter finds which subnets/SG to launch nodes into; without them node
+provisioning fails silently later.
+Checkpoints:
+```
+aws ec2 describe-route-tables --route-table-ids <rtb-privA> <rtb-privB> \
+  --query 'RouteTables[].[RouteTableId,Routes[?starts_with(GatewayId,`vpce-`)].GatewayId|[0]]' --output text   # both rows show the vpce id
+aws ec2 describe-tags --filters "Name=key,Values=karpenter.sh/discovery" --query 'Tags[].[ResourceId,ResourceType,Value]' --output text  # 2 subnets + 1 SG
+```
+GOTCHA: the endpoint is NOT part of eksctl's CloudFormation stack — delete it
+before `eksctl delete cluster` or the VPC deletion fails (see TEARDOWN.md).
+
+## Phase 6 — Platform layer (in progress)
+
+Chart versions pinned in git 2026-08-10 (re-check with `helm search repo` on
+rebuild): LBC 3.5.0, ESO 2.9.0, kube-prometheus-stack 88.2.0; KEDA 2.19.0 and
+Strimzi 0.49.0 were already pinned. Placeholders filled: vpcId (LBC app —
+REBUILD-SENSITIVE, discovery command in the file), S3 bucket name (account id).
+
+LBC prerequisites (done):
+```
+curl -sL -o /tmp/lbc-iam-policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v3.5.0/docs/install/iam_policy.json
+aws iam create-policy --policy-name AWSLoadBalancerControllerIAMPolicy --policy-document file:///tmp/lbc-iam-policy.json
+eksctl create iamserviceaccount --cluster streaming --region us-east-1 \
+  --namespace kube-system --name aws-load-balancer-controller \
+  --attach-policy-arn arn:aws:iam::242626138899:policy/AWSLoadBalancerControllerIAMPolicy --approve
+# checkpoint: kubectl get sa aws-load-balancer-controller -n kube-system -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}'  -> role ARN
+```
+
+Still to do in this phase:
+- Karpenter prerequisites: controller IRSA (needs Karpenter controller policy),
+  node IAM role/instance profile (see k8s/infra/karpenter/ec2nodeclass.yaml),
+  SQS interruption queue `Karpenter-streaming` + EventBridge rules
+- Install ArgoCD; register OCI repo public.ecr.aws/karpenter (--enable-oci)
+- Apply k8s/bootstrap/root-app.yaml and let sync waves converge
