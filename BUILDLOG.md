@@ -365,6 +365,17 @@ curl -o /dev/null -w "%{http_code} %{time_total}s" https://<cf-domain>/hls/live/
 # -> 200, ~0.5s for 1.4MB
 ```
 
+Scale-DOWN timeline (the other half of the lab):
+```
+01:42:5x  ffmpeg stream ends (unpublish hook -> worker sees stream end)
+01:43:45  Job transcode-live-4nxz2 Complete
+01:45:58  node cordoned/draining (Karpenter consolidation, ~2 min after idle)
+01:47:05  NodeClaim + EC2 node GONE
+```
+Node lifetime 10.5 min; c6a.xlarge on-demand cost of the whole transcode: ~$0.03.
+Also verified: analytics-worker consumed live_transcode_started/stopped from
+Kafka — the full event pipeline (webhook -> Kafka -> analytics -> Postgres).
+
 ## Phase 8 — GitOps bootstrap
 
 ```
