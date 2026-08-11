@@ -232,6 +232,18 @@ PVCs would hang Pending forever. FIX: moved to k8s/infra/storage/ + new
 k8s/argocd/apps/05-storage.yaml Application. Lesson for the docs: under
 GitOps, a manifest outside every Application's path simply does not exist.
 
+GOTCHA 6: kafka.yaml pinned Kafka 3.9.0; Strimzi 0.49 supports only
+4.0.0-4.1.1 (CR NotReady: UnsupportedKafkaVersionException). The operator pin
+and the Kafka version pin move together — check with:
+  kubectl -n kafka get deploy strimzi-cluster-operator -o jsonpath='{...STRIMZI_KAFKA_IMAGES...}'
+FIX: version: 4.1.1, metadataVersion line removed (fresh KRaft cluster ->
+Strimzi defaults it correctly).
+
+DESIGN CLEANUP: images made public -> externalsecret-ghcr.yaml deleted. It
+was dead weight anyway: no Deployment ever referenced an imagePullSecret, so
+private pulls would have failed even WITH the secret — the archived design
+had a latent bug here.
+
 ## Phase 8 — GitOps bootstrap
 
 ```
