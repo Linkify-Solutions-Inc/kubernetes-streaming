@@ -19,7 +19,7 @@ kind: Kustomization
 # `streaming-db`, which on EKS the External Secrets Operator creates. This box
 # has no ESO, so create it by hand once:
 #   kubectl -n streaming create secret generic streaming-db \
-#     --from-literal=POSTGRES_DSN='postgresql://streaming:streaming@postgres.streaming.svc.cluster.local:5432/streaming'
+#     --from-literal=POSTGRES_DSN='postgresql://<user>:<password>@postgres.streaming.svc.cluster.local:5432/streaming'
 # The separate `streaming-secrets` Secret this overlay's patches read
 # (MINIO_ROOT_USER / MINIO_ROOT_PASSWORD) is also hand-made and stays.
 
