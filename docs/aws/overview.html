@@ -1,0 +1,518 @@
+<title>TM SP-1 &#8212; Streaming Platform, AWS Deployment: System Description and Planning</title>
+<style>
+  @page { margin: 0.75in; }
+  * { box-sizing: border-box; }
+
+  :root {
+    --paper: #ffffff;
+    --ink: #111111;
+    --rule: #111111;
+    --desk: #6f7680;
+    --shade: #ececec;
+    --shade-2: #f6f6f6;
+    --soft: #4a4a4a;
+  }
+  @media (prefers-color-scheme: dark) { :root { --desk: #14171b; } }
+
+  body {
+    margin: 0; background: var(--desk); color: var(--ink);
+    font-family: Arial, Helvetica, "Liberation Sans", sans-serif;
+    font-size: 15px; line-height: 1.45;
+  }
+
+  .doc {
+    max-width: 8.5in; margin: 0 auto; background: var(--paper);
+    padding: 0.85in 0.8in 0.9in;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.35), 0 10px 40px rgba(0,0,0,0.35);
+  }
+
+  /* ---- front matter ---- */
+  .titleblock {
+    text-align: center; border-bottom: 3px double var(--rule);
+    padding-bottom: 1.1rem; margin-bottom: 1.4rem;
+  }
+  .docnum { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.08em; }
+  .doctype {
+    font-size: 0.8rem; letter-spacing: 0.3em; text-transform: uppercase;
+    margin: 0.9rem 0 0.5rem; color: var(--soft);
+  }
+  .doctitle {
+    font-size: 1.25rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; line-height: 1.3; margin: 0.3rem 0 0.6rem;
+  }
+  .docsub { font-size: 0.95rem; font-weight: 700; margin: 0 0 0.9rem; }
+  .issueline {
+    font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--soft);
+  }
+
+  h1.chap {
+    text-align: center; font-size: 1.02rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin: 2.6rem 0 1.2rem; padding-top: 1.2rem;
+    border-top: 1px solid var(--rule);
+  }
+  h1.chap .cn {
+    display: block; font-size: 0.86rem; letter-spacing: 0.28em;
+    margin-bottom: 0.45rem; font-weight: 700;
+  }
+  h1.fm {
+    text-align: center; font-size: 0.95rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.16em; margin: 2.2rem 0 1rem;
+  }
+  h2.sect {
+    font-size: 0.93rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; margin: 1.7rem 0 0.55rem;
+  }
+
+  p.para { margin: 0 0 0.75rem; }
+  p.para.l2 { margin-left: 1.4rem; }
+  p.para.l3 { margin-left: 2.8rem; }
+  .pn { font-weight: 700; }
+  .pt { font-weight: 700; text-transform: uppercase; }
+
+  ul.mil, ol.mil { margin: 0 0 0.85rem; padding-left: 1.5rem; }
+  ul.mil.l2, ol.mil.l2 { margin-left: 1.4rem; }
+  ul.mil li, ol.mil li { margin-bottom: 0.35rem; }
+
+  /* ---- advisories ---- */
+  .warning, .caution, .note { margin: 1.1rem 0; padding: 0.65rem 0.85rem 0.75rem; }
+  .warning { border: 3px solid var(--rule); }
+  .caution { border: 2px solid var(--rule); }
+  .note { border: 1px solid var(--rule); }
+  .warning .hd, .caution .hd, .note .hd {
+    text-align: center; font-weight: 700; padding-bottom: 0.3rem;
+    margin-bottom: 0.5rem; border-bottom: 1px solid var(--rule);
+  }
+  .warning .hd { letter-spacing: 0.4em; border-bottom-width: 2px; }
+  .caution .hd { letter-spacing: 0.32em; }
+  .note .hd { letter-spacing: 0.24em; font-size: 0.9rem; }
+  .warning p:last-child, .caution p:last-child, .note p:last-child { margin-bottom: 0; }
+  .warning p, .caution p, .note p { margin: 0 0 0.6rem; }
+
+  /* ---- tables and figures ---- */
+  .tcap, .fcap {
+    text-align: center; font-weight: 700; font-size: 0.82rem;
+    letter-spacing: 0.02em;
+  }
+  .tcap { margin: 1.3rem 0 0.35rem; }
+  .fcap { margin: 0.45rem 0 1.3rem; }
+  .tbl-wrap { overflow-x: auto; }
+  table {
+    border-collapse: collapse; width: 100%; font-size: 0.85rem;
+    margin: 0; min-width: 420px;
+  }
+  th, td {
+    border: 1px solid var(--rule); padding: 0.35rem 0.5rem;
+    text-align: left; vertical-align: top;
+  }
+  th {
+    background: var(--shade); text-transform: uppercase;
+    font-size: 0.74rem; letter-spacing: 0.05em; font-weight: 700;
+  }
+  figure { margin: 1.3rem 0 0; border: 1px solid var(--rule); padding: 0.9rem 0.8rem; }
+  .fig-row {
+    border: 1px solid var(--rule); padding: 0.5rem 0.6rem; margin-bottom: 0.45rem;
+    background: var(--shade-2);
+  }
+  .fig-row:last-child { margin-bottom: 0; }
+  .fig-lbl {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em;
+    font-weight: 700; margin-bottom: 0.4rem;
+  }
+  .fig-items { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .fig-item {
+    border: 1px solid var(--rule); background: var(--paper);
+    padding: 0.28rem 0.5rem; font-size: 0.78rem;
+  }
+  .fig-item b { display: block; font-weight: 700; }
+  .fig-item span {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 0.7rem; color: var(--soft);
+  }
+  .fig-arrow {
+    text-align: center; font-size: 0.85rem; margin: 0.1rem 0;
+    font-family: "Courier New", Courier, monospace;
+  }
+
+  /* ---- contents ---- */
+  .toc { margin: 0 0 1.2rem; }
+  .toc a {
+    display: flex; align-items: baseline; text-decoration: none;
+    color: inherit; font-size: 0.87rem; padding: 0.14rem 0;
+  }
+  .toc a:hover { background: var(--shade-2); }
+  .toc .num { flex: none; width: 3.6rem; font-weight: 700; }
+  .toc .txt { flex: none; max-width: 78%; }
+  .toc .lead {
+    flex: 1; border-bottom: 1px dotted var(--ink);
+    margin: 0 0.35rem; transform: translateY(-0.22em);
+  }
+  .toc .pg { flex: none; font-variant-numeric: tabular-nums; }
+  .toc .grp {
+    font-weight: 700; text-transform: uppercase; font-size: 0.82rem;
+    letter-spacing: 0.08em; margin: 0.9rem 0 0.2rem;
+  }
+
+  code {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 0.88em; background: var(--shade-2);
+    border: 1px solid #ccc; padding: 0 0.22em;
+  }
+
+  .pgfoot {
+    border-top: 1px solid var(--rule); margin-top: 2.6rem;
+    padding-top: 0.5rem; display: flex; justify-content: space-between;
+    font-size: 0.76rem; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  @media (max-width: 800px) {
+    .doc { padding: 1.2rem 1rem 2rem; }
+    .toc .txt { max-width: 62%; }
+  }
+  @media print {
+    body { background: #fff; }
+    .doc { box-shadow: none; max-width: none; padding: 0; }
+    h1.chap { page-break-before: always; }
+    .warning, .caution, .note, figure, table { page-break-inside: avoid; }
+  }
+</style>
+
+<div class="doc">
+
+<div class="titleblock">
+  <div class="docnum">TM SP-1</div>
+  <div class="doctype">Technical Manual</div>
+  <div class="doctitle">Streaming Platform, Kubernetes-Based<br>Amazon Web Services Deployment</div>
+  <div class="docsub">System Description and Installation Planning</div>
+  <div class="issueline">Project: kubernetes-streaming &middot; Region: us-east-1 &middot; Prepared for internal use</div>
+</div>
+
+<h1 class="fm">Record of Changes</h1>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:5rem">Change No.</th><th style="width:7rem">Basis</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>Initial</td><td>Original issue. Content derived from the deployment course, Modules 00 through 16.</td></tr>
+<tr><td>1</td><td>8775b6c</td><td>Pre-flight code changes (Module 00) recorded as complete. Installation now commences at Chapter 4, step 2.</td></tr>
+</tbody></table></div>
+
+<h1 class="fm">Table of Contents</h1>
+<div class="toc">
+  <div class="grp">Chapter 1 &#8212; General Information</div>
+  <a href="#p1-1"><span class="num">1-1</span><span class="txt">Scope</span><span class="lead"></span><span class="pg">1-1</span></a>
+  <a href="#p1-2"><span class="num">1-2</span><span class="txt">Purpose of this manual</span><span class="lead"></span><span class="pg">1-1</span></a>
+  <a href="#p1-3"><span class="num">1-3</span><span class="txt">Related publications</span><span class="lead"></span><span class="pg">1-2</span></a>
+  <a href="#p1-4"><span class="num">1-4</span><span class="txt">Advisory conventions</span><span class="lead"></span><span class="pg">1-2</span></a>
+
+  <div class="grp">Chapter 2 &#8212; Functional Description</div>
+  <a href="#p2-1"><span class="num">2-1</span><span class="txt">System composition</span><span class="lead"></span><span class="pg">2-1</span></a>
+  <a href="#p2-2"><span class="num">2-2</span><span class="txt">Division into three planes</span><span class="lead"></span><span class="pg">2-1</span></a>
+  <a href="#p2-3"><span class="num">2-3</span><span class="txt">End-state configuration</span><span class="lead"></span><span class="pg">2-2</span></a>
+
+  <div class="grp">Chapter 3 &#8212; Configuration Changes from the Development Baseline</div>
+  <a href="#p3-1"><span class="num">3-1</span><span class="txt">General</span><span class="lead"></span><span class="pg">3-1</span></a>
+  <a href="#p3-2"><span class="num">3-2</span><span class="txt">Database subsystem</span><span class="lead"></span><span class="pg">3-1</span></a>
+  <a href="#p3-3"><span class="num">3-3</span><span class="txt">Object storage and content delivery</span><span class="lead"></span><span class="pg">3-1</span></a>
+  <a href="#p3-4"><span class="num">3-4</span><span class="txt">Message broker</span><span class="lead"></span><span class="pg">3-2</span></a>
+  <a href="#p3-5"><span class="num">3-5</span><span class="txt">Ingest path</span><span class="lead"></span><span class="pg">3-2</span></a>
+  <a href="#p3-6"><span class="num">3-6</span><span class="txt">Transcoding subsystem</span><span class="lead"></span><span class="pg">3-2</span></a>
+  <a href="#p3-7"><span class="num">3-7</span><span class="txt">Credential handling</span><span class="lead"></span><span class="pg">3-3</span></a>
+
+  <div class="grp">Chapter 4 &#8212; Installation Sequence and Dependencies</div>
+  <a href="#p4-1"><span class="num">4-1</span><span class="txt">Mandatory sequence</span><span class="lead"></span><span class="pg">4-1</span></a>
+  <a href="#p4-2"><span class="num">4-2</span><span class="txt">Items that may be deferred</span><span class="lead"></span><span class="pg">4-2</span></a>
+  <a href="#p4-3"><span class="num">4-3</span><span class="txt">Items commonly deferred in error</span><span class="lead"></span><span class="pg">4-2</span></a>
+
+  <div class="grp">Chapter 5 &#8212; Support Data</div>
+  <a href="#p5-1"><span class="num">5-1</span><span class="txt">Recurring cost</span><span class="lead"></span><span class="pg">5-1</span></a>
+  <a href="#p5-2"><span class="num">5-2</span><span class="txt">Cost reduction measures</span><span class="lead"></span><span class="pg">5-1</span></a>
+  <a href="#p5-3"><span class="num">5-3</span><span class="txt">Residual billing after disposal</span><span class="lead"></span><span class="pg">5-2</span></a>
+  <a href="#p5-4"><span class="num">5-4</span><span class="txt">Required background knowledge</span><span class="lead"></span><span class="pg">5-2</span></a>
+</div>
+
+<h1 class="fm">List of Tables</h1>
+<div class="toc">
+  <a href="#t2-1"><span class="num">2-1</span><span class="txt">Division of the system into three planes</span><span class="lead"></span><span class="pg">2-1</span></a>
+  <a href="#t3-1"><span class="num">3-1</span><span class="txt">Baseline component disposition</span><span class="lead"></span><span class="pg">3-1</span></a>
+  <a href="#t5-1"><span class="num">5-1</span><span class="txt">Cost reduction measures in order of effect</span><span class="lead"></span><span class="pg">5-1</span></a>
+  <a href="#t5-2"><span class="num">5-2</span><span class="txt">Required background knowledge</span><span class="lead"></span><span class="pg">5-2</span></a>
+</div>
+
+<h1 class="fm">List of Illustrations</h1>
+<div class="toc">
+  <a href="#f2-1"><span class="num">2-1</span><span class="txt">End-state system configuration</span><span class="lead"></span><span class="pg">2-2</span></a>
+  <a href="#f4-1"><span class="num">4-1</span><span class="txt">Installation dependency sequence</span><span class="lead"></span><span class="pg">4-1</span></a>
+</div>
+
+<!-- ============================ CHAPTER 1 ============================ -->
+<h1 class="chap"><span class="cn">Chapter 1</span>General Information</h1>
+
+<h2 class="sect" id="p1-1">1-1. Scope</h2>
+<p class="para"><span class="pn">1-1.1</span> This manual describes the deployment of the kubernetes-streaming platform onto Amazon Web Services. It covers what is to be built, the order in which it shall be built, and the reasoning behind each configuration decision. It does not contain commands, configuration file listings, or console keystrokes.</p>
+<p class="para"><span class="pn">1-1.2</span> Procedures with commands are contained in the deployment course, Modules 00 through 16. Console navigation is contained in TM SP-2. See paragraph 1-3.</p>
+
+<h2 class="sect" id="p1-2">1-2. Purpose of this manual</h2>
+<p class="para"><span class="pn">1-2.1</span> This manual shall be read in full before any billable resource is created. The most costly error in a deployment of this type is building components in the wrong order and discovering a dependency several layers down, at which point earlier work must be discarded.</p>
+
+<h2 class="sect" id="p1-3">1-3. Related publications</h2>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:12rem">Publication</th><th>Content</th></tr></thead>
+<tbody>
+<tr><td><a href="console-walkthrough.html">TM SP-2</a></td><td>Installation procedures. Console navigation, screen-by-screen, with the decision represented by each field.</td></tr>
+<tr><td><a href="index.html">Deployment course, Modules 00&ndash;16</a></td><td>Commands, manifests, verification steps and failure modes. To be used as the authority when a procedure is attempted and fails.</td></tr>
+<tr><td><a href="../kubernetes-explained.html">Kubernetes concepts reference</a></td><td>Reconciliation loops, scheduling, service routing.</td></tr>
+<tr><td><code>SPEC.md</code></td><td>Platform data flow. Required reading before fault isolation of the stream path.</td></tr>
+</tbody></table></div>
+
+<h2 class="sect" id="p1-4">1-4. Advisory conventions</h2>
+<p class="para"><span class="pn">1-4.1</span> Three advisory types are used throughout this manual and TM SP-2. They are not interchangeable.</p>
+
+<div class="warning">
+  <div class="hd">WARNING</div>
+  <p>Denotes a condition that will result in unrecoverable loss, unbounded expenditure, or loss of access to the system. Read before proceeding past the advisory.</p>
+</div>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>Denotes a condition that will result in a failed installation step, wasted expenditure, or a fault that is difficult to diagnose later.</p>
+</div>
+
+<div class="note">
+  <div class="hd">NOTE</div>
+  <p>Denotes supplementary information that clarifies a decision but does not, by itself, indicate a hazard.</p>
+</div>
+
+<!-- ============================ CHAPTER 2 ============================ -->
+<h1 class="chap"><span class="cn">Chapter 2</span>Functional Description</h1>
+
+<h2 class="sect" id="p2-1">2-1. System composition</h2>
+<p class="para"><span class="pn">2-1.1</span> <span class="pt">Development baseline.</span> The platform presently operates as a Docker Compose deployment: five Python services, MediaMTX, PostgreSQL, MinIO and Kafka, on one host, one network, and one configuration file.</p>
+<p class="para"><span class="pn">2-1.2</span> <span class="pt">Target configuration.</span> On AWS the same system is divided across three planes. The planes shall be built in the order listed in table 2-1.</p>
+
+<div class="tcap" id="t2-1">Table 2-1. Division of the system into three planes.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:9rem">Plane</th><th>Constituent items</th><th style="width:9rem">Rate of change</th></tr></thead>
+<tbody>
+<tr><td>Account and network</td><td>AWS account, identities, VPC, subnets, routing, DNS zone, budget alarms</td><td>Built once. Rarely modified.</td></tr>
+<tr><td>Cluster platform</td><td>EKS control plane, nodes, storage driver, ingress controller, certificate automation, secrets synchronisation, autoscaler</td><td>Modified a few times per year.</td></tr>
+<tr><td>Application</td><td>The five services, MediaMTX, Kafka, transcode jobs, schema migrations</td><td>Modified daily. Managed by the continuous deployment agent.</td></tr>
+</tbody></table></div>
+
+<h2 class="sect" id="p2-2">2-2. Division into three planes</h2>
+<p class="para"><span class="pn">2-2.1</span> The three planes shall be treated as separate for diagnostic purposes. They fail in different ways and are examined with different tools.</p>
+<p class="para"><span class="pn">2-2.2</span> A pod that will not start is a plane 3 fault. A pod that starts but cannot reach the database is, in nearly all cases, a plane 1 fault. Determining the plane before beginning fault isolation eliminates the majority of wasted diagnostic effort.</p>
+
+<h2 class="sect" id="p2-3">2-3. End-state configuration</h2>
+<p class="para"><span class="pn">2-3.1</span> The completed system presents three public entry points, one cluster, and two managed data services external to the cluster, as shown in figure 2-1.</p>
+
+<figure id="f2-1">
+  <div class="fig-row">
+    <div class="fig-lbl">Public names &#8212; one delegated subdomain</div>
+    <div class="fig-items">
+      <div class="fig-item"><b>Web interface</b><span>stream.&hellip;</span></div>
+      <div class="fig-item"><b>Video delivery</b><span>cdn.&hellip;</span></div>
+      <div class="fig-item"><b>Ingest</b><span>rtmp.&hellip;</span></div>
+    </div>
+  </div>
+  <div class="fig-arrow">&darr;</div>
+  <div class="fig-row">
+    <div class="fig-lbl">Edge &#8212; three entry points, dissimilar by design</div>
+    <div class="fig-items">
+      <div class="fig-item"><b>Application load balancer</b><span>HTTP, TLS terminated</span></div>
+      <div class="fig-item"><b>Content delivery network</b><span>private read from object store</span></div>
+      <div class="fig-item"><b>Network load balancer</b><span>TCP passthrough</span></div>
+    </div>
+  </div>
+  <div class="fig-arrow">&darr;</div>
+  <div class="fig-row">
+    <div class="fig-lbl">EKS cluster</div>
+    <div class="fig-items">
+      <div class="fig-item"><b>web</b></div>
+      <div class="fig-item"><b>upload-api</b></div>
+      <div class="fig-item"><b>ingest-webhook</b></div>
+      <div class="fig-item"><b>mediamtx</b></div>
+      <div class="fig-item"><b>analytics-worker</b></div>
+      <div class="fig-item"><b>transcode jobs</b><span>created on demand</span></div>
+      <div class="fig-item"><b>Kafka</b><span>operator-managed</span></div>
+    </div>
+  </div>
+  <div class="fig-arrow">&darr;</div>
+  <div class="fig-row">
+    <div class="fig-lbl">Managed data services, external to the cluster</div>
+    <div class="fig-items">
+      <div class="fig-item"><b>RDS PostgreSQL</b><span>private subnets</span></div>
+      <div class="fig-item"><b>S3 bucket</b><span>raw/ and hls/</span></div>
+    </div>
+  </div>
+</figure>
+<div class="fcap">Figure 2-1. End-state system configuration.</div>
+
+<!-- ============================ CHAPTER 3 ============================ -->
+<h1 class="chap"><span class="cn">Chapter 3</span>Configuration Changes from the Development Baseline</h1>
+
+<h2 class="sect" id="p3-1">3-1. General</h2>
+<p class="para"><span class="pn">3-1.1</span> This deployment is not a direct transfer of the existing configuration. Six components change in function, not merely in location. Each is summarised in table 3-1 and described in the paragraphs that follow.</p>
+
+<div class="tcap" id="t3-1">Table 3-1. Baseline component disposition.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:11rem">Baseline component</th><th style="width:12rem">Target</th><th>Reference</th></tr></thead>
+<tbody>
+<tr><td><code>postgres</code> container</td><td>RDS PostgreSQL, managed</td><td>3-2</td></tr>
+<tr><td><code>minio</code> container</td><td>S3 bucket with CloudFront distribution</td><td>3-3</td></tr>
+<tr><td><code>kafka</code> container</td><td>Strimzi operator, retained in cluster</td><td>3-4</td></tr>
+<tr><td>MediaMTX host port 1935</td><td>Network load balancer, TCP passthrough</td><td>3-5</td></tr>
+<tr><td><code>transcode-worker</code>, long-running</td><td>Scaled job, one per stream</td><td>3-6</td></tr>
+<tr><td><code>.env</code> file</td><td>Secrets Manager with in-cluster synchronisation</td><td>3-7</td></tr>
+</tbody></table></div>
+
+<h2 class="sect" id="p3-2">3-2. Database subsystem</h2>
+<p class="para"><span class="pn">3-2.1</span> PostgreSQL transfers to RDS, which provides managed backup, failover and patching.</p>
+<p class="para"><span class="pn">3-2.2</span> The instructional content of this step is not the creation of the instance. It is network and identity configuration: RDS resides within the VPC but outside the cluster, which requires subnet groups and security groups to be reasoned about for the first time. The first connection failure in a deployment of this type nearly always occurs here.</p>
+
+<h2 class="sect" id="p3-3">3-3. Object storage and content delivery</h2>
+<p class="para"><span class="pn">3-3.1</span> MinIO is replaced by S3. MinIO served as an S3-compatible substitute; no functional adaptation is required beyond endpoint configuration.</p>
+<p class="para"><span class="pn">3-3.2</span> A content delivery network is placed in front of the bucket. HLS delivery consists of a high volume of small segment requests. If those requests are served from the cluster, both bandwidth cost and pod processor load scale with viewer count. The distribution decouples viewer count from cluster size, which is the purpose of the component.</p>
+<p class="para"><span class="pn">3-3.3</span> The distribution shall read from a private bucket. See TM SP-2, paragraph 4-5.</p>
+
+<h2 class="sect" id="p3-4">3-4. Message broker</h2>
+<p class="para"><span class="pn">3-4.1</span> Kafka is retained within the cluster and installed by operator. The managed alternative carries a substantial fixed monthly charge irrespective of utilisation.</p>
+
+<div class="note">
+  <div class="hd">NOTE</div>
+  <p>Operating the broker by operator has instructional value beyond cost. An operator is a controller that observes custom resources and reconciles real infrastructure toward them. The same pattern recurs in the node autoscaler, the secrets controller and the continuous deployment agent. It is the most transferable concept in this platform.</p>
+</div>
+
+<h2 class="sect" id="p3-5">3-5. Ingest path</h2>
+<p class="para"><span class="pn">3-5.1</span> RTMP is a raw TCP protocol. It cannot use hostname routing, path routing or TLS termination, all of which are functions of the application load balancer serving the web interface. A network load balancer performing TCP passthrough is therefore required as a second, separate entry point.</p>
+<p class="para"><span class="pn">3-5.2</span> Understanding why two dissimilar load balancers are required is the principal networking lesson of this deployment.</p>
+
+<h2 class="sect" id="p3-6">3-6. Transcoding subsystem</h2>
+<p class="para"><span class="pn">3-6.1</span> In the baseline configuration a worker process runs continuously and consumes processor capacity while idle. The target behaviour is: a stream commences, a job is created, a node is provisioned to run it, the stream ends, the job completes, and the node is removed.</p>
+<p class="para"><span class="pn">3-6.2</span> This change shall be performed last. It is meaningful only once the remainder of the system is confirmed operational.</p>
+
+<h2 class="sect" id="p3-7">3-7. Credential handling</h2>
+<p class="para"><span class="pn">3-7.1</span> The <code>.env</code> file is superseded. No credential shall be committed to version control.</p>
+<p class="para"><span class="pn">3-7.2</span> A controller within the cluster reads AWS Secrets Manager and materialises Kubernetes secrets. Manifests reference secrets by name and at no point contain values.</p>
+
+<!-- ============================ CHAPTER 4 ============================ -->
+<h1 class="chap"><span class="cn">Chapter 4</span>Installation Sequence and Dependencies</h1>
+
+<h2 class="sect" id="p4-1">4-1. Mandatory sequence</h2>
+<p class="para"><span class="pn">4-1.1</span> The dependencies shown in figure 4-1 are strict. Steps shall not be attempted out of sequence.</p>
+
+<figure id="f4-1">
+  <div class="fig-row">
+    <div class="fig-lbl">Step 1 &#8212; Precedes all billable work</div>
+    <div class="fig-items"><div class="fig-item"><b>Budget alarm</b><span>before any chargeable resource</span></div></div>
+  </div>
+  <div class="fig-arrow">&darr;</div>
+  <div class="fig-row">
+    <div class="fig-lbl">Step 2 &#8212; Foundation chain</div>
+    <div class="fig-items">
+      <div class="fig-item"><b>VPC</b></div>
+      <div class="fig-item"><b>&rarr; EKS cluster</b></div>
+      <div class="fig-item"><b>&rarr; cluster add-ons</b></div>
+    </div>
+  </div>
+  <div class="fig-arrow">&darr; enables &darr;</div>
+  <div class="fig-row">
+    <div class="fig-lbl">Step 3 &#8212; Capabilities unlocked by the add-ons</div>
+    <div class="fig-items">
+      <div class="fig-item"><b>Database reachability</b><span>security groups</span></div>
+      <div class="fig-item"><b>Default storage class</b><span>prerequisite to Kafka</span></div>
+      <div class="fig-item"><b>Load balancer controller</b><span>prerequisite to public access</span></div>
+      <div class="fig-item"><b>Workload identity</b><span>prerequisite to object storage access</span></div>
+    </div>
+  </div>
+  <div class="fig-arrow">&darr;</div>
+  <div class="fig-row">
+    <div class="fig-lbl">Parallel track &#8212; commence early; depends on external parties</div>
+    <div class="fig-items">
+      <div class="fig-item"><b>DNS delegation</b></div>
+      <div class="fig-item"><b>&rarr; certificate issue</b></div>
+      <div class="fig-item"><b>&rarr; HTTPS</b></div>
+    </div>
+  </div>
+  <div class="fig-arrow">&darr;</div>
+  <div class="fig-row">
+    <div class="fig-lbl">Step 4 &#8212; Remaining sequence</div>
+    <div class="fig-items">
+      <div class="fig-item"><b>services operational</b></div>
+      <div class="fig-item"><b>first stream</b><span>acceptance milestone</span></div>
+      <div class="fig-item"><b>elastic transcoding</b></div>
+      <div class="fig-item"><b>continuous deployment</b></div>
+    </div>
+  </div>
+</figure>
+<div class="fcap">Figure 4-1. Installation dependency sequence.</div>
+
+<p class="para"><span class="pn">4-1.2</span> The data layer shall be installed before the application. Every service requires at least one data component at start-up, and a service that cannot reach its database is substantially harder to diagnose than one not yet deployed.</p>
+
+<h2 class="sect" id="p4-2">4-2. Items that may be deferred</h2>
+<p class="para"><span class="pn">4-2.1</span> The following may be deferred or performed in parallel without obstructing the sequence:</p>
+<ul class="mil">
+<li>Content delivery network. Direct object store access is adequate for testing.</li>
+<li>Dynamic node provisioning. A fixed node group is adequate initially.</li>
+<li>Continuous deployment. Manual deployment is adequate until the configuration stabilises.</li>
+<li>Monitoring.</li>
+</ul>
+
+<h2 class="sect" id="p4-3">4-3. Items commonly deferred in error</h2>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>Three items are routinely deferred and shall not be. The budget alarm incurs cost if omitted. The default storage class silently prevents Kafka from starting, presenting as an unexplained pending state. DNS delegation involves a propagation delay and an external party, neither of which can be compressed once the schedule requires them.</p>
+</div>
+
+<!-- ============================ CHAPTER 5 ============================ -->
+<h1 class="chap"><span class="cn">Chapter 5</span>Support Data</h1>
+
+<h2 class="sect" id="p5-1">5-1. Recurring cost</h2>
+<p class="para"><span class="pn">5-1.1</span> Approximately $240 per month with all components in continuous operation.</p>
+<p class="para"><span class="pn">5-1.2</span> The largest single item is the EKS control plane at approximately $73 per month, fixed, incurred before any workload is scheduled. This figure governs the remaining design decisions: it is the reason a single NAT gateway is specified in place of one per availability zone, and the reason the message broker is not placed on the managed service.</p>
+
+<h2 class="sect" id="p5-2">5-2. Cost reduction measures</h2>
+<div class="tcap" id="t5-1">Table 5-1. Cost reduction measures in order of effect.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:2.5rem">No.</th><th style="width:13rem">Measure</th><th>Remarks</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>Scale nodes to zero when not in use</td><td>Control plane, database and load balancers continue to bill. Compute is the fastest-accumulating item.</td></tr>
+<tr><td>2</td><td>Spot capacity for interruptible work</td><td>Transcode jobs are re-runnable and are the correct workload for this. Not to be applied to continuously available services.</td></tr>
+<tr><td>3</td><td>NAT gateway count and traffic volume</td><td>Charged per hour and per gigabyte processed.</td></tr>
+<tr><td>4</td><td>Object lifecycle rules</td><td>Prevents unbounded accumulation of recorded video.</td></tr>
+</tbody></table></div>
+
+<h2 class="sect" id="p5-3">5-3. Residual billing after disposal</h2>
+
+<div class="warning">
+  <div class="hd">WARNING</div>
+  <p>Deletion of the cluster does not terminate all charges. Load balancers created by Kubernetes objects, content delivery distributions, object versions, orphaned volumes and unassociated addresses all persist and continue to bill.</p>
+  <p>Disposal shall be verified against the cost-by-service report one to two days after teardown. A console resource list is not sufficient verification, as it will not show what was not looked for. Disposal procedure is given in TM SP-2, chapter 6.</p>
+</div>
+
+<p class="para"><span class="pn">5-3.1</span> Disposal shall be planned before construction begins. Where infrastructure was created from a configuration file, disposal is a single operation followed by a manual sweep. Where infrastructure was created by hand, disposal becomes an exercise in recollection.</p>
+
+<h2 class="sect" id="p5-4">5-4. Required background knowledge</h2>
+<p class="para"><span class="pn">5-4.1</span> The subjects in table 5-2 are listed in approximately the order in which they are required.</p>
+
+<div class="tcap" id="t5-2">Table 5-2. Required background knowledge.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:2.5rem">No.</th><th style="width:13rem">Subject</th><th>Remarks</th></tr></thead>
+<tbody>
+<tr><td>1</td><td>VPC fundamentals</td><td>Subnets, route tables, security groups compared with network access control lists, network address translation.</td></tr>
+<tr><td>2</td><td>EKS networking</td><td>Pods draw addresses from VPC subnets, which constrains pod density per instance. This is not intuitive and is frequently discovered late.</td></tr>
+<tr><td>3</td><td>Workload identity</td><td>IAM roles for service accounts, and EKS pod identity. The highest-value subject in this list.</td></tr>
+<tr><td>4</td><td>Services, ingress, gateway API</td><td>Function of each layer and the position of the AWS controller within it.</td></tr>
+<tr><td>5</td><td>Operator pattern</td><td>Custom resources and controllers. Accounts for the broker, autoscaler, secrets controller and deployment agent simultaneously.</td></tr>
+<tr><td>6</td><td>HLS and delivery caching</td><td>Why playlists and segments require dissimilar cache treatment.</td></tr>
+<tr><td>7</td><td>Kafka partitioning</td><td>Ordering, consumer lag, and why consumer count above partition count yields no additional throughput.</td></tr>
+</tbody></table></div>
+
+<div class="pgfoot">
+  <span>TM SP-1</span>
+  <span><a href="console-walkthrough.html">Continue to TM SP-2 &#8212; Installation Procedures</a></span>
+</div>
+
+</div>

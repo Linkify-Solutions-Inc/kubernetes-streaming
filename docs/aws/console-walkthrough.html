@@ -1,0 +1,915 @@
+<title>TM SP-2 &#8212; Streaming Platform, AWS Deployment: Installation Procedures</title>
+<style>
+  @page { margin: 0.75in; }
+  * { box-sizing: border-box; }
+
+  :root {
+    --paper: #ffffff;
+    --ink: #111111;
+    --rule: #111111;
+    --desk: #6f7680;
+    --shade: #ececec;
+    --shade-2: #f6f6f6;
+    --soft: #4a4a4a;
+  }
+  @media (prefers-color-scheme: dark) { :root { --desk: #14171b; } }
+
+  body {
+    margin: 0; background: var(--desk); color: var(--ink);
+    font-family: Arial, Helvetica, "Liberation Sans", sans-serif;
+    font-size: 15px; line-height: 1.45;
+  }
+
+  .doc {
+    max-width: 8.5in; margin: 0 auto; background: var(--paper);
+    padding: 0.85in 0.8in 0.9in;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.35), 0 10px 40px rgba(0,0,0,0.35);
+  }
+
+  .titleblock {
+    text-align: center; border-bottom: 3px double var(--rule);
+    padding-bottom: 1.1rem; margin-bottom: 1.4rem;
+  }
+  .docnum { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.08em; }
+  .doctype {
+    font-size: 0.8rem; letter-spacing: 0.3em; text-transform: uppercase;
+    margin: 0.9rem 0 0.5rem; color: var(--soft);
+  }
+  .doctitle {
+    font-size: 1.25rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; line-height: 1.3; margin: 0.3rem 0 0.6rem;
+  }
+  .docsub { font-size: 0.95rem; font-weight: 700; margin: 0 0 0.9rem; }
+  .issueline {
+    font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--soft);
+  }
+
+  h1.chap {
+    text-align: center; font-size: 1.02rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin: 2.6rem 0 1.2rem; padding-top: 1.2rem;
+    border-top: 1px solid var(--rule);
+  }
+  h1.chap .cn {
+    display: block; font-size: 0.86rem; letter-spacing: 0.28em;
+    margin-bottom: 0.45rem; font-weight: 700;
+  }
+  h1.fm {
+    text-align: center; font-size: 0.95rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.16em; margin: 2.2rem 0 1rem;
+  }
+  h2.sect {
+    font-size: 0.93rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; margin: 1.7rem 0 0.55rem;
+  }
+
+  p.para { margin: 0 0 0.75rem; }
+  p.para.l2 { margin-left: 1.4rem; }
+  .pn { font-weight: 700; }
+  .pt { font-weight: 700; text-transform: uppercase; }
+
+  ul.mil, ol.mil { margin: 0 0 0.85rem; padding-left: 1.5rem; }
+  ul.mil li, ol.mil li { margin-bottom: 0.35rem; }
+
+  .warning, .caution, .note { margin: 1.1rem 0; padding: 0.65rem 0.85rem 0.75rem; }
+  .warning { border: 3px solid var(--rule); }
+  .caution { border: 2px solid var(--rule); }
+  .note { border: 1px solid var(--rule); }
+  .warning .hd, .caution .hd, .note .hd {
+    text-align: center; font-weight: 700; padding-bottom: 0.3rem;
+    margin-bottom: 0.5rem; border-bottom: 1px solid var(--rule);
+  }
+  .warning .hd { letter-spacing: 0.4em; border-bottom-width: 2px; }
+  .caution .hd { letter-spacing: 0.32em; }
+  .note .hd { letter-spacing: 0.24em; font-size: 0.9rem; }
+  .warning p, .caution p, .note p { margin: 0 0 0.6rem; }
+  .warning p:last-child, .caution p:last-child, .note p:last-child { margin-bottom: 0; }
+
+  .tcap, .fcap {
+    text-align: center; font-weight: 700; font-size: 0.82rem;
+    letter-spacing: 0.02em;
+  }
+  .tcap { margin: 1.3rem 0 0.35rem; }
+  .fcap { margin: 0.45rem 0 1.3rem; }
+  .tbl-wrap { overflow-x: auto; }
+  table {
+    border-collapse: collapse; width: 100%; font-size: 0.85rem;
+    margin: 0; min-width: 420px;
+  }
+  th, td {
+    border: 1px solid var(--rule); padding: 0.35rem 0.5rem;
+    text-align: left; vertical-align: top;
+  }
+  th {
+    background: var(--shade); text-transform: uppercase;
+    font-size: 0.74rem; letter-spacing: 0.05em; font-weight: 700;
+  }
+  figure { margin: 1.3rem 0 0; border: 1px solid var(--rule); padding: 0.9rem 0.8rem; }
+  .fig-row {
+    border: 1px solid var(--rule); padding: 0.5rem 0.6rem; margin-bottom: 0.45rem;
+    background: var(--shade-2);
+  }
+  .fig-row:last-child { margin-bottom: 0; }
+  .fig-lbl {
+    font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.1em;
+    font-weight: 700; margin-bottom: 0.4rem;
+  }
+  .fig-items { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+  .fig-item {
+    border: 1px solid var(--rule); background: var(--paper);
+    padding: 0.28rem 0.5rem; font-size: 0.78rem;
+  }
+  .fig-item b { display: block; font-weight: 700; }
+  .fig-item span {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 0.7rem; color: var(--soft);
+  }
+  .fig-arrow {
+    text-align: center; font-size: 0.85rem; margin: 0.1rem 0;
+    font-family: "Courier New", Courier, monospace;
+  }
+  .fig-step {
+    display: grid; grid-template-columns: 2.2rem 1fr; gap: 0.6rem;
+    padding: 0.4rem 0; border-bottom: 1px dotted var(--rule); font-size: 0.86rem;
+  }
+  .fig-step:last-child { border-bottom: none; }
+  .fig-step .sn { font-weight: 700; }
+
+  .toc { margin: 0 0 1.2rem; }
+  .toc a {
+    display: flex; align-items: baseline; text-decoration: none;
+    color: inherit; font-size: 0.87rem; padding: 0.14rem 0;
+  }
+  .toc a:hover { background: var(--shade-2); }
+  .toc .num { flex: none; width: 3.6rem; font-weight: 700; }
+  .toc .txt { flex: none; max-width: 76%; }
+  .toc .lead {
+    flex: 1; border-bottom: 1px dotted var(--ink);
+    margin: 0 0.35rem; transform: translateY(-0.22em);
+  }
+  .toc .pg { flex: none; font-variant-numeric: tabular-nums; }
+  .toc .grp {
+    font-weight: 700; text-transform: uppercase; font-size: 0.82rem;
+    letter-spacing: 0.08em; margin: 0.9rem 0 0.2rem;
+  }
+
+  code {
+    font-family: "Courier New", Courier, monospace;
+    font-size: 0.88em; background: var(--shade-2);
+    border: 1px solid #ccc; padding: 0 0.22em;
+  }
+
+  .navpath {
+    font-family: "Courier New", Courier, monospace; font-size: 0.82rem;
+    border: 1px solid var(--rule); background: var(--shade-2);
+    padding: 0.35rem 0.6rem; margin: 0 0 0.85rem; display: block;
+    overflow-x: auto; white-space: nowrap;
+  }
+  .navpath .lbl {
+    font-family: Arial, Helvetica, sans-serif; font-size: 0.68rem;
+    text-transform: uppercase; letter-spacing: 0.1em; font-weight: 700;
+    padding-right: 0.5rem; border-right: 1px solid var(--rule); margin-right: 0.55rem;
+  }
+  .navpath .sep { padding: 0 0.3rem; }
+
+  .verify {
+    border: 1px solid var(--rule); border-left-width: 5px;
+    padding: 0.5rem 0.8rem; margin: 1rem 0; background: var(--shade-2);
+    font-size: 0.9rem;
+  }
+  .verify .hd {
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em;
+    font-size: 0.76rem; margin-bottom: 0.25rem;
+  }
+  .verify p { margin: 0; }
+
+  .medium {
+    display: inline-block; border: 1px solid var(--rule);
+    font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.1em;
+    font-weight: 700; padding: 0.1rem 0.45rem; margin-left: 0.5rem;
+    vertical-align: middle; background: var(--shade);
+  }
+
+  .pgfoot {
+    border-top: 1px solid var(--rule); margin-top: 2.6rem;
+    padding-top: 0.5rem; display: flex; justify-content: space-between;
+    gap: 1rem; flex-wrap: wrap;
+    font-size: 0.76rem; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+
+  @media (max-width: 800px) {
+    .doc { padding: 1.2rem 1rem 2rem; }
+    .toc .txt { max-width: 60%; }
+  }
+  @media print {
+    body { background: #fff; }
+    .doc { box-shadow: none; max-width: none; padding: 0; }
+    h1.chap { page-break-before: always; }
+    .warning, .caution, .note, figure, table { page-break-inside: avoid; }
+  }
+</style>
+
+<div class="doc">
+
+<div class="titleblock">
+  <div class="docnum">TM SP-2</div>
+  <div class="doctype">Technical Manual</div>
+  <div class="doctitle">Streaming Platform, Kubernetes-Based<br>Amazon Web Services Deployment</div>
+  <div class="docsub">Installation Procedures &#8212; Management Console</div>
+  <div class="issueline">Prerequisite: TM SP-1 &middot; Operator qualification: none assumed</div>
+</div>
+
+<h1 class="fm">Record of Changes</h1>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:5rem">Change No.</th><th style="width:7rem">Basis</th><th>Description</th></tr></thead>
+<tbody>
+<tr><td>0</td><td>Initial</td><td>Original issue.</td></tr>
+<tr><td>1</td><td>Review</td><td>Paragraphs 3-1 and 3-2 revised. Network and cluster construction reassigned from console to configuration file; console procedure retained for instruction only. See the CAUTION at paragraph 3-1.</td></tr>
+</tbody></table></div>
+
+<h1 class="fm">Table of Contents</h1>
+<div class="toc">
+  <div class="grp">Chapter 1 &#8212; General Information</div>
+  <a href="#p1-1"><span class="num">1-1</span><span class="txt">Scope</span><span class="lead"></span><span class="pg">1-1</span></a>
+  <a href="#p1-2"><span class="num">1-2</span><span class="txt">Applicability</span><span class="lead"></span><span class="pg">1-1</span></a>
+  <a href="#p1-3"><span class="num">1-3</span><span class="txt">Arrangement of procedures</span><span class="lead"></span><span class="pg">1-1</span></a>
+  <a href="#p1-4"><span class="num">1-4</span><span class="txt">Division of effort between console and command line</span><span class="lead"></span><span class="pg">1-2</span></a>
+  <a href="#p1-5"><span class="num">1-5</span><span class="txt">Advisory conventions</span><span class="lead"></span><span class="pg">1-3</span></a>
+
+  <div class="grp">Chapter 2 &#8212; Preparation for Use</div>
+  <a href="#p2-1"><span class="num">2-1</span><span class="txt">Access credentials</span><span class="lead"></span><span class="pg">2-1</span></a>
+  <a href="#p2-2"><span class="num">2-2</span><span class="txt">Verification of granted permissions</span><span class="lead"></span><span class="pg">2-1</span></a>
+  <a href="#p2-3"><span class="num">2-3</span><span class="txt">Console orientation</span><span class="lead"></span><span class="pg">2-2</span></a>
+  <a href="#p2-4"><span class="num">2-4</span><span class="txt">Cost control provisions</span><span class="lead"></span><span class="pg">2-3</span></a>
+  <a href="#p2-5"><span class="num">2-5</span><span class="txt">Workstation preparation</span><span class="lead"></span><span class="pg">2-4</span></a>
+
+  <div class="grp">Chapter 3 &#8212; Platform Installation</div>
+  <a href="#p3-1"><span class="num">3-1</span><span class="txt">Network</span><span class="lead"></span><span class="pg">3-1</span></a>
+  <a href="#p3-2"><span class="num">3-2</span><span class="txt">Cluster</span><span class="lead"></span><span class="pg">3-3</span></a>
+  <a href="#p3-3"><span class="num">3-3</span><span class="txt">Cluster access</span><span class="lead"></span><span class="pg">3-4</span></a>
+  <a href="#p3-4"><span class="num">3-4</span><span class="txt">Compute nodes</span><span class="lead"></span><span class="pg">3-5</span></a>
+  <a href="#p3-5"><span class="num">3-5</span><span class="txt">Cluster add-ons</span><span class="lead"></span><span class="pg">3-6</span></a>
+  <a href="#p3-6"><span class="num">3-6</span><span class="txt">Workload identity</span><span class="lead"></span><span class="pg">3-6</span></a>
+
+  <div class="grp">Chapter 4 &#8212; Data Services Installation</div>
+  <a href="#p4-1"><span class="num">4-1</span><span class="txt">Name delegation</span><span class="lead"></span><span class="pg">4-1</span></a>
+  <a href="#p4-2"><span class="num">4-2</span><span class="txt">Certificate</span><span class="lead"></span><span class="pg">4-1</span></a>
+  <a href="#p4-3"><span class="num">4-3</span><span class="txt">Database</span><span class="lead"></span><span class="pg">4-2</span></a>
+  <a href="#p4-4"><span class="num">4-4</span><span class="txt">Object storage</span><span class="lead"></span><span class="pg">4-3</span></a>
+  <a href="#p4-5"><span class="num">4-5</span><span class="txt">Content delivery</span><span class="lead"></span><span class="pg">4-3</span></a>
+  <a href="#p4-6"><span class="num">4-6</span><span class="txt">Message broker</span><span class="lead"></span><span class="pg">4-4</span></a>
+
+  <div class="grp">Chapter 5 &#8212; Application Deployment</div>
+  <a href="#p5-1"><span class="num">5-1</span><span class="txt">Workload deployment</span><span class="lead"></span><span class="pg">5-1</span></a>
+  <a href="#p5-2"><span class="num">5-2</span><span class="txt">External exposure</span><span class="lead"></span><span class="pg">5-1</span></a>
+  <a href="#p5-3"><span class="num">5-3</span><span class="txt">Operational verification</span><span class="lead"></span><span class="pg">5-2</span></a>
+  <a href="#p5-4"><span class="num">5-4</span><span class="txt">Elastic transcoding</span><span class="lead"></span><span class="pg">5-3</span></a>
+  <a href="#p5-5"><span class="num">5-5</span><span class="txt">Continuous deployment</span><span class="lead"></span><span class="pg">5-3</span></a>
+
+  <div class="grp">Chapter 6 &#8212; Sustainment and Disposal</div>
+  <a href="#p6-1"><span class="num">6-1</span><span class="txt">Cost monitoring</span><span class="lead"></span><span class="pg">6-1</span></a>
+  <a href="#p6-2"><span class="num">6-2</span><span class="txt">Fault isolation</span><span class="lead"></span><span class="pg">6-1</span></a>
+  <a href="#p6-3"><span class="num">6-3</span><span class="txt">Disposal</span><span class="lead"></span><span class="pg">6-2</span></a>
+</div>
+
+<h1 class="fm">List of Tables</h1>
+<div class="toc">
+  <a href="#t1-1"><span class="num">1-1</span><span class="txt">Division of effort between console and command line</span><span class="lead"></span><span class="pg">1-2</span></a>
+  <a href="#t2-1"><span class="num">2-1</span><span class="txt">Permission profiles and their consequence</span><span class="lead"></span><span class="pg">2-1</span></a>
+  <a href="#t2-2"><span class="num">2-2</span><span class="txt">Budget configuration fields</span><span class="lead"></span><span class="pg">2-3</span></a>
+  <a href="#t2-3"><span class="num">2-3</span><span class="txt">Required workstation tools</span><span class="lead"></span><span class="pg">2-4</span></a>
+  <a href="#t3-1"><span class="num">3-1</span><span class="txt">Network wizard fields</span><span class="lead"></span><span class="pg">3-1</span></a>
+  <a href="#t3-2"><span class="num">3-2</span><span class="txt">Wizard field to configuration file mapping</span><span class="lead"></span><span class="pg">3-2</span></a>
+  <a href="#t3-3"><span class="num">3-3</span><span class="txt">Cluster configuration fields</span><span class="lead"></span><span class="pg">3-3</span></a>
+  <a href="#t3-4"><span class="num">3-4</span><span class="txt">Node group fields</span><span class="lead"></span><span class="pg">3-5</span></a>
+  <a href="#t4-1"><span class="num">4-1</span><span class="txt">Database configuration fields</span><span class="lead"></span><span class="pg">4-2</span></a>
+  <a href="#t4-2"><span class="num">4-2</span><span class="txt">Distribution configuration fields</span><span class="lead"></span><span class="pg">4-3</span></a>
+  <a href="#t5-1"><span class="num">5-1</span><span class="txt">External access methods</span><span class="lead"></span><span class="pg">5-1</span></a>
+  <a href="#t6-1"><span class="num">6-1</span><span class="txt">Resources requiring disposal verification</span><span class="lead"></span><span class="pg">6-2</span></a>
+</div>
+
+<h1 class="fm">List of Illustrations</h1>
+<div class="toc">
+  <a href="#f3-1"><span class="num">3-1</span><span class="txt">Authentication and authorization sequence</span><span class="lead"></span><span class="pg">3-4</span></a>
+  <a href="#f3-2"><span class="num">3-2</span><span class="txt">Workload credential issue sequence</span><span class="lead"></span><span class="pg">3-6</span></a>
+  <a href="#f5-1"><span class="num">5-1</span><span class="txt">Stream path fault isolation sequence</span><span class="lead"></span><span class="pg">5-2</span></a>
+  <a href="#f6-1"><span class="num">6-1</span><span class="txt">General fault isolation method</span><span class="lead"></span><span class="pg">6-1</span></a>
+</div>
+
+<!-- ============================ CHAPTER 1 ============================ -->
+<h1 class="chap"><span class="cn">Chapter 1</span>General Information</h1>
+
+<h2 class="sect" id="p1-1">1-1. Scope</h2>
+<p class="para"><span class="pn">1-1.1</span> This manual contains the installation procedures for the streaming platform on Amazon Web Services, expressed as management console navigation. Each procedure states the screen to be opened, the decision that screen represents, the fields requiring deliberate selection, the verification criterion, and the failure modes associated with that step.</p>
+<p class="para"><span class="pn">1-1.2</span> Commands and configuration file listings are not reproduced here. Where a step cannot be performed from the console, that fact is stated and the module containing the command is cited.</p>
+
+<h2 class="sect" id="p1-2">1-2. Applicability</h2>
+<p class="para"><span class="pn">1-2.1</span> This manual assumes the operator has been issued an IAM role and has no prior familiarity with the management console. No other qualification is assumed.</p>
+<p class="para"><span class="pn">1-2.2</span> System description, architecture and installation planning are contained in <a href="overview.html">TM SP-1</a>, which shall be read first.</p>
+
+<h2 class="sect" id="p1-3">1-3. Arrangement of procedures</h2>
+<p class="para"><span class="pn">1-3.1</span> Procedures shall be performed in the order presented. Each is arranged as follows:</p>
+<ul class="mil">
+<li><b>Navigation.</b> The console path, given as a breadcrumb.</li>
+<li><b>Function.</b> The decision the screen represents. This is the instructional content and shall be read before the fields are set.</li>
+<li><b>Fields.</b> Only those requiring deliberate selection. Fields not listed may be left at their default values.</li>
+<li><b>Verification.</b> The condition confirming the step is complete.</li>
+<li><b>Failure modes.</b> The faults associated with the step, in order of observed frequency.</li>
+</ul>
+
+<div class="note">
+  <div class="hd">NOTE</div>
+  <p>The console is used here as the instructional surface. The deployment course builds the cluster from a configuration file, which is the correct method for infrastructure that is to be retained. A configuration file is not readable until its field names are known, and the console is where they are learned. Every field in that file exists as a labelled control on a screen in this manual.</p>
+</div>
+
+<h2 class="sect" id="p1-4">1-4. Division of effort between console and command line</h2>
+<p class="para"><span class="pn">1-4.1</span> The division is not entirely a matter of preference. The management console creates AWS resources. It cannot create Kubernetes objects, which are held by a separate API server operating within the cluster.</p>
+
+<div class="tcap" id="t1-1">Table 1-1. Division of effort between console and command line.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:9rem">Medium</th><th style="width:12rem">Applies to</th><th>Remarks</th></tr></thead>
+<tbody>
+<tr><td>Console</td><td>Budget, cost reporting, IAM inspection, database, object storage, content delivery, name service, certificates</td><td>Created once and seldom modified. The console is faster for these and teaches the field names.</td></tr>
+<tr><td>Configuration file (eksctl)</td><td>VPC, cluster, node group, identity provider, access entries, cluster add-ons</td><td>One interlocking unit. Disposal is a single operation rather than an exercise in recollection.</td></tr>
+<tr><td>Command line (kubectl, helm)</td><td>All Kubernetes objects; all platform controllers</td><td>No console equivalent exists. Chapters 4 (paragraph 4-6) and 5 in their entirety.</td></tr>
+</tbody></table></div>
+
+<p class="para"><span class="pn">1-4.2</span> The cluster console provides a resources view which will display Kubernetes objects. It is adequate as a read-only inspection aid and shall not be relied upon for creation.</p>
+<p class="para"><span class="pn">1-4.3</span> <span class="pt">Diagnostic application.</span> When a fault is observed, determine first which side of table 1-1 it lies on. A pod in a pending state is a Kubernetes-side condition and no amount of console inspection will reveal the cause; the cause is recorded in that object's events.</p>
+
+<h2 class="sect" id="p1-5">1-5. Advisory conventions</h2>
+<p class="para"><span class="pn">1-5.1</span> Advisories are used as defined in TM SP-1, paragraph 1-4. WARNING denotes unrecoverable loss, unbounded expenditure or loss of access. CAUTION denotes a failed step or wasted expenditure. NOTE denotes clarifying information.</p>
+
+<!-- ============================ CHAPTER 2 ============================ -->
+<h1 class="chap"><span class="cn">Chapter 2</span>Preparation for Use</h1>
+
+<h2 class="sect" id="p2-1">2-1. Access credentials</h2>
+<p class="para"><span class="pn">2-1.1</span> <span class="pt">A role is not an account.</span> A user is a permanent identity holding a password and possibly long-lived keys. A role is a set of permissions belonging to no one; it is assumed temporarily, and the credentials issued expire within hours.</p>
+<p class="para"><span class="pn">2-1.2</span> Three consequences follow, all of which are normal behaviour and not faults:</p>
+<ul class="mil">
+<li><b>Sessions expire.</b> This is the purpose of the design. A credential that expires cannot be used a year after it is taken.</li>
+<li><b>The identity has a readable form.</b> The console displays the role name and account number at upper right. That string is the principal, and it is the principal that is named when access is denied.</li>
+<li><b>No action is anonymous.</b> Every call is recorded against the principal in the audit trail. This is how the cause of a deletion is later established.</li>
+</ul>
+
+<h2 class="sect" id="p2-2">2-2. Verification of granted permissions</h2>
+<span class="navpath"><span class="lbl">Navigate</span>IAM<span class="sep">&rsaquo;</span>Roles<span class="sep">&rsaquo;</span>[your role name]<span class="sep">&rsaquo;</span>Permissions</span>
+
+<p class="para"><span class="pn">2-2.1</span> Inspect the policies attached to the issued role before any work is attempted. The result determines whether the remainder of this manual can be executed without assistance.</p>
+
+<div class="tcap" id="t2-1">Table 2-1. Permission profiles and their consequence.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:11rem">Observed policy</th><th>Consequence</th></tr></thead>
+<tbody>
+<tr><td>AdministratorAccess</td><td>All procedures in this manual may be executed. Exercise care rather than relief.</td></tr>
+<tr><td>PowerUserAccess</td><td>All procedures except the creation of IAM roles, which the cluster requires repeatedly. Obstruction will occur at paragraph 3-2. Identify the party who can create roles before proceeding.</td></tr>
+<tr><td>A written policy</td><td>Inspect for authority over <code>iam:CreateRole</code>, <code>iam:PassRole</code>, <code>eks</code>, <code>ec2</code> and <code>rds</code> actions. Absence of <code>PassRole</code> is the least obvious and most obstructive.</td></tr>
+</tbody></table></div>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>Several components created in this manual do not act as the operator; they act as a role handed to them. The control plane assumes a role, nodes assume a role, the database assumes a role for logging. Handing a role to a service is itself a privileged act, gated separately as <code>iam:PassRole</code>, because otherwise any party able to launch an instance could launch it with administrative authority.</p>
+  <p>The resulting symptom is a successful creation form followed by an access denial naming <code>PassRole</code>. This is not a fault in the form.</p>
+</div>
+
+<p class="para"><span class="pn">2-2.2</span> <span class="pt">Two halves of the permission model.</span> Identity policies attach to the operator and state what may be done. Resource policies attach to an object and state who may act upon it. Most services require only the identity side; object storage and key management require both sides to agree. This is why an object storage denial is sometimes not corrected by granting the operator additional permissions.</p>
+
+<div class="verify">
+  <div class="hd">Verification</div>
+  <p>The operator can state the name of the issued role, whether it may create IAM roles, and who is to be asked if it may not.</p>
+</div>
+
+<h2 class="sect" id="p2-3">2-3. Console orientation</h2>
+<p class="para"><span class="pn">2-3.1</span> <span class="pt">Region selector.</span> Located at upper right. Nearly every resource exists in exactly one region and is not visible from any other. The characteristic first-week fault is creating a cluster, returning the following day to an empty list, and concluding it was deleted, when the console has reset to a different region. This project uses <code>us-east-1</code>.</p>
+
+<div class="note">
+  <div class="hd">NOTE</div>
+  <p>Certain services are global and will display as <code>us-east-1</code> or as Global: identity management, name service, content delivery and billing. These have no region. A consequence is that a certificate intended for the content delivery network shall be requested in <code>us-east-1</code> specifically. See paragraph 4-2.</p>
+</div>
+
+<p class="para"><span class="pn">2-3.2</span> <span class="pt">Search field.</span> The search field at the top of every page is the primary navigation. It resolves both service names and individual resource identifiers. Every navigation path in this manual begins with a service name that may be entered there.</p>
+<p class="para"><span class="pn">2-3.3</span> <span class="pt">Resource names.</span> Every object carries an Amazon Resource Name stating partition, service, region, account, type and identifier. Resource names are entered into policies and are quoted in error messages. Familiarity sufficient to read one at a glance is required.</p>
+<p class="para"><span class="pn">2-3.4</span> <span class="pt">Tagging.</span> Nearly every creation form carries a tags section near the bottom, and it is nearly always skipped. A consistent project tag shall be applied to every resource created. Two benefits accrue later: the bill may be filtered by that tag, and disposal may enumerate by that tag rather than by recollection.</p>
+<p class="para"><span class="pn">2-3.5</span> <span class="pt">Status of the console.</span> The console is a client calling the same interface as the command line. No capability is console-only. When a form fails, the message displayed is generally the unmodified interface error and is generally precise.</p>
+
+<h2 class="sect" id="p2-4">2-4. Cost control provisions</h2>
+<span class="navpath"><span class="lbl">Navigate</span>Billing and Cost Management<span class="sep">&rsaquo;</span>Budgets<span class="sep">&rsaquo;</span>Create budget</span>
+
+<div class="warning">
+  <div class="hd">WARNING</div>
+  <p>A budget is not a limit. Expenditure will not be halted when the figure is reached. A budget observes spending and issues notification; no resource is stopped and no service is suspended. No facility exists to cap an account at a chosen figure.</p>
+  <p>This provision shall be completed before any chargeable resource is created.</p>
+</div>
+
+<div class="tcap" id="t2-2">Table 2-2. Budget configuration fields.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:9rem">Field</th><th>Selection criteria</th></tr></thead>
+<tbody>
+<tr><td>Budget type</td><td>Cost. The usage and savings-plan types are not applicable at this stage.</td></tr>
+<tr><td>Period</td><td>Monthly, corresponding to the billing period.</td></tr>
+<tr><td>Amount</td><td>A figure that would be unwelcome, not a figure that is expected. This platform runs at approximately $240 per month at full operation.</td></tr>
+<tr><td>Alert thresholds</td><td>More than one. One at approximately 50 percent of actual spend and one at approximately 100 percent of forecast spend. The forecast alert is the useful one, as it is issued while action remains possible.</td></tr>
+<tr><td>Notification address</td><td>An address that is read. Not an unattended distribution alias.</td></tr>
+</tbody></table></div>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>Billing data is restricted separately from all other permissions. By default only the account management identity may view it, and account administrators may be refused until access to billing data is enabled in the account settings. If the budgets page is inaccessible, this is the cause. It is a brief correction for the account owner and shall be requested before construction begins.</p>
+</div>
+
+<p class="para"><span class="pn">2-4.1</span> <span class="pt">Cost reporting.</span> Enable cost reporting at <span class="navpath" style="display:inline; padding:0.05rem 0.35rem; white-space:normal;">Billing and Cost Management<span class="sep">&rsaquo;</span>Cost Explorer</span> at this time. Collection begins when enabled and cannot be applied retroactively to preceding days. When expenditure later requires explanation, group by service to identify the category, then by usage type to identify the line item. The second grouping is where it is discovered that a substantial share of cost is network address translation data processing rather than the compute that was assumed.</p>
+
+<div class="verify">
+  <div class="hd">Verification</div>
+  <p>Budget creation is confirmed and cost reporting is enabled. Chargeable resources may now be created.</p>
+</div>
+
+<h2 class="sect" id="p2-5">2-5. Workstation preparation<span class="medium">Local machine</span></h2>
+<p class="para"><span class="pn">2-5.1</span> Four tools are required. The reason each is required is stated, as the requirement is not arbitrary.</p>
+
+<div class="tcap" id="t2-3">Table 2-3. Required workstation tools.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:7rem">Tool</th><th>Function within this deployment</th></tr></thead>
+<tbody>
+<tr><td>AWS CLI</td><td>Communicates with AWS. Principally required for the one operation the console cannot perform: writing the file that permits <code>kubectl</code> to authenticate to the cluster.</td></tr>
+<tr><td>kubectl</td><td>Communicates with Kubernetes. Deployments, services, ingresses, secrets and jobs are held by the cluster's own interface and are not AWS resources.</td></tr>
+<tr><td>Helm</td><td>Installs the platform controllers: ingress, autoscaling, secrets synchronisation, message broker. These are distributed as charts and have no console equivalent.</td></tr>
+<tr><td>eksctl</td><td>Constructs the cluster from a single configuration file. Its failure messages are readable, which is the principal argument for it at this scale.</td></tr>
+</tbody></table></div>
+
+<p class="para"><span class="pn">2-5.2</span> <span class="pt">Credential resolution.</span> When any AWS tool requires credentials it examines a fixed sequence of locations &#8212; environment variables, then a named profile in the configuration file, then any role attached to the machine &#8212; and uses the first found. Nearly every instance of a command acting on the wrong account is caused by an entry earlier in that sequence than was assumed.</p>
+<p class="para"><span class="pn">2-5.3</span> Where the role is issued through a sign-on portal, a profile is configured naming the portal and the role, and signing in caches short-lived credentials. Where the role is assumed from a base user, the profile names the role and its source. In either case a named profile shall be used and the default profile shall not. The default profile is the mechanism by which deletions are executed against the wrong account.</p>
+
+<div class="verify">
+  <div class="hd">Verification</div>
+  <p>A single command reports the identity AWS currently attributes to the operator. It shall be executed at the start of every session, and before any resource is touched. If the role reported is not the role expected, work shall stop until it is. The command is given in Module 1.</p>
+</div>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>Tool versions are significant. <code>kubectl</code> is supported only within one minor version of the cluster, and <code>eksctl</code> shall be recent enough to recognise the cluster features in use. An unrecognised-field error is far more often an obsolete tool than an incorrect configuration. Versions are pinned in Module 1.</p>
+</div>
+
+<!-- ============================ CHAPTER 3 ============================ -->
+<h1 class="chap"><span class="cn">Chapter 3</span>Platform Installation</h1>
+
+<h2 class="sect" id="p3-1">3-1. Network</h2>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>This procedure is performed for instruction only. The screens shall be completed and then cancelled. <code>infra/eks/cluster.yaml</code> constructs the network as part of the cluster; a network constructed here by hand would be a second, unused one, carrying a network address translation gateway billing approximately $33 per month to carry no traffic.</p>
+  <p>Complete the wizard. Study what it draws. Cancel.</p>
+</div>
+
+<span class="navpath"><span class="lbl">Navigate</span>VPC<span class="sep">&rsaquo;</span>Your VPCs<span class="sep">&rsaquo;</span>Create VPC<span class="sep">&rsaquo;</span>VPC and more</span>
+
+<p class="para"><span class="pn">3-1.1</span> <span class="pt">Purpose of the procedure.</span> Select "VPC and more" rather than "VPC only". The latter produces an empty network to be furnished by hand. The former constructs the complete set from a small number of answers and, materially, renders the resulting network as a diagram at the right of the screen which updates as options are changed.</p>
+<p class="para"><span class="pn">3-1.2</span> That preview is the instructional value of the screen. Alter the zone count and observe subnets multiply. Change address translation from one gateway to one per zone and observe gateways appear. Enable the object storage endpoint and observe where it attaches. This costs nothing because the form is to be cancelled.</p>
+<p class="para"><span class="pn">3-1.3</span> The decision represented by this screen reduces to one question: which components shall be reachable from the internet, and by what means shall the remainder reach outward.</p>
+
+<div class="tcap" id="t3-1">Table 3-1. Network wizard fields.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:9rem">Field</th><th>Meaning and selection criteria</th></tr></thead>
+<tbody>
+<tr><td>IPv4 CIDR</td><td>The private address range for the network. The significant property is size: in EKS every pod draws a real address from the subnets, so pod count is bounded by address space. A /16 is generous and carries no charge. A small range shall not be selected for tidiness.</td></tr>
+<tr><td>Availability zones</td><td>Physically separated facilities. One is fragile and prevents certain managed services from operating, as the database requires two subnets in separate zones. Two is the frugal selection. Three is the default applied by <code>eksctl</code> when the configuration is silent, and is what this project receives.</td></tr>
+<tr><td>Public subnets</td><td>Carry a route to the internet gateway. Load balancers reside here. No other component requires it.</td></tr>
+<tr><td>Private subnets</td><td>Carry no inbound route from the internet. Nodes and the database reside here. This is the default location for any component not deliberately published.</td></tr>
+<tr><td>NAT gateways</td><td>The expenditure decision on this screen. See paragraph 3-1.4.</td></tr>
+<tr><td>VPC endpoints</td><td>Enable the object storage gateway endpoint. It carries no charge and keeps object storage traffic off the address translation gateway. This single control can represent a material share of the bill.</td></tr>
+<tr><td>DNS hostnames and resolution</td><td>Both enabled. EKS requires them and failures in their absence are obscure.</td></tr>
+</tbody></table></div>
+
+<p class="para"><span class="pn">3-1.4</span> <span class="pt">Address translation.</span> Components in private subnets still require outbound access to retrieve container images and call service interfaces. A network address translation gateway permits outbound without inbound. It is charged per hour and per gigabyte processed, and is generally the second-largest item on a cluster bill after the control plane.</p>
+<p class="para"><span class="pn">3-1.5</span> The wizard offers one gateway per zone, which is resilient, or one in total, which is cheaper but surrenders outbound access for all private subnets if that zone becomes unavailable. This project specifies one, and <code>cluster.yaml</code> records the monthly difference in a comment beside the setting. The requirement is that the operator can state which was selected and what is forfeited by it.</p>
+
+<p class="para"><span class="pn">3-1.6</span> <span class="pt">Subnet tagging.</span> When an ingress is later created, a controller within the cluster shall determine which subnets are to receive a load balancer. It does so by reading specific tags on the subnets, one marking a subnet as suitable for internet-facing balancers and another for internal ones. Recent configurations can often determine this automatically; where a load balancer fails to appear and the controller log refers to subnet discovery, this is the cause.</p>
+<p class="para"><span class="pn">3-1.7</span> Because <code>eksctl</code> creates these subnets it also tags them correctly, which is among the quieter arguments for permitting it to do so. The location is recorded for inspection, as an absent tag is undetectable until an ingress fails to produce anything:</p>
+<span class="navpath"><span class="lbl">Inspect</span>VPC<span class="sep">&rsaquo;</span>Subnets<span class="sep">&rsaquo;</span>[subnet]<span class="sep">&rsaquo;</span>Tags</span>
+
+<p class="para"><span class="pn">3-1.8</span> <span class="pt">Security groups.</span> A security group is a stateful filter attached to a resource, not to a subnet. Two properties are significant and both are counter-intuitive:</p>
+<ul class="mil">
+<li><b>Allow rules only.</b> No deny rule exists. Traffic not permitted is refused by omission.</li>
+<li><b>Stateful.</b> Where an inbound connection is permitted, the reply is permitted outbound automatically. Return rules are not written.</li>
+</ul>
+<p class="para"><span class="pn">3-1.9</span> The source of a security group rule may be another security group rather than an address range. "Permit database traffic from the cluster's security group" is both more legible and more correct than any address range, as it remains valid as node addresses change. This construction is used at paragraph 4-3.</p>
+
+<p class="para"><span class="pn">3-1.10</span> <span class="pt">Correlation with the configuration file.</span> Close the console and open the <code>vpc:</code> block of <code>infra/eks/cluster.yaml</code>. Every field just completed appears there under a different name, as shown in table 3-2.</p>
+
+<div class="tcap" id="t3-2">Table 3-2. Wizard field to configuration file mapping.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:9rem">Wizard field</th><th style="width:9rem">File field</th><th>Remarks</th></tr></thead>
+<tbody>
+<tr><td>IPv4 CIDR</td><td><code>vpc.cidr</code></td><td>A /16, per paragraph 3-1.3.</td></tr>
+<tr><td>NAT gateways</td><td><code>vpc.nat.gateway</code></td><td>Set to a single gateway, with the cost of the selection recorded in an adjacent comment.</td></tr>
+<tr><td>Availability zones</td><td><em>Absent</em></td><td>Not stated, so the tool default applies. An unwritten field remains a decision; this one procures three zones.</td></tr>
+<tr><td>Public and private subnets</td><td><em>Derived</em></td><td>The subnet layout is computed from the address range and zone count. The shape is described and the arithmetic is performed by the tool.</td></tr>
+<tr><td>&#8212; (a cluster field)</td><td><code>vpc.clusterEndpoints</code></td><td>Whether the Kubernetes interface is reachable publicly, privately or both. Encountered again at paragraph 3-2.</td></tr>
+</tbody></table></div>
+
+<div class="note">
+  <div class="hd">NOTE</div>
+  <p>Read without preparation, <code>gateway: Single</code> conveys nothing. Read ten minutes after observing the wizard diagram gain and lose a gateway as that same control was changed, it conveys a specific quantity, and the operator is able to weigh $66 per month against the consequence of a zone failure because the consequence has been seen in both configurations.</p>
+  <p>This is the method of the manual as a whole: concepts carry labels and diagrams in the console; decisions are recorded in the configuration file. Learn in the first, construct with the second.</p>
+</div>
+
+<div class="verify">
+  <div class="hd">Verification</div>
+  <p>The operator can identify each field in the <code>vpc:</code> block of <code>cluster.yaml</code> and state what it will create, and no network has been created in the console.</p>
+</div>
+
+<p class="para"><span class="pn">3-1.11</span> <span class="pt">Failure modes.</span> A network created here notwithstanding the CAUTION, then forgotten; inspect <span class="navpath" style="display:inline; padding:0.05rem 0.35rem; white-space:normal;">VPC<span class="sep">&rsaquo;</span>Your VPCs</span> for strays before proceeding. Address space specified too small, discovered months later when pods cannot obtain addresses. DNS hostnames left disabled. Object storage endpoint omitted, discovered on the bill.</p>
+
+<h2 class="sect" id="p3-2">3-2. Cluster</h2>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>As paragraph 3-1. <code>cluster.yaml</code> creates the cluster, node group and core add-ons together with the network; they are one interlocking unit and are constructed as one. Walk these screens for instruction, cancel, and construct from the file. Paragraphs 3-2, 3-4 and 3-5 each correspond to a stanza of that file, identified in the paragraph heading.</p>
+</div>
+
+<span class="navpath"><span class="lbl">Navigate</span>EKS<span class="sep">&rsaquo;</span>Clusters<span class="sep">&rsaquo;</span>Create cluster</span>
+
+<p class="para"><span class="pn">3-2.1</span> <span class="pt">What is procured.</span> A Kubernetes control plane: interface server, scheduler, controller manager and the state store behind them, operated across multiple zones by the provider, patched by the provider, at a fixed hourly rate. The machines are never seen. What is delivered is an interface endpoint and an availability commitment.</p>
+<p class="para"><span class="pn">3-2.2</span> No capacity to run workloads is procured by this step. That is paragraph 3-4 and is billed separately. A cluster with no nodes is permissible, performs no function, and costs approximately $73 per month, which is the reason chapter 6 exists.</p>
+
+<p class="para"><span class="pn">3-2.3</span> <span class="pt">Managed compute mode.</span> The creation screen offers a mode in which compute, storage and load balancing are managed by the provider: nodes appear on demand, a storage class exists, ingress functions, with nothing installed by the operator. A percentage premium is charged above the instance rate.</p>
+
+<div class="note">
+  <div class="hd">NOTE</div>
+  <p>Where the objective is to operate the application with minimum operational surface, that mode is a sound selection. Where the objective is to learn the function of those controllers, its entire value consists of concealing them. The course installs them individually for that reason; the storage driver, load balancer controller and node autoscaler are met separately at paragraphs 3-5 and 5-4. Selecting the manual path is an exchange of effort for understanding and shall be made deliberately.</p>
+</div>
+
+<p class="para"><span class="pn">3-2.4</span> <span class="pt">Screen 1 &#8212; cluster configuration.</span> Fields per table 3-3.</p>
+
+<div class="tcap" id="t3-3">Table 3-3. Cluster configuration fields.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:9rem">Field</th><th>Selection criteria</th></tr></thead>
+<tbody>
+<tr><td>Name</td><td>Permanent. It appears in resource names, in the local configuration file, and in the names of every generated identity role.</td></tr>
+<tr><td>Kubernetes version</td><td>Not the newest offered. Match the version the manifests were written against; this project pins the version used by the rehearsal cluster, so that behaviour learned there transfers unchanged. Confirm the duration of standard support for that version, as extended support is charged at a higher hourly rate.</td></tr>
+<tr><td>Cluster service role</td><td>An identity role assumed by the control plane itself, to create network interfaces and act upon compute resources. An empty selection list indicates the role shall be created, and is the first point at which a restriction identified at paragraph 2-2 obstructs progress.</td></tr>
+<tr><td>Authentication mode</td><td>Paragraph 3-3 shall be read before selection.</td></tr>
+<tr><td>Secrets encryption</td><td>Encrypts Kubernetes secrets at rest with a managed key. Inexpensive, and demonstrable when security posture is later questioned.</td></tr>
+</tbody></table></div>
+
+<p class="para"><span class="pn">3-2.5</span> <span class="pt">Screen 2 &#8212; networking.</span> The console requires an existing network and subnets to be selected, which is precisely the step the configuration file removes: because it creates network and cluster together, it is never required to ask. The distinction between the two methods is visible in this one screen. Selecting by hand requires the network to exist first; the file describes both and permits one tool to resolve the order.</p>
+<p class="para"><span class="pn">3-2.6</span> Two fields warrant consideration under either method:</p>
+<ul class="mil">
+<li><b>Subnets.</b> The private subnets host the cluster's own network interfaces. Public subnets are for load balancers, which a controller creates later; they need not be the cluster's residence.</li>
+<li><b>Cluster endpoint access.</b> Public, private or both. This is <code>vpc.clusterEndpoints</code> from table 3-2. Public indicates the Kubernetes interface is reachable from the internet &#8212; authenticated, but reachable. Private restricts it to within the network, which is safer and requires a bastion or private connection for any administrative command. This project specifies both, together with a permitted-range field presently left open and annotated to be narrowed where a fixed address is available. This concerns the administrative interface only and not application traffic; the two are unrelated.</li>
+</ul>
+
+<p class="para"><span class="pn">3-2.7</span> <span class="pt">Screen 3 &#8212; add-ons.</span> The networking plugin, name service and proxy component are offered, together with an optional storage driver and workload identity agent. Accept the defaults and add the identity agent. The remainder may be added at paragraph 3-5. Nothing at this screen is irreversible.</p>
+
+<div class="warning">
+  <div class="hd">WARNING</div>
+  <p>The identity that creates the cluster is granted Kubernetes administrative rights automatically. Where a colleague creates the cluster with their role, or where the operator creates it while assuming a role other than the one used routinely, authentication will succeed and every subsequent action will be refused, without the reason being stated.</p>
+  <p>The cluster shall be created as the role that will be used to operate it. Paragraph 3-3 is the corrective action where it was not.</p>
+</div>
+
+<div class="verify">
+  <div class="hd">Verification</div>
+  <p>Cluster status advances from creating to active. Elapsed time is approximately ten to fifteen minutes; this does not indicate a stalled operation.</p>
+</div>
+
+<h2 class="sect" id="p3-3">3-3. Cluster access</h2>
+<p class="para"><span class="pn">3-3.1</span> This is the least intuitive element of the platform and warrants unhurried attention. Once understood, an entire category of faults becomes self-explanatory.</p>
+
+<figure id="f3-1">
+  <div class="fig-row">
+    <div class="fig-lbl">Stage 1 &#8212; AWS identity: may this principal address the cluster</div>
+    <div class="fig-items"><div class="fig-item"><b>Issued IAM role</b><span>establishes identity</span></div></div>
+  </div>
+  <div class="fig-arrow">&darr; if permitted &darr;</div>
+  <div class="fig-row">
+    <div class="fig-lbl">Stage 2 &#8212; Kubernetes authorization: what may be done within it</div>
+    <div class="fig-items"><div class="fig-item"><b>Access entry to Kubernetes group</b><span>establishes authority</span></div></div>
+  </div>
+</figure>
+<div class="fcap">Figure 3-1. Authentication and authorization sequence.</div>
+
+<p class="para"><span class="pn">3-3.2</span> Two independent systems operate in sequence. AWS establishes identity; Kubernetes establishes authority. The connection between them is an access entry: a record stating that a given AWS principal corresponds to a given Kubernetes identity.</p>
+
+<span class="navpath"><span class="lbl">Navigate</span>EKS<span class="sep">&rsaquo;</span>[cluster]<span class="sep">&rsaquo;</span>Access<span class="sep">&rsaquo;</span>Create access entry</span>
+
+<p class="para"><span class="pn">3-3.3</span> The entry names an identity role and attaches an access policy: the cluster administrator policy for the operator, narrower policies for others. The screen is brief; the concept is the substance.</p>
+
+<div class="note">
+  <div class="hd">NOTE</div>
+  <p>An explicit entry shall be created for the operator notwithstanding the automatic grant described at paragraph 3-2. The automatic grant is bound to the exact principal that performed the creation. Where a sign-on role is recreated, which occurs when permission sets are amended, it returns with a different internal identifier and the automatic grant no longer corresponds. An explicit entry survives this. It appears redundant; it is what prevents loss of access to the operator's own cluster.</p>
+</div>
+
+<p class="para"><span class="pn">3-3.4</span> <span class="pt">Workstation connection.<span class="medium">Command line</span></span> One command writes a local configuration entry for the cluster. What is written warrants understanding: not a password, but an instruction directing the administrative tool to request a token from the AWS command line on each connection. Consequently cluster access expires with the AWS session, and restoring access generally means re-authenticating to AWS rather than altering anything in Kubernetes. The command is given in Module 3.</p>
+
+<div class="verify">
+  <div class="hd">Verification</div>
+  <p>A node listing returns a result, including the response indicating no resources were found, which is the correct result before paragraph 3-4. That response confirms passage through both permission systems.</p>
+</div>
+
+<p class="para"><span class="pn">3-3.5</span> <span class="pt">Distinguishing the two failures.</span> A message stating the operator must be logged in to the server, or reporting unauthorized status, originates on the AWS side: credentials are incorrect or expired. A message reporting forbidden status and naming a resource that cannot be listed originates on the Kubernetes side: entry succeeded but the access entry does not confer that authority. These are separate conditions with separate corrections, and distinguishing them conserves substantial time.</p>
+
+<h2 class="sect" id="p3-4">3-4. Compute nodes<span class="medium">File stanza: managedNodeGroups</span></h2>
+<span class="navpath"><span class="lbl">Navigate</span>EKS<span class="sep">&rsaquo;</span>[cluster]<span class="sep">&rsaquo;</span>Compute<span class="sep">&rsaquo;</span>Add node group</span>
+
+<p class="para"><span class="pn">3-4.1</span> A managed node group is an auto scaling group configured by the provider: instances are launched from an optimised image whose start-up routine joins them to the cluster, and draining during upgrade is handled. Ordinary instance rates apply. The term managed refers to lifecycle handling and not to the charge.</p>
+
+<div class="tcap" id="t3-4">Table 3-4. Node group fields.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:9rem">Field</th><th>Selection criteria</th></tr></thead>
+<tbody>
+<tr><td>Node IAM role</td><td>A second role, distinct from the cluster's. Nodes require it to register with the cluster, retrieve images from the registry, and manage pod networking. Three managed policies satisfy it; the console names them.</td></tr>
+<tr><td>Instance type</td><td>Sizing is governed by pod density, not processor capacity alone. Each instance hosts a bounded number of pods, determined by the network interfaces and addresses it supports, so an undersized instance exhausts pod capacity well before memory. Two medium general-purpose instances is an adequate floor.</td></tr>
+<tr><td>Capacity type</td><td>On-demand for this baseline group. Spot capacity is substantially cheaper but may be reclaimed at two minutes' notice; suitable for transcode jobs at paragraph 5-4, unsuitable for continuously available services.</td></tr>
+<tr><td>Desired, minimum, maximum</td><td>A minimum of zero shall be set even where the desired count is two, so that reduction to zero outside working hours does not require the group limits to be amended at the time.</td></tr>
+<tr><td>Subnets</td><td>Private. Nodes shall not hold public addresses.</td></tr>
+</tbody></table></div>
+
+<div class="verify">
+  <div class="hd">Verification</div>
+  <p>A node listing reports the instances in ready state. This is the checkpoint upon which the remainder of the platform depends.</p>
+</div>
+
+<p class="para"><span class="pn">3-4.2</span> <span class="pt">Failure modes.</span> Nodes are created but never reach ready state. The cause is nearly always the node's ability to reach the cluster endpoint or to retrieve images, which indicates address translation, routing, or the node role. Examine in that order.</p>
+
+<h2 class="sect" id="p3-5">3-5. Cluster add-ons<span class="medium">File stanza: addons</span></h2>
+<span class="navpath"><span class="lbl">Navigate</span>EKS<span class="sep">&rsaquo;</span>[cluster]<span class="sep">&rsaquo;</span>Add-ons<span class="sep">&rsaquo;</span>Get more add-ons</span>
+
+<p class="para"><span class="pn">3-5.1</span> A bare cluster cannot perform several functions that are commonly assumed present. Each add-on is a controller, and each is properly understood as a program that observes Kubernetes objects and causes AWS to act.</p>
+<p class="para"><span class="pn">3-5.2</span> Two are required at this stage:</p>
+<ul class="mil">
+<li><b>Block storage driver.</b> Without it a pod requesting a volume waits indefinitely. The message broker requests a volume. Install it now, and afterwards confirm a storage class is marked default.</li>
+<li><b>Workload identity agent.</b> Prerequisite to paragraph 3-6.</li>
+</ul>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>A storage driver installed without a default storage class produces precisely the same symptom as no driver at all: volume requests remain pending with no informative message. Confirm the default marking as a separate act from the installation.</p>
+</div>
+
+<h2 class="sect" id="p3-6">3-6. Workload identity<span class="medium">File stanza: iam.withOIDC</span></h2>
+<p class="para"><span class="pn">3-6.1</span> The upload service requires write access to object storage. The secrets controller requires read access to the secret store. Neither shall contain an access key, as a key within a container image is a key within version control, within the registry, and upon every machine that has retrieved it.</p>
+<p class="para"><span class="pn">3-6.2</span> The mechanism substituted is shown in figure 3-2.</p>
+
+<figure id="f3-2">
+  <div class="fig-step"><span class="sn">1.</span><span>A pod operates under a Kubernetes service account, an identity existing only within the cluster.</span></div>
+  <div class="fig-step"><span class="sn">2.</span><span>An identity role is created carrying the permissions that pod requires, and no others.</span></div>
+  <div class="fig-step"><span class="sn">3.</span><span>An association is created stating that this service account, in this namespace, may assume that role.</span></div>
+  <div class="fig-step"><span class="sn">4.</span><span>At run time the pod is issued temporary credentials which rotate automatically. The software development kit within the application locates them without configuration.</span></div>
+</figure>
+<div class="fcap">Figure 3-2. Workload credential issue sequence.</div>
+
+<span class="navpath"><span class="lbl">Navigate</span>EKS<span class="sep">&rsaquo;</span>[cluster]<span class="sep">&rsaquo;</span>Access<span class="sep">&rsaquo;</span>Pod Identity associations<span class="sep">&rsaquo;</span>Create</span>
+
+<div class="note">
+  <div class="hd">NOTE</div>
+  <p>Two mechanisms exist and this project requires both. The earlier, identity roles for service accounts, operates through an identity provider: the cluster publishes a provider and each role's trust policy names the service account permitted to assume it. The later, pod identity, substitutes a plain association created through the service interface, requiring no provider and no trust policy amendment, and permitting roles to be reused across clusters.</p>
+  <p>Pod identity is simpler and is what the application services use. Several widely used controllers, including the load balancer controller and the node autoscaler, still require the earlier mechanism, so the provider shall exist as well. It shall be enabled at cluster creation rather than added afterwards. This is the practical consequence of an ecosystem mid-transition.</p>
+</div>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>Credentials are resolved when a pod starts. An association created while the pod is already running will continue to produce access denials until the pod is restarted. The association is correct; the running pod precedes it. Restart before commencing diagnosis.</p>
+</div>
+
+<p class="para"><span class="pn">3-6.3</span> Two further practices apply. One role shall be created per service rather than one shared role; this is additional configuration, and it ensures that a compromised transcode job cannot read the database credential. Denials shall be read literally; an AWS denial names the action, the resource and the principal, all three of which are generally accurate. The action indicates the permission to be added; the resource indicates whether the correct object was addressed at all.</p>
+
+<!-- ============================ CHAPTER 4 ============================ -->
+<h1 class="chap"><span class="cn">Chapter 4</span>Data Services Installation</h1>
+
+<p class="para"><span class="pn">4-0.1</span> The data layer shall be installed before the application, per TM SP-1 paragraph 4-1.2.</p>
+
+<h2 class="sect" id="p4-1">4-1. Name delegation</h2>
+<span class="navpath"><span class="lbl">Navigate</span>Route 53<span class="sep">&rsaquo;</span>Hosted zones<span class="sep">&rsaquo;</span>Create hosted zone</span>
+
+<p class="para"><span class="pn">4-1.1</span> A domain is not being purchased; authority is being claimed over a subdomain of one already in existence. Creating the zone yields four name server records, which have no effect until the party operating the parent domain publishes a delegation directing the subdomain to them.</p>
+<p class="para"><span class="pn">4-1.2</span> <span class="pt">Delegation.</span> The name service is a chain of referrals. A resolver seeking the hostname interrogates the parent zone, which replies that authority lies elsewhere and names four servers. That referral is the delegation. Until the parent publishes it, the zone is a valid set of records to which no resolver in the world will be directed. The symptom of an absent delegation is therefore not an error but silence.</p>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>Transmit the four records to the operator of the parent zone before this step is required by the schedule. Propagation requires minutes to hours; obtaining the action from another party is the element that consumes a day.</p>
+</div>
+
+<h2 class="sect" id="p4-2">4-2. Certificate</h2>
+<span class="navpath"><span class="lbl">Navigate</span>Certificate Manager<span class="sep">&rsaquo;</span>Request certificate<span class="sep">&rsaquo;</span>Request a public certificate</span>
+
+<p class="para"><span class="pn">4-2.1</span> Public certificates are issued without charge and renew automatically, but only where validation is performed by name service record rather than by electronic mail, as a record can be re-examined indefinitely and a message link cannot. Name service validation shall be selected.</p>
+<p class="para"><span class="pn">4-2.2</span> Request one certificate covering the names to be served. A wildcard covers one level of subdomain and is generally the tidiest selection. Following the request the screen offers to create the validation records automatically; this shall be used. Status remains at pending validation for several minutes and then advances to issued.</p>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>A certificate is regional and a load balancer may use only one from its own region. The content delivery network, being global, accepts certificates only from <code>us-east-1</code>. Where work is performed in another region and the distribution does not offer the certificate, this is the cause, and the correction is a second certificate requested in <code>us-east-1</code>. This project operates in <code>us-east-1</code> throughout and does not encounter it, but the condition shall be known.</p>
+</div>
+
+<div class="verify">
+  <div class="hd">Verification</div>
+  <p>The certificate reports issued status, and a public lookup of any name in the zone reaches the name service rather than nothing.</p>
+</div>
+
+<h2 class="sect" id="p4-3">4-3. Database</h2>
+<span class="navpath"><span class="lbl">Navigate</span>RDS<span class="sep">&rsaquo;</span>Databases<span class="sep">&rsaquo;</span>Create database<span class="sep">&rsaquo;</span>Standard create</span>
+
+<p class="para"><span class="pn">4-3.1</span> Standard create shall be selected in preference to easy create, which conceals precisely the fields that matter at this step.</p>
+
+<div class="tcap" id="t4-1">Table 4-1. Database configuration fields.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:10rem">Field</th><th>Selection criteria</th></tr></thead>
+<tbody>
+<tr><td>Engine</td><td>PostgreSQL, at the major version the migrations expect.</td></tr>
+<tr><td>Template</td><td>Development or test. The production template enables a multi-zone standby, approximately doubling the charge for a resilience property not yet required.</td></tr>
+<tr><td>Credentials management</td><td>Managed in the secret store. The service then generates the password, retains it, and does not display it. This is a better practice than devising one, and places the credential where the cluster's secrets controller will seek it at paragraph 5-1.</td></tr>
+<tr><td>Public access</td><td>No. No configuration of this project requires the database to be reachable from the internet.</td></tr>
+<tr><td>Network and subnet group</td><td>The project network, private subnets. The subnet group is the reason two zones were required.</td></tr>
+<tr><td>Security group</td><td>Create a new group and leave it empty. One rule is added at paragraph 4-3.2.</td></tr>
+<tr><td>Instance class</td><td>The smallest burstable class is adequate for this workload. Storage autoscaling enabled, with a ceiling.</td></tr>
+<tr><td>Backup retention</td><td>Non-zero. Backups are near-free at this size and the practice is worth more than the storage.</td></tr>
+</tbody></table></div>
+
+<p class="para"><span class="pn">4-3.2</span> <span class="pt">Connection to the cluster.</span> Add one inbound rule with the source set to the cluster's security group rather than to any address range, per paragraph 3-1.9. It then reads as a statement: the cluster may reach the database on the database port. Nothing else may.</p>
+<span class="navpath"><span class="lbl">Navigate</span>EC2<span class="sep">&rsaquo;</span>Security Groups<span class="sep">&rsaquo;</span>[database group]<span class="sep">&rsaquo;</span>Edit inbound rules</span>
+
+<div class="note">
+  <div class="hd">NOTE</div>
+  <p>A blocked connection to the database does not refuse; it hangs until timeout, because a security group discards silently rather than replying. Accordingly: a hang indicates a network condition; connection refused indicates something was reached and declined; an authentication failure indicates the database itself was reached. These three symptoms correspond to three distinct layers, and distinguishing them constitutes the majority of the diagnosis.</p>
+</div>
+
+<div class="verify">
+  <div class="hd">Verification</div>
+  <p>A pod within the cluster opens a connection, and the migration job has created the required tables.</p>
+</div>
+
+<h2 class="sect" id="p4-4">4-4. Object storage</h2>
+<span class="navpath"><span class="lbl">Navigate</span>S3<span class="sep">&rsaquo;</span>Buckets<span class="sep">&rsaquo;</span>Create bucket</span>
+
+<div class="warning">
+  <div class="hd">WARNING</div>
+  <p>Block all public access shall remain enabled. Every instinct will suggest disabling it so that browsers may retrieve video; it shall not be disabled. The content delivery network is granted private access instead, which is both more secure and less costly, as public bucket reads are charged at storage rates rather than delivery rates.</p>
+</div>
+
+<p class="para"><span class="pn">4-4.1</span> Two settings warrant deliberate selection rather than acceptance:</p>
+<ul class="mil">
+<li><b>Versioning.</b> Useful, but every overwrite retains the prior copy and prior versions are charged as objects. Where enabled, it shall be paired with a lifecycle rule expiring them; otherwise this becomes a disposal obstruction, as a bucket holding versions cannot be deleted until they are removed.</li>
+<li><b>Lifecycle rules.</b> Video accumulates. The retention period for segments and recordings shall be decided now and recorded as a rule rather than retained as an intention.</li>
+</ul>
+
+<h2 class="sect" id="p4-5">4-5. Content delivery</h2>
+<span class="navpath"><span class="lbl">Navigate</span>CloudFront<span class="sep">&rsaquo;</span>Distributions<span class="sep">&rsaquo;</span>Create distribution</span>
+
+<p class="para"><span class="pn">4-5.1</span> A distribution is a global cache placed before an origin. Its function here is that viewers retrieve video segments from an edge location near them, repeatedly, without any portion of that traffic reaching the cluster.</p>
+
+<div class="tcap" id="t4-2">Table 4-2. Distribution configuration fields.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:11rem">Field</th><th>Selection criteria</th></tr></thead>
+<tbody>
+<tr><td>Origin</td><td>The bucket created at paragraph 4-4.</td></tr>
+<tr><td>Origin access</td><td>Origin access control. This is the mechanism permitting the distribution to read a private bucket: it signs its requests with an identity the bucket trusts. The console generates a bucket policy to be applied, which constitutes the bucket's side of the arrangement.</td></tr>
+<tr><td>Viewer protocol policy</td><td>Redirect insecure requests to secure.</td></tr>
+<tr><td>Cache policy</td><td>Per paragraph 4-5.2. This field determines whether the stream functions.</td></tr>
+<tr><td>Alternate domain name and certificate</td><td>The delivery hostname, and the <code>us-east-1</code> certificate from paragraph 4-2.</td></tr>
+</tbody></table></div>
+
+<p class="para"><span class="pn">4-5.2</span> <span class="pt">Two cache behaviours are required.</span> An HLS stream comprises two classes of file with opposing cache requirements. Segments are immutable: once written the file never changes, and shall be cached at length. The playlist is rewritten every few seconds to announce new segments, so caching it even briefly causes players to re-read a stale list and the stream to appear frozen.</p>
+<p class="para"><span class="pn">4-5.3</span> Accordingly a second cache behaviour shall be added matching the playlist path with caching effectively disabled, leaving the default behaviour aggressive for all other paths.</p>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>Where the two behaviours are transposed, the symptom is a stream that begins and then ceases to advance. This presents as a transcoding fault and is not one.</p>
+  <p>Distribution amendments deploy across the global edge network and require several minutes. Where a cache setting is changed and no effect is observed, the change is probably correct and merely early. Invalidation of cached paths is available and is charged beyond a free allowance; it shall be used for the playlist during testing and not as routine practice.</p>
+</div>
+
+<h2 class="sect" id="p4-6">4-6. Message broker<span class="medium">Command line &#8212; entirely</span></h2>
+<p class="para"><span class="pn">4-6.1</span> No console procedure exists for this component, and the reason constitutes the instruction. The broker here is not a provider service; it is software operating within the cluster, installed by operator.</p>
+
+<div class="note">
+  <div class="hd">NOTE</div>
+  <p>Kubernetes is able to operate deployments and services. It has no knowledge of the broker. An operator supplies that knowledge: a controller is installed which registers new object types, such as broker cluster and broker topic, and operates a loop observing those objects and performing whatever work causes reality to correspond to them. Create a topic object and the operator creates the topic. Delete a broker pod and the operator observes the deficiency and rebuilds it.</p>
+  <p>This pattern recurs at the node autoscaler in paragraph 5-4, the secrets controller, and the deployment agent in paragraph 5-5. It is the most transferable concept in the platform.</p>
+</div>
+
+<p class="para"><span class="pn">4-6.2</span> The sequence is: install the operator by chart, then declare a broker cluster and the required topics as manifests to be applied. Persistent storage shall be operational, so the storage driver and default storage class from paragraph 3-5 are prerequisite. Where brokers remain pending, that is the cause in every observed instance. Manifests are given in Module 10.</p>
+<p class="para"><span class="pn">4-6.3</span> <span class="pt">Partitioning.</span> Messages shall be partitioned by stream identifier. Ordering is guaranteed within a partition and not within a topic. Directing all events for a given stream to the same partition is what causes commencement, segment and termination events to arrive in that order. It also establishes the ceiling for paragraph 5-4: consumers in excess of the partition count can never be usefully employed, as they are assigned nothing.</p>
+
+<!-- ============================ CHAPTER 5 ============================ -->
+<h1 class="chap"><span class="cn">Chapter 5</span>Application Deployment</h1>
+
+<h2 class="sect" id="p5-1">5-1. Workload deployment<span class="medium">Command line</span></h2>
+<p class="para"><span class="pn">5-1.1</span> Manifests are held in the repository under <code>k8s/</code>, arranged as a base with per-environment overlays. The arrangement shall be understood before any value is amended, or a value will be corrected in the base and silently overridden by an overlay.</p>
+<p class="para"><span class="pn">5-1.2</span> Nothing is published at this stage. The objective is solely that every pod is running and readiness checks pass. Local forwarding is adequate for manual examination.</p>
+<p class="para"><span class="pn">5-1.3</span> <span class="pt">Expected effort.</span> In order of likelihood: registry credentials for private images; configuration referring to development service names which now requires cluster service names or provider endpoints; and readiness check timeouts which were adequate on a workstation and are not adequate for a pod starting cold.</p>
+
+<h2 class="sect" id="p5-2">5-2. External exposure</h2>
+<p class="para"><span class="pn">5-2.1</span> Kubernetes objects are created by the operator; AWS resources are created by controllers in response. That indirection shall be retained in mind: where a load balancer does not appear, the compute console is not the first place to examine. The controller is asked why it did not create one.</p>
+
+<div class="tcap" id="t5-1">Table 5-1. External access methods.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:9rem">Entry point</th><th style="width:11rem">Object created</th><th>Resource produced</th></tr></thead>
+<tbody>
+<tr><td>Web interface and upload service</td><td>An ingress, annotated with the certificate</td><td>An application load balancer, secure, routing by host and path</td></tr>
+<tr><td>Video delivery</td><td>None. Already constructed.</td><td>The distribution reading from object storage. The cluster only writes there.</td></tr>
+<tr><td>Ingest</td><td>A service of load balancer type</td><td>A network load balancer performing TCP passthrough</td></tr>
+</tbody></table></div>
+
+<p class="para"><span class="pn">5-2.2</span> <span class="pt">Why a single load balancer is not used.</span> The application load balancer interprets HTTP: it reads a hostname, matches a path, terminates encryption. RTMP possesses none of these properties; it is a persistent TCP conversation with its own handshake, and a balancer attempting to interpret it will disrupt it. Ingest therefore receives a network load balancer, which transfers bytes and interprets nothing. This is the clearest instance in the platform of selecting the component that matches the protocol.</p>
+
+<h2 class="sect" id="p5-3">5-3. Operational verification</h2>
+
+<div class="verify">
+  <div class="hd">Acceptance milestone</div>
+  <p>Direct the encoder to the ingest hostname with a stream key and commence streaming, then open the web interface in a browser. Video is displayed. All preceding work is installation; all subsequent work is improvement of the installation.</p>
+</div>
+
+<p class="para"><span class="pn">5-3.1</span> First attempts are not expected to succeed. Fault isolation shall follow the data path rather than proceed by supposition. Each stage in figure 5-1 is a separate and answerable question; identify the first answered in the negative.</p>
+
+<figure id="f5-1">
+  <div class="fig-step"><span class="sn">1.</span><span><b>Ingest server.</b> Is the stream arriving at all? Its log will state so.</span></div>
+  <div class="fig-step"><span class="sn">2.</span><span><b>Ingest webhook.</b> Was the commencement event issued?</span></div>
+  <div class="fig-step"><span class="sn">3.</span><span><b>Broker.</b> Is a message present on the topic?</span></div>
+  <div class="fig-step"><span class="sn">4.</span><span><b>Transcode job.</b> Did a job run, and did it complete or fail?</span></div>
+  <div class="fig-step"><span class="sn">5.</span><span><b>Object storage.</b> Are segments and a playlist appearing in the bucket?</span></div>
+  <div class="fig-step"><span class="sn">6.</span><span><b>Content delivery.</b> Does retrieval of the playlist through the distribution return the current one?</span></div>
+</figure>
+<div class="fcap">Figure 5-1. Stream path fault isolation sequence.</div>
+
+<h2 class="sect" id="p5-4">5-4. Elastic transcoding</h2>
+<p class="para"><span class="pn">5-4.1</span> The continuously running worker is replaced by per-stream jobs. A workload autoscaler observes broker consumer lag and creates one job per pending stream; a node autoscaler provisions capacity for those jobs and removes it afterwards.</p>
+<p class="para"><span class="pn">5-4.2</span> Consumer lag, being the difference between messages produced and messages processed, is the correct signal. It measures work awaiting attention rather than work in progress, and is materially better than processor utilisation for this purpose.</p>
+
+<div class="caution">
+  <div class="hd">CAUTION</div>
+  <p>The scaler shall be capped at the partition count. Consumers beyond that number are assigned no work; they start, remain idle, and are charged. This form of waste presents as successful scaling.</p>
+  <p>The disposition of a partially completed job shall be decided deliberately. A transcode interrupted mid-stream leaves partial output. Whether that job is retried, and whether retrying produces duplicate segments, is a design decision and shall not be discovered in service.</p>
+</div>
+
+<p class="para"><span class="pn">5-4.3</span> Spot capacity is appropriate at this paragraph and not elsewhere. These jobs are interruptible and re-runnable, which is the workload for which reclaimable capacity exists.</p>
+
+<h2 class="sect" id="p5-5">5-5. Continuous deployment</h2>
+<p class="para"><span class="pn">5-5.1</span> An agent within the cluster observes the repository and continuously causes the cluster to correspond to it. Deployment commands cease; changes are merged instead.</p>
+<p class="para"><span class="pn">5-5.2</span> <span class="pt">Pull compared with push.</span> A push pipeline requires the integration system to hold credentials to the production cluster. Every runner, every third-party action and every contributor able to amend a workflow definition then lies within the affected area. A pull agent requires no inbound access; it reaches outward. No cluster credential exists outside the cluster. Because it reconciles continuously rather than at deployment time, a manually amended resource is reverted automatically and the cluster ceases to drift from the repository.</p>
+
+<div class="note">
+  <div class="hd">NOTE</div>
+  <p>Certain components cannot be managed by the agent, including the cluster itself, identity roles and the database, as they shall exist before the agent does. The boundary between agent-managed and separately managed infrastructure shall be recorded. Where this is omitted, two partial accounts of what is deployed result.</p>
+</div>
+
+<!-- ============================ CHAPTER 6 ============================ -->
+<h1 class="chap"><span class="cn">Chapter 6</span>Sustainment and Disposal</h1>
+
+<h2 class="sect" id="p6-1">6-1. Cost monitoring</h2>
+<span class="navpath"><span class="lbl">Navigate</span>Billing and Cost Management<span class="sep">&rsaquo;</span>Cost Explorer<span class="sep">&rsaquo;</span>Group by: Service</span>
+
+<p class="para"><span class="pn">6-1.1</span> Inspection shall be performed weekly. Group by service to identify the category, then by usage type to identify the line item. The specific object of the search is a figure not corresponding to anything the operator recalls creating, which generally indicates something created by a controller on the operator's behalf and not subsequently removed.</p>
+<p class="para"><span class="pn">6-1.2</span> Reduction measures are listed in TM SP-1, table 5-1.</p>
+
+<h2 class="sect" id="p6-2">6-2. Fault isolation</h2>
+<p class="para"><span class="pn">6-2.1</span> One method applied consistently is superior to memorised failure modes. The sequence is given in figure 6-1.</p>
+
+<figure id="f6-1">
+  <div class="fig-step"><span class="sn">1.</span><span><b>Establish which system is refusing.</b> AWS or Kubernetes. Paragraph 3-3.5 distinguishes them by the form of the message. Every subsequent step depends on this, and it is the step most often omitted.</span></div>
+  <div class="fig-step"><span class="sn">2.</span><span><b>Identify the component not in a ready state and interrogate it.</b> In Kubernetes the cause is seldom in the pod log, as a pod that never started has produced none. It is in the object's events, which state conditions such as no nodes available or image retrieval failed in near-plain language.</span></div>
+  <div class="fig-step"><span class="sn">3.</span><span><b>Where a controller is responsible, read that controller's log.</b> Absent load balancer, the load balancer controller. Absent node, the node autoscaler. Unpopulated secret, the secrets controller. Each states its reasoning and each is seldom consulted.</span></div>
+  <div class="fig-step"><span class="sn">4.</span><span><b>Read denials literally.</b> The action, resource and principal named are generally accurate. The discrepancy between what is named and what was assumed is the fault.</span></div>
+  <div class="fig-step"><span class="sn">5.</span><span><b>Distinguish hang, refusal and rejection.</b> A hang indicates a network path condition, generally a security group discarding silently. Connection refused indicates arrival with nothing listening. An authentication error indicates arrival, receipt and refusal. Three layers, three locations to examine.</span></div>
+  <div class="fig-step"><span class="sn">6.</span><span><b>Establish what changed.</b> The audit trail records every service interface call against the principal that issued it. The question of what deleted a resource has an actual answer.</span></div>
+</figure>
+<div class="fcap">Figure 6-1. General fault isolation method.</div>
+
+<div class="note">
+  <div class="hd">NOTE</div>
+  <p>Before any change is made, the operator shall state the expected effect of that change. Where this cannot be stated, the action is supposition, and supposition applied to infrastructure produces a system that functions for reasons unknown and subsequently fails for reasons that cannot be located.</p>
+</div>
+
+<h2 class="sect" id="p6-3">6-3. Disposal</h2>
+
+<div class="warning">
+  <div class="hd">WARNING</div>
+  <p>Deletion of the cluster does not terminate billing. Several resources outlive it because Kubernetes created them rather than the operator, and deleting the cluster does not delete what its controllers produced. Each item in table 6-1 shall be inspected individually.</p>
+</div>
+
+<div class="tcap" id="t6-1">Table 6-1. Resources requiring disposal verification.</div>
+<div class="tbl-wrap"><table>
+<thead><tr><th style="width:11rem">Location</th><th>Resource and remarks</th></tr></thead>
+<tbody>
+<tr><td>EC2 &rsaquo; Load Balancers</td><td>Balancers created by the ingress and services. The item most frequently overlooked.</td></tr>
+<tr><td>EC2 &rsaquo; Volumes</td><td>Orphaned volumes from broker storage claims.</td></tr>
+<tr><td>EC2 &rsaquo; Elastic IPs</td><td>Unassociated addresses are charged precisely because they are unassociated.</td></tr>
+<tr><td>VPC &rsaquo; NAT Gateways</td><td>Charged per hour irrespective of traffic.</td></tr>
+<tr><td>CloudFront</td><td>Shall be disabled and then deleted. Two separate operations with an interval between them.</td></tr>
+<tr><td>S3</td><td>A versioned bucket will not delete until every version is removed.</td></tr>
+<tr><td>RDS</td><td>Snapshots continue to bill after the instance is deleted. Retention shall be decided deliberately.</td></tr>
+</tbody></table></div>
+
+<div class="verify">
+  <div class="hd">Verification</div>
+  <p>The cost-by-service report one to two days after disposal. Where a service continues to report a non-zero figure, a resource remains in operation. This is the only verification that cannot be defeated by a console listing that was not consulted.</p>
+</div>
+
+<p class="para"><span class="pn">6-3.1</span> Disposal is the principal argument for constructing the cluster from a configuration file rather than by hand. A tool that created the resources knows what it created and can remove precisely that set. Where construction was manual, disposal becomes an exercise in recollection, and it is in recollection that the forgotten address translation gateway resides.</p>
+
+<div class="pgfoot">
+  <span>TM SP-2</span>
+  <span><a href="overview.html">TM SP-1 &#8212; System Description</a> &middot; <a href="index.html">Course, Modules 00&ndash;16</a></span>
+</div>
+
+</div>

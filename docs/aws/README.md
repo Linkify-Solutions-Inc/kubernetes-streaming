@@ -12,6 +12,11 @@ Every module has the same shape:
 
 You will break things. That's fine and it's budgeted for. Module 16 covers teardown, and Module 1 sets a billing alarm before you create anything that costs money.
 
+Two companion manuals sit alongside this course, written to MIL-STD-38784 format and containing no commands:
+
+- **[TM SP-1 — System Description and Installation Planning](overview.html)** — what you're building, in what order, and why each piece is shaped the way it is. The same material in plain prose, not to the standard, is in [OVERVIEW.md](OVERVIEW.md).
+- **[TM SP-2 — Installation Procedures](console-walkthrough.html)** — every console screen you'll touch, the decision each one represents, and the verification for each step. Written for an operator issued an IAM role and nothing else.
+
 ---
 
 ## What you already have

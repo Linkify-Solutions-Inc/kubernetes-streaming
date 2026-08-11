@@ -1,0 +1,2106 @@
+<title>AWS/EKS &mdash; Consolidated CLI runbook</title>
+<style>
+  :root {
+    --paper: #eef1f4; --surface: #ffffff; --surface-dim: #e4e8ec;
+    --ink: #1b232c; --ink-dim: #57626d; --line: #ccd3d9;
+    --amber: #a35f22; --amber-ink: #7c4718; --teal: #2d5f74; --teal-bg: #dfe9ec;
+    --ok: #2f6b3e; --ok-bg: #dfeee2; --warn: #9a3d3d; --warn-bg: #f2e0e0;
+    --code-bg: #1b232c; --code-ink: #e7ebee; --code-dim: #93a1ac; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+      --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+      --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+      --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+      --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161c; --surface: #1a2029; --surface-dim: #212833;
+    --ink: #e7ebee; --ink-dim: #93a1ac; --line: #2c3542;
+    --amber: #e0954f; --amber-ink: #f0b378; --teal: #7fb3c9; --teal-bg: #1c2e35;
+    --ok: #7cc190; --ok-bg: #1a2d20; --warn: #e08a8a; --warn-bg: #2e1c1c;
+    --code-bg: #0d1116; --code-ink: #e7ebee; --code-dim: #6b7885; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.35);
+  }
+  :root[data-theme="light"] {
+    --paper: #eef1f4; --surface: #ffffff; --surface-dim: #e4e8ec;
+    --ink: #1b232c; --ink-dim: #57626d; --line: #ccd3d9;
+    --amber: #a35f22; --amber-ink: #7c4718; --teal: #2d5f74; --teal-bg: #dfe9ec;
+    --ok: #2f6b3e; --ok-bg: #dfeee2; --warn: #9a3d3d; --warn-bg: #f2e0e0;
+    --code-bg: #1b232c; --code-ink: #e7ebee; --code-dim: #93a1ac; --code-key: #e0954f;
+    --shadow: 0 1px 2px rgba(27, 35, 44, 0.06), 0 6px 16px rgba(27, 35, 44, 0.05);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    line-height: 1.6; font-size: 16px;
+  }
+  ::selection { background: var(--amber); color: #fff; }
+  a { color: var(--amber-ink); }
+  code, pre, kbd {
+    font-family: "Cascadia Code", "Cascadia Mono", ui-monospace, "SF Mono", Consolas,
+      "Liberation Mono", monospace;
+  }
+  .topbar { border-bottom: 1px solid var(--line); background: var(--surface); }
+  .topbar-inner { max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem 1.75rem; }
+  .eyebrow {
+    display: inline-block; font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--amber-ink); background: color-mix(in srgb, var(--amber) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+    padding: 0.2rem 0.55rem; border-radius: 3px;
+  }
+  h1 { margin: 0.65rem 0 0.35rem; font-size: 1.95rem; font-weight: 700; letter-spacing: -0.015em; }
+  .subtitle { margin: 0 0 1rem; color: var(--ink-dim); font-size: 1.02rem; max-width: 68ch; }
+  .layout {
+    max-width: 980px; margin: 0 auto; padding: 2rem 1.5rem 5rem;
+    display: grid; grid-template-columns: 230px minmax(0, 1fr);
+    gap: 2.5rem; align-items: start;
+  }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } .rail { display: none; } }
+  .rail {
+    position: sticky; top: 1.5rem; display: flex; flex-direction: column;
+    gap: 0.1rem; max-height: calc(100vh - 3rem); overflow-y: auto; padding-right: 0.4rem;
+  }
+  .rail a {
+    display: flex; gap: 0.5rem; align-items: baseline;
+    padding: 0.3rem 0 0.3rem 0.7rem; font-size: 0.83rem;
+    color: var(--ink-dim); text-decoration: none;
+    border-left: 2px solid var(--line); margin-left: -1px;
+  }
+  .rail a:hover { color: var(--ink); border-left-color: var(--amber); }
+  .rail a .n {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    color: var(--amber-ink); font-size: 0.76rem; flex-shrink: 0;
+  }
+  main { min-width: 0; }
+  .intro { color: var(--ink-dim); max-width: 74ch; margin: 0 0 2rem; }
+  .intro p { margin: 0 0 0.9rem; }
+  .intro strong { color: var(--ink); }
+  .intro code.inline { color: var(--ink); }
+  .step {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 10px; padding: 1.5rem 1.6rem 1.7rem;
+    margin-bottom: 1.5rem; box-shadow: var(--shadow); scroll-margin-top: 1.5rem;
+  }
+  .step-head { display: flex; align-items: baseline; gap: 0.85rem; margin-bottom: 0.9rem; flex-wrap: wrap; }
+  .step-num { font-family: "Cascadia Code", ui-monospace, monospace; color: var(--amber); font-size: 1.05rem; font-weight: 600; }
+  .step h2 { margin: 0; font-size: 1.25rem; font-weight: 650; letter-spacing: -0.008em; }
+  .step h3 { margin: 1.6rem 0 0.6rem; font-size: 1.02rem; font-weight: 650; }
+  .step h3:first-of-type { margin-top: 0; }
+  .step h4 { margin: 1.1rem 0 0.4rem; font-size: 0.92rem; font-weight: 650; color: var(--ink-dim); }
+  .context-chip {
+    font-family: "Cascadia Code", ui-monospace, monospace;
+    font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase;
+    color: var(--teal); background: var(--teal-bg);
+    border-radius: 999px; padding: 0.18rem 0.65rem; white-space: nowrap;
+  }
+  p { margin: 0 0 1rem; }
+  .step ul, .step ol { margin: 0 0 1rem; padding-left: 1.35rem; }
+  .step li { margin-bottom: 0.45rem; }
+  pre {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+    padding: 0.85rem 1rem; margin: 0 0 1rem; overflow-x: auto;
+    font-size: 0.85rem; line-height: 1.55;
+  }
+  pre code { color: inherit; background: none; padding: 0; }
+  code.inline, :not(pre) > code {
+    background: var(--surface-dim); padding: 0.1rem 0.4rem;
+    border-radius: 3px; font-size: 0.87em; word-break: break-word;
+  }
+  .tbl-wrap { overflow-x: auto; margin: 0 0 1rem; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 420px; }
+  th, td { text-align: left; padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 0.73rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-dim); font-weight: 600; }
+  tbody tr:last-child td { border-bottom: none; }
+  blockquote {
+    margin: 0 0 1rem; padding: 0.7rem 0.95rem; border-radius: 0 6px 6px 0;
+    background: var(--warn-bg); border-left: 3px solid var(--warn); color: var(--ink);
+  }
+  blockquote p { margin: 0; }
+  hr { border: none; border-top: 1px solid var(--line); margin: 0 0 1.5rem; }
+  :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+</style>
+
+<div class="topbar">
+  <div class="topbar-inner">
+    <span class="eyebrow">AWS &middot; EKS &middot; Consolidated runbook</span>
+    <h1>The whole course, CLI-first, one page</h1>
+    <p class="subtitle">Every runnable command from Modules 0&ndash;16, in order. Reasoning and troubleshooting live in <code class="inline">docs/aws/*.md</code> &mdash; this page is for typing, not reading.</p>
+  </div>
+</div>
+
+<div class="layout">
+<nav class="rail">
+  <div class="rail-label">Modules</div>
+  <a href="#m00"><span class="n">00</span> Pre-flight code changes</a>
+  <a href="#m01"><span class="n">01</span> AWS account, access, and not getting a surprise bill</a>
+  <a href="#m02"><span class="n">02</span> The VPC</a>
+  <a href="#m03"><span class="n">03</span> The EKS cluster</a>
+  <a href="#m04"><span class="n">04</span> Add-ons and the storage blocker</a>
+  <a href="#m05"><span class="n">05</span> DNS, certificates, load balancer controller</a>
+  <a href="#m06"><span class="n">06</span> Karpenter</a>
+  <a href="#m07"><span class="n">07</span> Secrets</a>
+  <a href="#m08"><span class="n">08</span> RDS Postgres</a>
+  <a href="#m09"><span class="n">09</span> S3 and CloudFront</a>
+  <a href="#m10"><span class="n">10</span> Kafka with Strimzi</a>
+  <a href="#m11"><span class="n">11</span> Running the services</a>
+  <a href="#m12"><span class="n">12</span> Exposing it to the world</a>
+  <a href="#m13"><span class="n">13</span> Your first stream</a>
+  <a href="#m14"><span class="n">14</span> Transcoding that scales</a>
+  <a href="#m15"><span class="n">15</span> GitOps with ArgoCD</a>
+  <a href="#m16"><span class="n">16</span> Monitoring, cost, and teardown</a>
+</nav>
+<main>
+<div class="intro">
+<p>This is every runnable command from <code>docs/aws/00</code> through <code>16</code>, in order, extracted so you can go top to bottom in one WSL2 terminal without opening sixteen separate files. Reasoning, alternatives, and "what breaks" troubleshooting live in the source docs (<code>docs/aws/*.md</code>) — come back here for <em>what to type</em>, go there when something doesn't match.</p>
+<p><strong>Conventions.</strong> <code>&lt;like-this&gt;</code> is a placeholder — substitute your own value. Every other <code>$VARIABLE</code> (<code>$ACCOUNT_ID</code>, <code>$VPC_ID</code>, ...) is set by an earlier command in the same module via command substitution — export it once and it holds for the rest of that shell session. Blocks marked <span class="context-chip">CONSOLE</span> have no CLI equivalent — click through in a browser. Blocks marked <span class="context-chip">OBS</span> are OBS Studio fields, not commands. Blocks marked <span class="context-chip">BROWSER</span> are "open this URL and look."</p>
+<p><strong>Read this before Module 11.</strong> This repo already has Module 14's KEDA manifests wired into the base Kustomize root — <code>k8s/apps/base/kustomization.yaml</code> points <code>transcode-worker</code> at <code>k8s/apps/base/transcode/</code> (two <code>ScaledJob</code>s), not a long-running Deployment. That means <strong>Module 11's <code>kubectl apply -k k8s/apps/overlays/prod</code> will fail with <code>no matches for kind "ScaledJob"</code> unless KEDA is already installed.</strong> Do Module 14 §14.1 (install KEDA) before Module 11, not after — everything else in Module 14 stays where it is, as a later verification step.</p>
+<p><strong>Also already done, so you won't find separate steps for them below:</strong> the Module 0 code changes (S3_BUCKET, Pod-Identity-aware <code>s3_client()</code>, <code>/livez</code>/<code>/readyz</code>, idempotent migrations), the entire Module 14 KEDA rewrite of <code>transcode-worker</code> and <code>ingest-webhook</code>, migration <code>002_transcode_claim.sql</code>, the consumer-group bootstrap Job, <code>check_ceiling_sync.sh</code>, and Module 15's CI <code>bump-manifests</code>/<code>manifest-check</code> jobs. All of that is committed and pushed to <code>master</code> already — this runbook only covers what still requires <em>you</em> to type something.</p>
+<hr />
+
+</div>
+<section class="step" id="m00"><div class="step-head"><span class="step-num">00</span><h2>Module 0 — Pre-flight code changes</h2></div>
+<p><strong>Done.</strong> Every change this module describes (bucket-name env var, <code>HLS_PUBLIC_BASE_URL</code>, Pod-Identity <code>s3_client()</code>, idempotent migrations, <code>config.py</code>) is committed on <code>master</code>. Nothing to run here — skip straight to Module 1.</p>
+<hr />
+</section>
+<section class="step" id="m01"><div class="step-head"><span class="step-num">01</span><h2>Module 1 — AWS account, access, and not getting a surprise bill</h2></div>
+<p><strong>Accomplishes:</strong> Produces an expiring, MFA-protected AWS credential on your laptop via IAM Identity Center, a budget alarm, Cost Explorer enabled, and pinned CLI tooling (<code>aws</code>, <code>kubectl</code>, <code>eksctl</code>, <code>helm</code>, <code>k9s</code>) installed.</p>
+<h3>1.1 — Enable Identity Center and create the user <span class="context-chip">CONSOLE</span></h3>
+<p>This part is console-only and done once by whoever owns the AWS account.</p>
+<ul>
+<li>Sign in to the AWS console as the account root or an existing admin. <strong>Set the region selector to <code>us-east-1</code> before you start</strong> — Identity Center is regional and its home region cannot be changed later without deleting the instance.</li>
+<li><strong>IAM Identity Center → Enable.</strong> If the account is not part of an AWS Organization, this creates one with the account as management account. That's expected.</li>
+<li><strong>Permission sets → Create permission set → Predefined → <code>AdministratorAccess</code>.</strong> Set the session duration to 8 hours. (Default is 1 hour, which means logging in repeatedly during a 15-minute <code>eksctl create cluster</code>.)</li>
+<li><strong>Users → Add user.</strong> Username <code>intern</code>, a real email address — the invitation goes there and it's also the MFA enrolment path.</li>
+<li><strong>AWS accounts → select the account → Assign users → <code>intern</code> → <code>AdministratorAccess</code>.</strong></li>
+<li><strong>Settings → Authentication → Multi-factor authentication → Edit.</strong> Set:</li>
+<li><em>Prompt users for MFA</em>: <strong>Every time they sign in</strong></li>
+<li><em>If a user does not yet have a registered MFA device</em>: <strong>Require them to register an MFA device at sign-in</strong></li>
+<li>Note the <strong>AWS access portal URL</strong> from the Identity Center dashboard. It looks like <code>https://d-1234567890.awsapps.com/start</code>. You need it in the next step.</li>
+</ul>
+<p>The invited user completes the email invitation, sets a password, and enrols an MFA device (any TOTP app).</p>
+<h3>1.2 — Configure the CLI profile</h3>
+<pre><code class="language-sh">aws configure sso
+</code></pre>
+<p>Answer as follows (profile name is fixed by convention and every later module assumes it):</p>
+<pre><code>SSO session name (Recommended): linkify
+SSO start URL [None]: https://d-1234567890.awsapps.com/start
+SSO region [None]: us-east-1
+SSO registration scopes [sso:account:access]: &lt;press enter&gt;
+</code></pre>
+<p>A browser opens; approve the request. The CLI then lists the accounts and roles you have access to:</p>
+<pre><code>The only AWS account available to you is: 123456789012
+Using the account ID 123456789012
+The only role available to you is: AdministratorAccess
+Using the role name &quot;AdministratorAccess&quot;
+CLI default client Region [None]: us-east-1
+CLI default output format [None]: json
+CLI profile name [AdministratorAccess-123456789012]: linkify-streaming
+</code></pre>
+<p>Set the two environment variables every shell block in this course assumes. Put them in your shell profile (<code>~/.bashrc</code>) so they survive a new terminal:</p>
+<pre><code class="language-sh">export AWS_PROFILE=linkify-streaming
+export AWS_REGION=us-east-1
+</code></pre>
+<p>Log in:</p>
+<pre><code class="language-sh">aws sso login
+</code></pre>
+<blockquote>
+<p>You'll run <code>aws sso login</code> once a day; when the session expires, commands fail with <code>The SSO session associated with this profile has expired</code>.</p>
+</blockquote>
+<h3>1.3 — Cost Explorer, on day zero <span class="context-chip">CONSOLE</span></h3>
+<pre><code>Billing and Cost Management → Cost Explorer → Launch Cost Explorer
+</code></pre>
+<blockquote>
+<p>Cost Explorer takes roughly <strong>24 hours</strong> to populate and does not backfill from before it was enabled — enable it now, not on day ten.</p>
+</blockquote>
+<p>While in the Billing console, also activate cost allocation tags:</p>
+<pre><code>Billing and Cost Management → Cost allocation tags → User-defined cost allocation tags
+Find &quot;Project&quot; → Activate
+</code></pre>
+<blockquote>
+<p>The <code>Project</code> tag won't appear in that list until at least one resource has been tagged with it (comes back after Module 3) — without it, Cost Explorer can't break the bill down by tag.</p>
+</blockquote>
+<h3>1.4 — The budget alarm, before you create anything</h3>
+<pre><code class="language-sh">aws budgets create-budget \
+  --account-id &quot;$(aws sts get-caller-identity --query Account --output text)&quot; \
+  --budget '{
+    &quot;BudgetName&quot;: &quot;streaming-monthly&quot;,
+    &quot;BudgetLimit&quot;: {&quot;Amount&quot;: &quot;200&quot;, &quot;Unit&quot;: &quot;USD&quot;},
+    &quot;TimeUnit&quot;: &quot;MONTHLY&quot;,
+    &quot;BudgetType&quot;: &quot;COST&quot;
+  }' \
+  --notifications-with-subscribers '[
+    {&quot;Notification&quot;:{&quot;NotificationType&quot;:&quot;ACTUAL&quot;,&quot;ComparisonOperator&quot;:&quot;GREATER_THAN&quot;,&quot;Threshold&quot;:50,&quot;ThresholdType&quot;:&quot;PERCENTAGE&quot;},
+     &quot;Subscribers&quot;:[{&quot;SubscriptionType&quot;:&quot;EMAIL&quot;,&quot;Address&quot;:&quot;info@linkifysolutions.com&quot;}]},
+    {&quot;Notification&quot;:{&quot;NotificationType&quot;:&quot;FORECASTED&quot;,&quot;ComparisonOperator&quot;:&quot;GREATER_THAN&quot;,&quot;Threshold&quot;:100,&quot;ThresholdType&quot;:&quot;PERCENTAGE&quot;},
+     &quot;Subscribers&quot;:[{&quot;SubscriptionType&quot;:&quot;EMAIL&quot;,&quot;Address&quot;:&quot;info@linkifysolutions.com&quot;}]}
+  ]'
+</code></pre>
+<h3>1.5 — Tools, pinned</h3>
+<p>WSL2/Ubuntu:</p>
+<pre><code class="language-sh"># aws CLI v2
+curl &quot;https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip&quot; -o awscliv2.zip
+unzip awscliv2.zip &amp;&amp; sudo ./aws/install
+
+# eksctl
+curl -sLO &quot;https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz&quot;
+tar -xzf eksctl_Linux_amd64.tar.gz -C /tmp &amp;&amp; sudo mv /tmp/eksctl /usr/local/bin
+
+# helm
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# kubectl, pinned to match the cluster (Module 3 is 1.35)
+curl -LO &quot;https://dl.k8s.io/release/v1.35.7/bin/linux/amd64/kubectl&quot;
+chmod +x kubectl &amp;&amp; sudo mv kubectl /usr/local/bin/kubectl
+</code></pre>
+<blockquote>
+<p><code>kubectl</code> <strong>must be within one minor version of the cluster</strong>. A client two minors ahead of the server produces confusing failures later rather than an obvious error.</p>
+</blockquote>
+<pre><code class="language-sh">kubectl version --client &amp;&amp; eksctl version &amp;&amp; helm version --short &amp;&amp; aws --version
+</code></pre>
+<h3>Verify — Module 1</h3>
+<pre><code class="language-sh">aws sts get-caller-identity
+</code></pre>
+<pre><code class="language-json">{
+    &quot;UserId&quot;: &quot;AROAEXAMPLEID:intern&quot;,
+    &quot;Account&quot;: &quot;123456789012&quot;,
+    &quot;Arn&quot;: &quot;arn:aws:sts::123456789012:assumed-role/AWSReservedSSO_AdministratorAccess_abc1234567890def/intern&quot;
+}
+</code></pre>
+<blockquote>
+<p>If <code>Arn</code> shows <code>user/something</code> instead of <code>assumed-role/AWSReservedSSO_</code>, you're on an IAM user credential, not the SSO session — check <code>echo $AWS_PROFILE</code>.</p>
+</blockquote>
+<p>Save the full IAM role ARN (needed, in this different form, by EKS Access Entries in Module 3):</p>
+<pre><code class="language-sh">aws iam list-roles --path-prefix /aws-reserved/sso.amazonaws.com/ \
+  --query 'Roles[?starts_with(RoleName, `AWSReservedSSO_AdministratorAccess`)].Arn' --output text
+</code></pre>
+<p>Confirm the budget exists:</p>
+<pre><code class="language-sh">aws budgets describe-budgets \
+  --account-id &quot;$(aws sts get-caller-identity --query Account --output text)&quot; \
+  --query 'Budgets[].{Name:BudgetName,Limit:BudgetLimit.Amount}' --output table
+</code></pre>
+<p><strong>Placeholders in Module 1:</strong> the SSO start URL, account ID, and role suffix are illustrative examples — substitute your account's real values throughout.</p>
+<hr />
+</section>
+<section class="step" id="m02"><div class="step-head"><span class="step-num">02</span><h2>Module 2 — The VPC</h2></div>
+<p><strong>Accomplishes:</strong> Adds the two things <code>eksctl</code>'s auto-created VPC is missing — an S3 Gateway VPC endpoint on every private route table, and the <code>karpenter.sh/discovery</code> tags on private subnets and the cluster security group — both of which fail silently rather than erroring if skipped.</p>
+<blockquote>
+<p>These commands don't run standalone — they run <strong>immediately after <code>eksctl create cluster</code> finishes</strong> in Module 3. They're reproduced again under Module 3 §3.4 in actual run order; this section exists so the reasoning has a home.</p>
+</blockquote>
+<h3>2.1 — Get the VPC eksctl created</h3>
+<pre><code class="language-sh">export AWS_PROFILE=linkify-streaming
+export AWS_REGION=us-east-1
+
+VPC_ID=$(aws eks describe-cluster --name streaming \
+  --query cluster.resourcesVpcConfig.vpcId --output text)
+echo &quot;$VPC_ID&quot;
+</code></pre>
+<h3>2.2 — Add the S3 Gateway endpoint to every private route table</h3>
+<pre><code class="language-sh">PRIVATE_RTBS=$(aws ec2 describe-route-tables \
+  --filters &quot;Name=vpc-id,Values=$VPC_ID&quot; \
+            &quot;Name=tag:Name,Values=*Private*&quot; \
+  --query 'RouteTables[].RouteTableId' --output text)
+echo &quot;$PRIVATE_RTBS&quot;
+
+aws ec2 create-vpc-endpoint \
+  --vpc-id &quot;$VPC_ID&quot; \
+  --service-name com.amazonaws.us-east-1.s3 \
+  --vpc-endpoint-type Gateway \
+  --route-table-ids $PRIVATE_RTBS \
+  --tag-specifications 'ResourceType=vpc-endpoint,Tags=[{Key=Project,Value=streaming}]'
+</code></pre>
+<blockquote>
+<p><code>$PRIVATE_RTBS</code> is intentionally unquoted in <code>--route-table-ids</code> — the command takes a list and the shell needs to split it. Without this endpoint, every HLS segment written to S3 is billed through NAT at $0.045/GB (~$0.19/hour per live stream).</p>
+</blockquote>
+<h3>2.3 — Tag the private subnets for Karpenter</h3>
+<pre><code class="language-sh">PRIVATE_SUBNETS=$(aws ec2 describe-subnets \
+  --filters &quot;Name=vpc-id,Values=$VPC_ID&quot; &quot;Name=tag:Name,Values=*Private*&quot; \
+  --query 'Subnets[].SubnetId' --output text)
+
+aws ec2 create-tags --resources $PRIVATE_SUBNETS \
+  --tags Key=karpenter.sh/discovery,Value=streaming Key=Project,Value=streaming
+</code></pre>
+<h3>2.4 — Tag the cluster security group for Karpenter</h3>
+<pre><code class="language-sh">CLUSTER_SG=$(aws eks describe-cluster --name streaming \
+  --query cluster.resourcesVpcConfig.clusterSecurityGroupId --output text)
+
+aws ec2 create-tags --resources &quot;$CLUSTER_SG&quot; \
+  --tags Key=karpenter.sh/discovery,Value=streaming
+</code></pre>
+<blockquote>
+<p><code>eksctl</code> applies the <code>kubernetes.io/role/*</code> and <code>kubernetes.io/cluster/*</code> tags itself; <strong><code>karpenter.sh/discovery</code> it does not</strong> — missing it means Karpenter logs <code>no subnets matched selector</code> and never launches an instance while pods sit <code>Pending</code>.</p>
+</blockquote>
+<h3>Verify — Module 2</h3>
+<p><strong>1. The S3 route exists in every private route table.</strong></p>
+<pre><code class="language-sh">aws ec2 describe-route-tables --route-table-ids $PRIVATE_RTBS \
+  --query 'RouteTables[].Routes[?GatewayId!=null &amp;&amp; starts_with(GatewayId, `vpce-`)].[DestinationPrefixListId,GatewayId]' \
+  --output text
+</code></pre>
+<p>One line per private route table — a missing route table means that subnet's pods pay NAT charges for every byte to S3, silently.</p>
+<p><strong>2. Subnet tags are present.</strong></p>
+<pre><code class="language-sh">aws ec2 describe-subnets --filters &quot;Name=vpc-id,Values=$VPC_ID&quot; \
+  --query 'Subnets[].{Name:Tags[?Key==`Name`]|[0].Value,
+                      elb:Tags[?Key==`kubernetes.io/role/elb`]|[0].Value,
+                      internal:Tags[?Key==`kubernetes.io/role/internal-elb`]|[0].Value,
+                      karpenter:Tags[?Key==`karpenter.sh/discovery`]|[0].Value}' \
+  --output table
+</code></pre>
+<p>Every <strong>public</strong> subnet must show <code>elb = 1</code>. Every <strong>private</strong> subnet must show <code>internal = 1</code> and <code>karpenter = streaming</code>.</p>
+<p><strong>3. Nodes are in private subnets with no public IP.</strong></p>
+<pre><code class="language-sh">aws ec2 describe-instances \
+  --filters &quot;Name=tag:eks:cluster-name,Values=streaming&quot; &quot;Name=instance-state-name,Values=running&quot; \
+  --query 'Reservations[].Instances[].{Id:InstanceId,Private:PrivateIpAddress,Public:PublicIpAddress,Subnet:SubnetId}' \
+  --output table
+</code></pre>
+<p><code>Public</code> must be <code>None</code> for every node.</p>
+<hr />
+</section>
+<section class="step" id="m03"><div class="step-head"><span class="step-num">03</span><h2>Module 3 — The EKS cluster</h2></div>
+<p><strong>Accomplishes:</strong> Creates the EKS cluster <code>streaming</code> (Kubernetes 1.35, <code>us-east-1</code>) with a two-<code>t3.medium</code> managed node group, EKS Access Entries auth, OIDC, control-plane logging, and core add-ons, using a single <code>eksctl</code> config file and command — then immediately runs the Module 2 post-creation VPC steps.</p>
+<h3>3.1 — Write the config file</h3>
+<p><code>infra/eks/cluster.yaml</code> (already in the repo):</p>
+<pre><code class="language-yaml">apiVersion: eksctl.io/v1alpha5
+kind: ClusterConfig
+
+metadata:
+  name: streaming
+  region: us-east-1
+  version: &quot;1.35&quot;
+  tags:
+    Project: streaming
+
+accessConfig:
+  authenticationMode: API
+  bootstrapClusterCreatorAdminPermissions: true
+  accessEntries:
+    - principalARN: arn:aws:iam::&lt;accountid&gt;:role/aws-reserved/sso.amazonaws.com/us-east-1/AWSReservedSSO_&lt;SSO_ROLE_SUFFIX&gt;
+      accessPolicies:
+        - policyARN: arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy
+          accessScope:
+            type: cluster
+
+vpc:
+  cidr: 10.42.0.0/16
+  nat:
+    gateway: Single
+  clusterEndpoints:
+    publicAccess: true
+    privateAccess: true
+  publicAccessCIDRs:
+    - 0.0.0.0/0
+
+iam:
+  withOIDC: true
+
+managedNodeGroups:
+  - name: system
+    instanceType: t3.medium
+    amiFamily: AmazonLinux2023
+    desiredCapacity: 2
+    minSize: 2
+    maxSize: 4
+    volumeSize: 40
+    volumeType: gp3
+    volumeEncrypted: true
+    privateNetworking: true
+    availabilityZones: [us-east-1a, us-east-1b]
+    labels:
+      workload: system
+    tags:
+      Project: streaming
+      karpenter.sh/discovery: &quot;&quot;
+
+cloudWatch:
+  clusterLogging:
+    enableTypes: [&quot;api&quot;, &quot;audit&quot;, &quot;authenticator&quot;]
+    logRetentionInDays: 7
+
+addons:
+  - name: vpc-cni
+    version: latest
+    configurationValues: |-
+      {&quot;env&quot;:{&quot;ENABLE_PREFIX_DELEGATION&quot;:&quot;false&quot;,&quot;WARM_ENI_TARGET&quot;:&quot;1&quot;}}
+  - name: coredns
+    version: latest
+  - name: kube-proxy
+    version: latest
+  - name: eks-pod-identity-agent
+    version: latest
+  - name: aws-ebs-csi-driver
+    version: latest
+    podIdentityAssociations:
+      - namespace: kube-system
+        serviceAccountName: ebs-csi-controller-sa
+        permissionPolicyARNs: [&quot;arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy&quot;]
+</code></pre>
+<p>Substitute the two placeholders before you apply:</p>
+<pre><code class="language-sh">export AWS_PROFILE=linkify-streaming
+export AWS_REGION=us-east-1
+
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+SSO_ROLE_ARN=$(aws iam list-roles --path-prefix /aws-reserved/sso.amazonaws.com/ \
+  --query 'Roles[?starts_with(RoleName, `AWSReservedSSO_AdministratorAccess`)].Arn' --output text)
+
+echo &quot;$ACCOUNT_ID&quot;
+echo &quot;$SSO_ROLE_ARN&quot;
+</code></pre>
+<blockquote>
+<p>Put <code>$SSO_ROLE_ARN</code> into <code>principalARN</code> verbatim and <code>$ACCOUNT_ID</code> wherever <code>&lt;accountid&gt;</code> appears — Access Entries reject the STS assumed-role session ARN form, and the error does not explain why.</p>
+</blockquote>
+<p>Confirm the file parses before spending 20 minutes on it:</p>
+<pre><code class="language-sh">eksctl create cluster -f infra/eks/cluster.yaml --dry-run &gt; /dev/null &amp;&amp; echo &quot;config OK&quot;
+</code></pre>
+<h3>3.2 — Create the cluster</h3>
+<pre><code class="language-sh">eksctl create cluster -f infra/eks/cluster.yaml
+</code></pre>
+<blockquote>
+<p><strong>This takes 15–20 minutes — leave it running, do not interrupt it.</strong></p>
+</blockquote>
+<h3>3.3 — Point kubectl at it</h3>
+<pre><code class="language-sh">aws eks update-kubeconfig --name streaming --region us-east-1
+kubectl config current-context
+</code></pre>
+<h3>3.4 — Immediately: the Module 2 post-creation steps</h3>
+<p>Run now, before anything writes to S3 — the endpoint is the difference between $0 and $0.19/hour per live stream.</p>
+<pre><code class="language-sh">export AWS_PROFILE=linkify-streaming
+export AWS_REGION=us-east-1
+
+VPC_ID=$(aws eks describe-cluster --name streaming \
+  --query cluster.resourcesVpcConfig.vpcId --output text)
+echo &quot;$VPC_ID&quot;
+
+PRIVATE_RTBS=$(aws ec2 describe-route-tables \
+  --filters &quot;Name=vpc-id,Values=$VPC_ID&quot; \
+            &quot;Name=tag:Name,Values=*Private*&quot; \
+  --query 'RouteTables[].RouteTableId' --output text)
+echo &quot;$PRIVATE_RTBS&quot;
+
+aws ec2 create-vpc-endpoint \
+  --vpc-id &quot;$VPC_ID&quot; \
+  --service-name com.amazonaws.us-east-1.s3 \
+  --vpc-endpoint-type Gateway \
+  --route-table-ids $PRIVATE_RTBS \
+  --tag-specifications 'ResourceType=vpc-endpoint,Tags=[{Key=Project,Value=streaming}]'
+
+PRIVATE_SUBNETS=$(aws ec2 describe-subnets \
+  --filters &quot;Name=vpc-id,Values=$VPC_ID&quot; &quot;Name=tag:Name,Values=*Private*&quot; \
+  --query 'Subnets[].SubnetId' --output text)
+
+aws ec2 create-tags --resources $PRIVATE_SUBNETS \
+  --tags Key=karpenter.sh/discovery,Value=streaming Key=Project,Value=streaming
+
+CLUSTER_SG=$(aws eks describe-cluster --name streaming \
+  --query cluster.resourcesVpcConfig.clusterSecurityGroupId --output text)
+
+aws ec2 create-tags --resources &quot;$CLUSTER_SG&quot; \
+  --tags Key=karpenter.sh/discovery,Value=streaming
+</code></pre>
+<h3>Verify — Module 3</h3>
+<p><strong>1. Two nodes, both <code>Ready</code>, no public IP.</strong></p>
+<pre><code class="language-sh">kubectl get nodes -o wide
+kubectl get nodes -L topology.kubernetes.io/zone
+</code></pre>
+<p><strong>2. Core system pods running.</strong></p>
+<pre><code class="language-sh">kubectl get pods -A
+</code></pre>
+<p><strong>3. Add-ons and OIDC provider registered.</strong></p>
+<pre><code class="language-sh">eksctl get addon --cluster streaming
+aws eks describe-cluster --name streaming --query cluster.identity.oidc.issuer --output text
+</code></pre>
+<blockquote>
+<p>An empty OIDC issuer means <code>withOIDC</code> didn't take effect, and the AWS Load Balancer Controller (Module 5) will fail to get credentials.</p>
+</blockquote>
+<p><strong>4. Access entries, not aws-auth.</strong></p>
+<pre><code class="language-sh">aws eks list-access-entries --cluster-name streaming --output table
+aws eks describe-cluster --name streaming --query cluster.accessConfig.authenticationMode --output text
+kubectl -n kube-system get configmap aws-auth
+</code></pre>
+<p><code>describe-cluster</code> should print <code>API</code>; the last command should return <code>Error from server (NotFound)</code> — that's the correct answer, confirming you're not on the legacy ConfigMap auth path.</p>
+<p><strong>Placeholders in Module 3:</strong> <code>&lt;accountid&gt;</code> and <code>&lt;SSO_ROLE_SUFFIX&gt;</code> in <code>cluster.yaml</code>'s <code>accessEntries[].principalARN</code>.</p>
+<hr />
+</section>
+<section class="step" id="m04"><div class="step-head"><span class="step-num">04</span><h2>Module 4 — Add-ons and the storage blocker</h2></div>
+<p><strong>Accomplishes:</strong> Confirms the five core EKS add-ons are healthy, grants the EBS CSI driver an IAM role via Pod Identity, installs a gp3 <code>StorageClass</code> as the cluster default (demoting gp2), and installs <code>metrics-server</code>.</p>
+<h3>4.1 — Confirm the core add-ons</h3>
+<pre><code class="language-sh">aws eks list-addons --cluster-name streaming
+kubectl get pods -n kube-system
+</code></pre>
+<pre><code class="language-sh">aws eks describe-addon-versions \
+  --addon-name aws-ebs-csi-driver \
+  --kubernetes-version 1.35 \
+  --query 'addons[0].addonVersions[?compatibilities[0].defaultVersion==`true`].addonVersion' \
+  --output text
+
+aws eks describe-addon --cluster-name streaming --addon-name aws-ebs-csi-driver --query 'addon.addonVersion'
+</code></pre>
+<h3>4.2 — Give the EBS CSI driver an IAM role</h3>
+<pre><code class="language-sh">ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+cat &gt; /tmp/pod-identity-trust.json &lt;&lt;'EOF'
+{
+  &quot;Version&quot;: &quot;2012-10-17&quot;,
+  &quot;Statement&quot;: [
+    {
+      &quot;Effect&quot;: &quot;Allow&quot;,
+      &quot;Principal&quot;: { &quot;Service&quot;: &quot;pods.eks.amazonaws.com&quot; },
+      &quot;Action&quot;: [&quot;sts:AssumeRole&quot;, &quot;sts:TagSession&quot;]
+    }
+  ]
+}
+EOF
+
+aws iam create-role \
+  --role-name streaming-ebs-csi-driver \
+  --assume-role-policy-document file:///tmp/pod-identity-trust.json
+
+aws iam attach-role-policy \
+  --role-name streaming-ebs-csi-driver \
+  --policy-arn arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy
+</code></pre>
+<blockquote>
+<p><code>sts:TagSession</code> in the trust policy is required — omitting it lets the association create successfully but credential vending then fails with an unhelpful <code>AccessDenied</code>.</p>
+</blockquote>
+<pre><code class="language-sh">aws eks create-pod-identity-association \
+  --cluster-name streaming \
+  --namespace kube-system \
+  --service-account ebs-csi-controller-sa \
+  --role-arn &quot;arn:aws:iam::${ACCOUNT_ID}:role/streaming-ebs-csi-driver&quot;
+
+kubectl -n kube-system rollout restart deploy/ebs-csi-controller
+kubectl -n kube-system rollout status deploy/ebs-csi-controller
+</code></pre>
+<blockquote>
+<p>Existing pods do not pick up a new Pod Identity association automatically — this restart is mandatory.</p>
+</blockquote>
+<pre><code class="language-sh">aws eks list-pod-identity-associations --cluster-name streaming \
+  --query 'associations[].[namespace,serviceAccount,roleArn]' --output table
+</code></pre>
+<h3>4.3 — gp3 as default, gp2 demoted</h3>
+<p>Manifest already in the repo at <code>k8s/infra/storageclass-gp3.yaml</code>.</p>
+<pre><code class="language-sh">kubectl patch storageclass gp2 \
+  -p '{&quot;metadata&quot;:{&quot;annotations&quot;:{&quot;storageclass.kubernetes.io/is-default-class&quot;:&quot;false&quot;}}}'
+
+kubectl apply -f k8s/infra/storageclass-gp3.yaml
+</code></pre>
+<blockquote>
+<p>Patch gp2 first — if both classes claim default at the same instant, Kubernetes picks one arbitrarily and a PVC created in that window can land on gp2.</p>
+</blockquote>
+<h3>4.4 — metrics-server</h3>
+<pre><code class="language-sh">kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
+kubectl -n kube-system rollout status deploy/metrics-server
+</code></pre>
+<blockquote>
+<p>Do not add <code>--kubelet-insecure-tls</code> on EKS — needing that flag means a security group is blocking port 10250 from the control plane to the nodes, not a cert problem to route around.</p>
+</blockquote>
+<h3>Verify — Module 4</h3>
+<pre><code class="language-sh">kubectl get storageclass
+</code></pre>
+<pre><code class="language-sh">kubectl apply -f - &lt;&lt;'EOF'
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-smoke-test
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: storage-smoke-test
+spec:
+  containers:
+    - name: writer
+      image: public.ecr.aws/docker/library/busybox:1.36
+      command: [&quot;sh&quot;, &quot;-c&quot;, &quot;echo ok &gt; /data/proof &amp;&amp; sleep 3600&quot;]
+      volumeMounts:
+        - name: data
+          mountPath: /data
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: storage-smoke-test
+EOF
+
+kubectl wait --for=condition=Ready pod/storage-smoke-test --timeout=180s
+kubectl get pvc storage-smoke-test
+kubectl delete pod storage-smoke-test
+kubectl delete pvc storage-smoke-test
+</code></pre>
+<pre><code class="language-sh">kubectl top nodes
+aws eks list-pod-identity-associations --cluster-name streaming \
+  --query 'associations[?serviceAccount==`ebs-csi-controller-sa`]' --output table
+</code></pre>
+<hr />
+</section>
+<section class="step" id="m05"><div class="step-head"><span class="step-num">05</span><h2>Module 5 — DNS, certificates, load balancer controller</h2></div>
+<p><strong>Accomplishes:</strong> Delegates a Route 53 subdomain (<code>k8s.linkifysolutions.com</code>), issues a wildcard ACM certificate for it in <code>us-east-1</code>, and installs the AWS Load Balancer Controller (IRSA) and ExternalDNS (Pod Identity).</p>
+<h3>5.1 — Create the hosted zone</h3>
+<pre><code class="language-sh">aws route53 create-hosted-zone \
+  --name k8s.linkifysolutions.com \
+  --caller-reference &quot;streaming-$(date +%s)&quot;
+
+HOSTED_ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+  --dns-name k8s.linkifysolutions.com \
+  --query 'HostedZones[0].Id' --output text | sed 's|/hostedzone/||')
+echo &quot;$HOSTED_ZONE_ID&quot;
+
+aws route53 get-hosted-zone --id &quot;$HOSTED_ZONE_ID&quot; \
+  --query 'DelegationSet.NameServers' --output text
+</code></pre>
+<h3>5.2 — The one-time change at the parent zone <span class="context-chip">CONSOLE</span></h3>
+<p>Done by whoever controls DNS for <code>linkifysolutions.com</code>, not necessarily you:</p>
+<ul>
+<li>Add one record set at the <strong>parent</strong> zone: Name <code>k8s</code>, Type <code>NS</code>, TTL <code>300</code>, Value = the four nameservers from 5.1, one per line.</li>
+</ul>
+<pre><code class="language-sh">dig +short NS k8s.linkifysolutions.com
+</code></pre>
+<blockquote>
+<p>Propagation is minutes, not hours — if nothing resolves after 15 minutes, something is wrong with the record, don't just wait.</p>
+</blockquote>
+<h3>5.3 — Request the ACM certificate</h3>
+<pre><code class="language-sh">CERT_ARN=$(aws acm request-certificate \
+  --domain-name &quot;*.k8s.linkifysolutions.com&quot; \
+  --subject-alternative-names &quot;k8s.linkifysolutions.com&quot; \
+  --validation-method DNS \
+  --region us-east-1 \
+  --query CertificateArn --output text)
+echo &quot;$CERT_ARN&quot;
+
+VAL_NAME=$(aws acm describe-certificate --certificate-arn &quot;$CERT_ARN&quot; --region us-east-1 \
+  --query 'Certificate.DomainValidationOptions[0].ResourceRecord.Name' --output text)
+VAL_VALUE=$(aws acm describe-certificate --certificate-arn &quot;$CERT_ARN&quot; --region us-east-1 \
+  --query 'Certificate.DomainValidationOptions[0].ResourceRecord.Value' --output text)
+
+cat &gt; /tmp/acm-validation.json &lt;&lt;EOF
+{
+  &quot;Changes&quot;: [{
+    &quot;Action&quot;: &quot;UPSERT&quot;,
+    &quot;ResourceRecordSet&quot;: {
+      &quot;Name&quot;: &quot;${VAL_NAME}&quot;,
+      &quot;Type&quot;: &quot;CNAME&quot;,
+      &quot;TTL&quot;: 300,
+      &quot;ResourceRecords&quot;: [{ &quot;Value&quot;: &quot;${VAL_VALUE}&quot; }]
+    }
+  }]
+}
+EOF
+
+aws route53 change-resource-record-sets \
+  --hosted-zone-id &quot;$HOSTED_ZONE_ID&quot; \
+  --change-batch file:///tmp/acm-validation.json
+</code></pre>
+<blockquote>
+<p>Never delete this validation CNAME, not even after the certificate reaches <code>ISSUED</code> — removing it breaks automatic renewal a year later.</p>
+</blockquote>
+<pre><code class="language-sh">aws acm wait certificate-validated --certificate-arn &quot;$CERT_ARN&quot; --region us-east-1
+aws acm describe-certificate --certificate-arn &quot;$CERT_ARN&quot; --region us-east-1 --query 'Certificate.Status' --output text
+</code></pre>
+<h3>5.4 — AWS Load Balancer Controller (IRSA)</h3>
+<pre><code class="language-sh">helm repo add eks https://aws.github.io/eks-charts
+helm repo update
+helm search repo eks/aws-load-balancer-controller --versions | head -5
+</code></pre>
+<pre><code class="language-sh">export LBC_VERSION=&quot;&lt;version from helm search, e.g. v2.13.0&gt;&quot;
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+curl -fsSL -o /tmp/lbc-iam-policy.json \
+  &quot;https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/${LBC_VERSION}/docs/install/iam_policy.json&quot;
+
+aws iam create-policy \
+  --policy-name AWSLoadBalancerControllerIAMPolicy \
+  --policy-document file:///tmp/lbc-iam-policy.json
+</code></pre>
+<blockquote>
+<p>This is the upstream-published policy — do not hand-edit it, and do not substitute <code>AdministratorAccess</code> in its place.</p>
+</blockquote>
+<pre><code class="language-sh">eksctl create iamserviceaccount \
+  --cluster=streaming \
+  --region=us-east-1 \
+  --namespace=kube-system \
+  --name=aws-load-balancer-controller \
+  --role-name=AmazonEKSLoadBalancerControllerRole \
+  --attach-policy-arn=&quot;arn:aws:iam::${ACCOUNT_ID}:policy/AWSLoadBalancerControllerIAMPolicy&quot; \
+  --approve
+
+VPC_ID=$(aws eks describe-cluster --name streaming \
+  --query 'cluster.resourcesVpcConfig.vpcId' --output text)
+
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=streaming \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=aws-load-balancer-controller \
+  --set region=us-east-1 \
+  --set vpcId=&quot;$VPC_ID&quot; \
+  --set replicaCount=2
+
+kubectl -n kube-system rollout status deploy/aws-load-balancer-controller
+</code></pre>
+<blockquote>
+<p><code>serviceAccount.create=false</code> and setting <code>region</code>/<code>vpcId</code> explicitly are both mandatory — auto-discovery fails intermittently under the secure IMDS hop-limit default, producing an unsearchable <code>failed to introspect vpcID</code> error.</p>
+</blockquote>
+<h3>5.5 — ExternalDNS (Pod Identity)</h3>
+<pre><code class="language-sh">cat &gt; /tmp/pod-identity-trust.json &lt;&lt;'EOF'
+{
+  &quot;Version&quot;: &quot;2012-10-17&quot;,
+  &quot;Statement&quot;: [
+    {
+      &quot;Effect&quot;: &quot;Allow&quot;,
+      &quot;Principal&quot;: { &quot;Service&quot;: &quot;pods.eks.amazonaws.com&quot; },
+      &quot;Action&quot;: [&quot;sts:AssumeRole&quot;, &quot;sts:TagSession&quot;]
+    }
+  ]
+}
+EOF
+
+aws iam create-role \
+  --role-name streaming-external-dns \
+  --assume-role-policy-document file:///tmp/pod-identity-trust.json
+
+cat &gt; /tmp/external-dns-policy.json &lt;&lt;EOF
+{
+  &quot;Version&quot;: &quot;2012-10-17&quot;,
+  &quot;Statement&quot;: [
+    {
+      &quot;Effect&quot;: &quot;Allow&quot;,
+      &quot;Action&quot;: [&quot;route53:ChangeResourceRecordSets&quot;],
+      &quot;Resource&quot;: [&quot;arn:aws:route53:::hostedzone/${HOSTED_ZONE_ID}&quot;]
+    },
+    {
+      &quot;Effect&quot;: &quot;Allow&quot;,
+      &quot;Action&quot;: [
+        &quot;route53:ListHostedZones&quot;,
+        &quot;route53:ListHostedZonesByName&quot;,
+        &quot;route53:ListResourceRecordSets&quot;,
+        &quot;route53:ListTagsForResource&quot;
+      ],
+      &quot;Resource&quot;: [&quot;*&quot;]
+    }
+  ]
+}
+EOF
+
+aws iam put-role-policy \
+  --role-name streaming-external-dns \
+  --policy-name route53-delegated-zone \
+  --policy-document file:///tmp/external-dns-policy.json
+
+kubectl create namespace external-dns
+
+aws eks create-pod-identity-association \
+  --cluster-name streaming \
+  --namespace external-dns \
+  --service-account external-dns \
+  --role-arn &quot;arn:aws:iam::${ACCOUNT_ID}:role/streaming-external-dns&quot;
+
+helm repo add external-dns https://kubernetes-sigs.github.io/external-dns/
+helm repo update
+
+helm install external-dns external-dns/external-dns \
+  -n external-dns \
+  --set provider.name=aws \
+  --set &quot;domainFilters[0]=k8s.linkifysolutions.com&quot; \
+  --set policy=sync \
+  --set registry=txt \
+  --set txtOwnerId=streaming-eks \
+  --set &quot;extraArgs[0]=--aws-zone-type=public&quot;
+
+kubectl -n external-dns rollout status deploy/external-dns
+</code></pre>
+<blockquote>
+<p>The Pod Identity association must exist before the pod starts, or restart it after: <code>kubectl -n external-dns rollout restart deploy/external-dns</code>.</p>
+</blockquote>
+<h3>Verify — Module 5</h3>
+<pre><code class="language-sh">aws acm describe-certificate --certificate-arn &quot;$CERT_ARN&quot; --region us-east-1 \
+  --query 'Certificate.{Status:Status,Domain:DomainName}' --output table
+
+kubectl -n kube-system get deploy aws-load-balancer-controller
+kubectl -n external-dns get deploy external-dns
+kubectl -n external-dns logs deploy/external-dns --tail=20
+</code></pre>
+<p><strong>Placeholders in Module 5:</strong> <code>LBC_VERSION</code> — substitute what <code>helm search</code> reports.</p>
+<hr />
+</section>
+<section class="step" id="m06"><div class="step-head"><span class="step-num">06</span><h2>Module 6 — Karpenter</h2></div>
+<p><strong>Accomplishes:</strong> Installs Karpenter with two NodePools (on-demand for live transcode, spot-capable for VOD) so that Pending pods trigger right-sized EC2 nodes within about a minute and idle nodes are terminated automatically.</p>
+<h3>6.1 — Pick a version</h3>
+<pre><code class="language-sh">helm show chart oci://public.ecr.aws/karpenter/karpenter | grep '^version:'
+</code></pre>
+<pre><code class="language-sh">export KARPENTER_VERSION=&quot;&lt;version from above, e.g. 1.13.0&gt;&quot;
+export KARPENTER_DOCS_VERSION=&quot;&lt;major.minor with a v, e.g. v1.13&gt;&quot;
+export CLUSTER_NAME=streaming
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+</code></pre>
+<h3>6.2 — Tag the subnets and security group</h3>
+<pre><code class="language-sh">PRIVATE_SUBNETS=$(aws ec2 describe-subnets \
+  --filters &quot;Name=tag:kubernetes.io/role/internal-elb,Values=1&quot; \
+            &quot;Name=tag:kubernetes.io/cluster/${CLUSTER_NAME},Values=owned,shared&quot; \
+  --query 'Subnets[].SubnetId' --output text)
+
+aws ec2 create-tags --resources $PRIVATE_SUBNETS \
+  --tags &quot;Key=karpenter.sh/discovery,Value=${CLUSTER_NAME}&quot;
+
+CLUSTER_SG=$(aws eks describe-cluster --name &quot;$CLUSTER_NAME&quot; \
+  --query 'cluster.resourcesVpcConfig.clusterSecurityGroupId' --output text)
+
+aws ec2 create-tags --resources &quot;$CLUSTER_SG&quot; \
+  --tags &quot;Key=karpenter.sh/discovery,Value=${CLUSTER_NAME}&quot;
+</code></pre>
+<blockquote>
+<p>Tag private subnets only, and the managed node group from Module 3 must never carry this discovery tag — Karpenter must not manage the nodes it itself runs on.</p>
+</blockquote>
+<h3>6.3 — The CloudFormation stack</h3>
+<pre><code class="language-sh">curl -fsSL -o /tmp/karpenter-cfn.yaml \
+  &quot;https://raw.githubusercontent.com/aws/karpenter-provider-aws/v${KARPENTER_VERSION}/website/content/en/${KARPENTER_DOCS_VERSION}/getting-started/getting-started-with-karpenter/cloudformation.yaml&quot;
+
+aws cloudformation deploy \
+  --stack-name &quot;Karpenter-${CLUSTER_NAME}&quot; \
+  --template-file /tmp/karpenter-cfn.yaml \
+  --capabilities CAPABILITY_NAMED_IAM \
+  --parameter-overrides &quot;ClusterName=${CLUSTER_NAME}&quot;
+</code></pre>
+<blockquote>
+<p>The SQS interruption queue this stack creates is not optional — without it, spot VOD jobs are terminated with no warning at all.</p>
+</blockquote>
+<h3>6.4 — IRSA for the controller</h3>
+<pre><code class="language-sh">eksctl create iamserviceaccount \
+  --cluster &quot;$CLUSTER_NAME&quot; \
+  --region us-east-1 \
+  --namespace kube-system \
+  --name karpenter \
+  --role-name &quot;${CLUSTER_NAME}-karpenter&quot; \
+  --attach-policy-arn &quot;arn:aws:iam::${ACCOUNT_ID}:policy/KarpenterControllerPolicy-${CLUSTER_NAME}&quot; \
+  --approve
+</code></pre>
+<h3>6.5 — Let Karpenter's nodes join the cluster</h3>
+<pre><code class="language-sh">aws eks create-access-entry \
+  --cluster-name &quot;$CLUSTER_NAME&quot; \
+  --principal-arn &quot;arn:aws:iam::${ACCOUNT_ID}:role/KarpenterNodeRole-${CLUSTER_NAME}&quot; \
+  --type EC2_LINUX
+</code></pre>
+<blockquote>
+<p>This is the step people forget, and it's the worst failure mode in the module — without it, instances boot, get rejected by the API server, and repeatedly appear/disappear in the EC2 console while <code>kubectl get nodes</code> shows nothing, and billing continues the whole time.</p>
+</blockquote>
+<h3>6.6 — Install the controller</h3>
+<pre><code class="language-sh">helm upgrade --install karpenter \
+  oci://public.ecr.aws/karpenter/karpenter \
+  --version &quot;$KARPENTER_VERSION&quot; \
+  -n kube-system \
+  --set &quot;settings.clusterName=${CLUSTER_NAME}&quot; \
+  --set &quot;settings.interruptionQueue=Karpenter-${CLUSTER_NAME}&quot; \
+  --set serviceAccount.create=false \
+  --set serviceAccount.name=karpenter \
+  --set controller.resources.requests.cpu=200m \
+  --set controller.resources.requests.memory=512Mi \
+  --set controller.resources.limits.memory=512Mi \
+  --wait
+
+kubectl -n kube-system rollout status deploy/karpenter
+kubectl get crd | grep karpenter
+</code></pre>
+<h3>6.7 — Apply the node class and node pools</h3>
+<p>Manifests already in the repo — apply directly:</p>
+<pre><code class="language-sh">kubectl apply -f k8s/infra/karpenter/ec2nodeclass.yaml
+kubectl apply -f k8s/infra/karpenter/nodepool-live.yaml
+kubectl apply -f k8s/infra/karpenter/nodepool-vod.yaml
+</code></pre>
+<h3>Verify — Module 6</h3>
+<p>Second terminal:</p>
+<pre><code class="language-sh">kubectl get nodes -L karpenter.sh/nodepool,node.kubernetes.io/instance-type,karpenter.sh/capacity-type -w
+</code></pre>
+<p>First terminal:</p>
+<pre><code class="language-sh">kubectl apply -f - &lt;&lt;'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: karpenter-smoke-test
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: karpenter-smoke-test }
+  template:
+    metadata:
+      labels: { app: karpenter-smoke-test }
+    spec:
+      nodeSelector:
+        workload: transcode
+        transcode-mode: live
+      tolerations:
+        - key: workload
+          operator: Equal
+          value: transcode
+          effect: NoSchedule
+      containers:
+        - name: pause
+          image: public.ecr.aws/eks-distro/kubernetes/pause:3.9
+          resources:
+            requests:
+              cpu: &quot;3&quot;
+              memory: &quot;2Gi&quot;
+              ephemeral-storage: &quot;5Gi&quot;
+EOF
+
+kubectl -n kube-system logs deploy/karpenter --tail=20
+kubectl get pod -l app=karpenter-smoke-test -o wide
+</code></pre>
+<p>Confirm scale-down too — do not skip this half of the test:</p>
+<pre><code class="language-sh">kubectl delete deploy karpenter-smoke-test
+kubectl get nodes
+kubectl get nodeclaims
+</code></pre>
+<p><strong>Placeholders in Module 6:</strong> <code>KARPENTER_VERSION</code>, <code>KARPENTER_DOCS_VERSION</code> — substitute the version reported by <code>helm show chart</code>.</p>
+<hr />
+</section>
+<section class="step" id="m07"><div class="step-head"><span class="step-num">07</span><h2>Module 7 — Secrets</h2></div>
+<p><strong>Accomplishes:</strong> Creates the <code>streaming/ghcr</code> and <code>streaming/mediamtx</code> secrets in Secrets Manager, stands up an IAM role and Pod Identity association for the External Secrets Operator, installs ESO via Helm, and applies the <code>ClusterSecretStore</code>/<code>ExternalSecret</code>s/<code>ConfigMap</code> that populate ordinary Kubernetes Secrets from Secrets Manager.</p>
+<p>Every step in this module is CLI — no console steps.</p>
+<h3>7.1 — Create the secrets you own</h3>
+<pre><code class="language-sh">aws secretsmanager create-secret \
+  --name streaming/ghcr \
+  --description &quot;GHCR pull token for the streaming platform&quot; \
+  --secret-string '{&quot;username&quot;:&quot;&lt;github-username&gt;&quot;,&quot;token&quot;:&quot;&lt;ghp_...&gt;&quot;}'
+</code></pre>
+<blockquote>
+<p>Use a fine-grained PAT scoped only to <code>read:packages</code> — a classic token with <code>repo</code> scope grants source-code write access to anything that can read this secret.</p>
+</blockquote>
+<pre><code class="language-sh">aws secretsmanager create-secret \
+  --name streaming/mediamtx \
+  --secret-string &quot;{\&quot;apiUser\&quot;:\&quot;mediamtx\&quot;,\&quot;apiPassword\&quot;:\&quot;$(openssl rand -base64 24)\&quot;}&quot;
+
+aws secretsmanager list-secrets \
+  --query 'SecretList[?starts_with(Name, `streaming/`)].[Name,CreatedDate]' --output table
+</code></pre>
+<blockquote>
+<p>The RDS secret is not created here — <code>--manage-master-user-password</code> in Module 8 creates it.</p>
+</blockquote>
+<h3>7.2 — IAM role for ESO</h3>
+<pre><code class="language-sh">ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+cat &gt; /tmp/pod-identity-trust.json &lt;&lt;'EOF'
+{
+  &quot;Version&quot;: &quot;2012-10-17&quot;,
+  &quot;Statement&quot;: [
+    {
+      &quot;Effect&quot;: &quot;Allow&quot;,
+      &quot;Principal&quot;: { &quot;Service&quot;: &quot;pods.eks.amazonaws.com&quot; },
+      &quot;Action&quot;: [&quot;sts:AssumeRole&quot;, &quot;sts:TagSession&quot;]
+    }
+  ]
+}
+EOF
+
+aws iam create-role \
+  --role-name streaming-external-secrets \
+  --assume-role-policy-document file:///tmp/pod-identity-trust.json
+
+cat &gt; /tmp/eso-policy.json &lt;&lt;EOF
+{
+  &quot;Version&quot;: &quot;2012-10-17&quot;,
+  &quot;Statement&quot;: [
+    {
+      &quot;Effect&quot;: &quot;Allow&quot;,
+      &quot;Action&quot;: [&quot;secretsmanager:GetSecretValue&quot;, &quot;secretsmanager:DescribeSecret&quot;],
+      &quot;Resource&quot;: [
+        &quot;arn:aws:secretsmanager:us-east-1:${ACCOUNT_ID}:secret:streaming/*&quot;,
+        &quot;arn:aws:secretsmanager:us-east-1:${ACCOUNT_ID}:secret:rds!db-*&quot;
+      ]
+    }
+  ]
+}
+EOF
+
+aws iam put-role-policy \
+  --role-name streaming-external-secrets \
+  --policy-name read-streaming-secrets \
+  --policy-document file:///tmp/eso-policy.json
+</code></pre>
+<h3>7.3 — Install ESO</h3>
+<pre><code class="language-sh">helm repo add external-secrets https://charts.external-secrets.io
+helm repo update
+helm search repo external-secrets/external-secrets --versions | head -3
+</code></pre>
+<pre><code class="language-sh">export ESO_VERSION=&quot;&lt;version from helm search&gt;&quot;
+
+helm install external-secrets external-secrets/external-secrets \
+  -n external-secrets --create-namespace \
+  --version &quot;$ESO_VERSION&quot; \
+  --set installCRDs=true
+
+aws eks create-pod-identity-association \
+  --cluster-name streaming \
+  --namespace external-secrets \
+  --service-account external-secrets \
+  --role-arn &quot;arn:aws:iam::${ACCOUNT_ID}:role/streaming-external-secrets&quot;
+
+kubectl -n external-secrets rollout restart deploy/external-secrets
+kubectl -n external-secrets rollout status deploy/external-secrets
+</code></pre>
+<blockquote>
+<p>All three ESO Deployments (<code>external-secrets</code>, <code>external-secrets-webhook</code>, <code>external-secrets-cert-controller</code>) must be Ready before any <code>ExternalSecret</code> is accepted.</p>
+</blockquote>
+<pre><code class="language-sh">kubectl api-resources | grep externalsecret
+</code></pre>
+<blockquote>
+<p>If your install only serves <code>v1beta1</code>, upgrade the chart or change <code>apiVersion</code> in the manifests below to match.</p>
+</blockquote>
+<h3>7.4 — Create the namespace and the store</h3>
+<pre><code class="language-sh">kubectl create namespace streaming
+kubectl apply -f k8s/infra/secrets/clustersecretstore.yaml
+kubectl get clustersecretstore aws-secretsmanager
+</code></pre>
+<blockquote>
+<p><code>STATUS=Invalid</code> means stop here — no <code>ExternalSecret</code> will work until this reads <code>Valid</code>.</p>
+</blockquote>
+<h3>7.5 — The ExternalSecrets and the ConfigMap</h3>
+<p>Edit <code>k8s/infra/secrets/configmap-app.yaml</code>'s <code>S3_BUCKET</code> value to your real account ID before applying:</p>
+<pre><code class="language-sh">kubectl apply -f k8s/infra/secrets/externalsecret-ghcr.yaml
+kubectl apply -f k8s/infra/secrets/externalsecret-mediamtx.yaml
+kubectl apply -f k8s/infra/secrets/configmap-app.yaml
+
+kubectl -n streaming patch serviceaccount default \
+  -p '{&quot;imagePullSecrets&quot;:[{&quot;name&quot;:&quot;ghcr&quot;}]}'
+</code></pre>
+<h3>7.6 — The database ExternalSecret</h3>
+<p>Leave <code>k8s/infra/secrets/externalsecret-db.yaml</code> as-is for now — it can't sync until Module 8's RDS instance exists. Module 8 gives you the exact <code>sed</code> command to fill in its placeholder.</p>
+<h3>Verify — Module 7</h3>
+<pre><code class="language-sh">kubectl get externalsecret -n streaming
+kubectl describe externalsecret ghcr -n streaming | tail -20
+kubectl get secret -n streaming
+</code></pre>
+<blockquote>
+<p><code>ghcr</code>'s <code>TYPE</code> must read <code>kubernetes.io/dockerconfigjson</code> — <code>Opaque</code> means <code>template.type</code> is missing and image pulls will fail without ever mentioning the secret's type.</p>
+</blockquote>
+<pre><code class="language-sh">kubectl -n streaming get secret ghcr -o jsonpath='{.data.\.dockerconfigjson}' \
+  | base64 -d | python3 -m json.tool
+</code></pre>
+<p>Confirm the <code>.env</code> cleanup checklist: <code>SERVER_IP</code>/<code>SERVER_USERNAME</code>/<code>SERVER_PASSWORD</code>/<code>MINIO_ROOT_*</code>/<code>S3_ACCESS_KEY</code>/<code>S3_SECRET_KEY</code>/<code>S3_ENDPOINT</code>/<code>KAFKA_CLUSTER_ID</code> removed from <code>.env</code>, that SSH password rotated on the old dev box, <code>.env</code> confirmed gitignored (<code>git check-ignore -v .env</code>), and <code>git log --all --full-history -- .env</code> returns nothing.</p>
+<p><strong>Placeholders in Module 7:</strong> <code>&lt;github-username&gt;</code>, <code>&lt;ghp_...&gt;</code>, <code>ESO_VERSION</code>, <code>&lt;accountid&gt;</code> in <code>configmap-app.yaml</code>'s <code>S3_BUCKET</code>.</p>
+<hr />
+</section>
+<section class="step" id="m08"><div class="step-head"><span class="step-num">08</span><h2>Module 8 — RDS Postgres</h2></div>
+<p><strong>Accomplishes:</strong> Creates a private, single-AZ PostgreSQL 16 RDS instance reachable only from the EKS cluster's security group, wires its credential through Secrets Manager/ESO, and runs a Kubernetes Job that applies the schema migrations.</p>
+<h3>8.1 — Confirm the repo is ready</h3>
+<pre><code class="language-sh">ls postgres/migrations/
+grep -c &quot;IF NOT EXISTS&quot; postgres/migrations/001_baseline.sql
+</code></pre>
+<h3>8.2 — Find the network</h3>
+<pre><code class="language-sh">export AWS_PROFILE=linkify-streaming
+export AWS_REGION=us-east-1
+
+VPC_ID=$(aws eks describe-cluster --name streaming \
+  --query 'cluster.resourcesVpcConfig.vpcId' --output text)
+
+CLUSTER_SG=$(aws eks describe-cluster --name streaming \
+  --query 'cluster.resourcesVpcConfig.clusterSecurityGroupId' --output text)
+
+PRIVATE_SUBNETS=$(aws ec2 describe-subnets \
+  --filters &quot;Name=vpc-id,Values=$VPC_ID&quot; \
+            &quot;Name=tag:kubernetes.io/role/internal-elb,Values=1&quot; \
+  --query 'Subnets[].SubnetId' --output text)
+</code></pre>
+<h3>8.3 — Subnet group and security group</h3>
+<pre><code class="language-sh">aws rds create-db-subnet-group \
+  --db-subnet-group-name streaming-db \
+  --db-subnet-group-description &quot;streaming private subnets&quot; \
+  --subnet-ids $PRIVATE_SUBNETS
+
+RDS_SG=$(aws ec2 create-security-group \
+  --group-name streaming-rds \
+  --description &quot;RDS Postgres, reachable from the EKS cluster only&quot; \
+  --vpc-id &quot;$VPC_ID&quot; \
+  --query GroupId --output text)
+
+aws ec2 authorize-security-group-ingress \
+  --group-id &quot;$RDS_SG&quot; \
+  --protocol tcp --port 5432 \
+  --source-group &quot;$CLUSTER_SG&quot;
+</code></pre>
+<h3>8.4 — Parameter group</h3>
+<pre><code class="language-sh">aws rds create-db-parameter-group \
+  --db-parameter-group-name streaming-pg16 \
+  --db-parameter-group-family postgres16 \
+  --description &quot;streaming&quot;
+
+aws rds modify-db-parameter-group \
+  --db-parameter-group-name streaming-pg16 \
+  --parameters \
+    &quot;ParameterName=rds.force_ssl,ParameterValue=1,ApplyMethod=pending-reboot&quot; \
+    &quot;ParameterName=log_min_duration_statement,ParameterValue=1000,ApplyMethod=immediate&quot; \
+    &quot;ParameterName=log_connections,ParameterValue=1,ApplyMethod=immediate&quot;
+</code></pre>
+<h3>8.5 — Create the instance</h3>
+<pre><code class="language-sh">aws rds create-db-instance \
+  --db-instance-identifier streaming-db \
+  --engine postgres \
+  --engine-version 16.10 \
+  --db-instance-class db.t4g.micro \
+  --allocated-storage 20 \
+  --max-allocated-storage 100 \
+  --storage-type gp3 \
+  --db-name streaming \
+  --master-username streamadmin \
+  --manage-master-user-password \
+  --db-subnet-group-name streaming-db \
+  --vpc-security-group-ids &quot;$RDS_SG&quot; \
+  --db-parameter-group-name streaming-pg16 \
+  --backup-retention-period 7 \
+  --no-multi-az \
+  --no-publicly-accessible \
+  --deletion-protection \
+  --no-enable-performance-insights \
+  --tags Key=Project,Value=streaming
+</code></pre>
+<blockquote>
+<p><code>--deletion-protection</code> is on deliberately — Module 16's teardown needs <code>aws rds modify-db-instance --no-deletion-protection</code> first. If <code>16.10</code> isn't accepted, check <code>aws rds describe-db-engine-versions --engine postgres --query 'DBEngineVersions[?starts_with(EngineVersion,</code>16.<code>)].EngineVersion'</code> and use the highest 16.x offered — don't jump to 17.</p>
+</blockquote>
+<pre><code class="language-sh">aws rds wait db-instance-available --db-instance-identifier streaming-db
+</code></pre>
+<h3>8.6 — Read the endpoint and the secret ARN</h3>
+<pre><code class="language-sh">DB_HOST=$(aws rds describe-db-instances --db-instance-identifier streaming-db \
+  --query 'DBInstances[0].Endpoint.Address' --output text)
+
+DB_SECRET_ARN=$(aws rds describe-db-instances --db-instance-identifier streaming-db \
+  --query 'DBInstances[0].MasterUserSecret.SecretArn' --output text)
+
+DB_SECRET_NAME=$(aws secretsmanager describe-secret --secret-id &quot;$DB_SECRET_ARN&quot; \
+  --query Name --output text)
+
+aws secretsmanager create-secret \
+  --name streaming/db-endpoint \
+  --description &quot;Non-secret RDS connection facts for the ESO template&quot; \
+  --secret-string &quot;{\&quot;host\&quot;:\&quot;$DB_HOST\&quot;,\&quot;port\&quot;:\&quot;5432\&quot;,\&quot;dbname\&quot;:\&quot;streaming\&quot;}&quot;
+</code></pre>
+<h3>8.7 — Wire it to ESO</h3>
+<pre><code class="language-sh">sed -i.bak &quot;s|rds!db-REPLACE-ME|$DB_SECRET_NAME|&quot; k8s/infra/secrets/externalsecret-db.yaml
+rm k8s/infra/secrets/externalsecret-db.yaml.bak
+
+kubectl apply -f k8s/infra/secrets/externalsecret-db.yaml
+kubectl -n streaming get externalsecret streaming-db
+</code></pre>
+<h3>8.8 — Run the migration Job</h3>
+<pre><code class="language-sh">kubectl kustomize --load-restrictor LoadRestrictionsNone k8s/apps/base/db-migrate \
+  | kubectl apply -f -
+
+kubectl -n streaming wait --for=condition=complete job/db-migrate --timeout=180s
+kubectl -n streaming logs job/db-migrate
+</code></pre>
+<blockquote>
+<p><code>kubectl apply -k</code> has no flag for the outside-root restriction — this build-and-pipe form is required, every time you touch this Job.</p>
+</blockquote>
+<p>To prove idempotency (a Job's pod template is immutable, so delete first):</p>
+<pre><code class="language-sh">kubectl -n streaming delete job db-migrate
+kubectl kustomize --load-restrictor LoadRestrictionsNone k8s/apps/base/db-migrate \
+  | kubectl apply -f -
+kubectl -n streaming wait --for=condition=complete job/db-migrate --timeout=180s
+</code></pre>
+<h3>Verify — Module 8</h3>
+<pre><code class="language-sh">kubectl -n streaming run psql --rm -it --restart=Never --image=postgres:16-alpine \
+  --overrides='
+{
+  &quot;spec&quot;: {
+    &quot;containers&quot;: [{
+      &quot;name&quot;: &quot;psql&quot;,
+      &quot;image&quot;: &quot;postgres:16-alpine&quot;,
+      &quot;stdin&quot;: true, &quot;tty&quot;: true,
+      &quot;command&quot;: [&quot;sh&quot;,&quot;-c&quot;,&quot;exec psql \&quot;$POSTGRES_DSN\&quot;&quot;],
+      &quot;env&quot;: [{&quot;name&quot;:&quot;POSTGRES_DSN&quot;,&quot;valueFrom&quot;:{&quot;secretKeyRef&quot;:{&quot;name&quot;:&quot;streaming-db&quot;,&quot;key&quot;:&quot;POSTGRES_DSN&quot;}}}]
+    }]
+  }
+}'
+</code></pre>
+<p>At the prompt, run <code>\dt</code> and <code>\d streams</code> — you want the <code>SSL connection (protocol: TLSv1.3 ...)</code> banner line, four tables, and <code>gen_random_uuid()</code> as the <code>streams.id</code> default. Do not move to Module 9 until all three are true.</p>
+<p><strong>Placeholders in Module 8:</strong> none — <code>$DB_HOST</code>/<code>$DB_SECRET_NAME</code> etc. are populated by command substitution in the same session.</p>
+<hr />
+</section>
+<section class="step" id="m09"><div class="step-head"><span class="step-num">09</span><h2>Module 9 — S3 and CloudFront</h2></div>
+<p><strong>Accomplishes:</strong> Creates a private S3 bucket (source uploads + HLS output) with lifecycle rules, an Origin Access Control, cache/response-headers policies, a CloudFront distribution on <code>cdn.k8s.linkifysolutions.com</code>, the bucket policy and CORS config that let only that distribution read <code>hls/*</code>, the DNS alias record, and the two Pod-Identity IAM roles for <code>upload-api</code>/<code>transcode-worker</code>.</p>
+<p>Every step in this module is CLI — no console steps.</p>
+<pre><code class="language-sh">export AWS_PROFILE=linkify-streaming
+export AWS_REGION=us-east-1
+
+ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+BUCKET=&quot;linkify-streaming-media-${ACCOUNT_ID}&quot;
+echo &quot;$BUCKET&quot;
+</code></pre>
+<h3>9.1 — The bucket</h3>
+<pre><code class="language-sh">aws s3api create-bucket --bucket &quot;$BUCKET&quot; --region us-east-1
+
+aws s3api put-public-access-block --bucket &quot;$BUCKET&quot; \
+  --public-access-block-configuration \
+    BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+
+aws s3api put-bucket-encryption --bucket &quot;$BUCKET&quot; \
+  --server-side-encryption-configuration \
+    '{&quot;Rules&quot;:[{&quot;ApplyServerSideEncryptionByDefault&quot;:{&quot;SSEAlgorithm&quot;:&quot;AES256&quot;},&quot;BucketKeyEnabled&quot;:true}]}'
+
+aws s3api get-public-access-block --bucket &quot;$BUCKET&quot; --query PublicAccessBlockConfiguration
+</code></pre>
+<p>All four values must be <code>true</code>.</p>
+<h3>9.2 — Lifecycle rules</h3>
+<pre><code class="language-sh">cat &gt; /tmp/lifecycle.json &lt;&lt;'JSON'
+{&quot;Rules&quot;: [
+  {&quot;ID&quot;: &quot;expire-live-hls&quot;, &quot;Status&quot;: &quot;Enabled&quot;,
+   &quot;Filter&quot;: {&quot;Prefix&quot;: &quot;hls/live/&quot;},
+   &quot;Expiration&quot;: {&quot;Days&quot;: 7}},
+
+  {&quot;ID&quot;: &quot;expire-raw-uploads&quot;, &quot;Status&quot;: &quot;Enabled&quot;,
+   &quot;Filter&quot;: {&quot;Prefix&quot;: &quot;raw/&quot;},
+   &quot;Expiration&quot;: {&quot;Days&quot;: 30}},
+
+  {&quot;ID&quot;: &quot;abort-incomplete-mpu&quot;, &quot;Status&quot;: &quot;Enabled&quot;,
+   &quot;Filter&quot;: {&quot;Prefix&quot;: &quot;&quot;},
+   &quot;AbortIncompleteMultipartUpload&quot;: {&quot;DaysAfterInitiation&quot;: 1}}
+]}
+JSON
+
+aws s3api put-bucket-lifecycle-configuration \
+  --bucket &quot;$BUCKET&quot; --lifecycle-configuration file:///tmp/lifecycle.json
+</code></pre>
+<blockquote>
+<p>The third rule (abort incomplete multipart uploads) is the invisible one — orphaned parts from a failed upload never show in <code>aws s3 ls</code> and bill as standard storage forever without it.</p>
+</blockquote>
+<h3>9.3 — Origin Access Control</h3>
+<pre><code class="language-sh">OAC_ID=$(aws cloudfront create-origin-access-control \
+  --origin-access-control-config '{
+    &quot;Name&quot;: &quot;streaming-media-oac&quot;,
+    &quot;Description&quot;: &quot;S3 origin for the streaming HLS distribution&quot;,
+    &quot;OriginAccessControlOriginType&quot;: &quot;s3&quot;,
+    &quot;SigningBehavior&quot;: &quot;always&quot;,
+    &quot;SigningProtocol&quot;: &quot;sigv4&quot;
+  }' --query 'OriginAccessControl.Id' --output text)
+</code></pre>
+<h3>9.4 — Cache and response-headers policies</h3>
+<pre><code class="language-sh">LIVE_CACHE_POLICY_ID=$(aws cloudfront create-cache-policy --cache-policy-config '{
+  &quot;Name&quot;: &quot;streaming-hls-live-manifest&quot;,
+  &quot;Comment&quot;: &quot;Near-live HLS playlists&quot;,
+  &quot;MinTTL&quot;: 0,
+  &quot;DefaultTTL&quot;: 1,
+  &quot;MaxTTL&quot;: 2,
+  &quot;ParametersInCacheKeyAndForwardedToOrigin&quot;: {
+    &quot;EnableAcceptEncodingGzip&quot;: true,
+    &quot;EnableAcceptEncodingBrotli&quot;: true,
+    &quot;HeadersConfig&quot;: {&quot;HeaderBehavior&quot;: &quot;none&quot;},
+    &quot;CookiesConfig&quot;: {&quot;CookieBehavior&quot;: &quot;none&quot;},
+    &quot;QueryStringsConfig&quot;: {&quot;QueryStringBehavior&quot;: &quot;none&quot;}
+  }
+}' --query 'CachePolicy.Id' --output text)
+
+RHP_ID=$(aws cloudfront create-response-headers-policy --response-headers-policy-config '{
+  &quot;Name&quot;: &quot;streaming-hls-cors&quot;,
+  &quot;Comment&quot;: &quot;Synthesise CORS headers regardless of what is cached&quot;,
+  &quot;CorsConfig&quot;: {
+    &quot;AccessControlAllowOrigins&quot;: {&quot;Quantity&quot;: 1, &quot;Items&quot;: [&quot;https://stream.k8s.linkifysolutions.com&quot;]},
+    &quot;AccessControlAllowMethods&quot;: {&quot;Quantity&quot;: 3, &quot;Items&quot;: [&quot;GET&quot;, &quot;HEAD&quot;, &quot;OPTIONS&quot;]},
+    &quot;AccessControlAllowHeaders&quot;: {&quot;Quantity&quot;: 1, &quot;Items&quot;: [&quot;*&quot;]},
+    &quot;AccessControlAllowCredentials&quot;: false,
+    &quot;AccessControlExposeHeaders&quot;: {&quot;Quantity&quot;: 4, &quot;Items&quot;: [&quot;Content-Length&quot;, &quot;Content-Range&quot;, &quot;ETag&quot;, &quot;Accept-Ranges&quot;]},
+    &quot;AccessControlMaxAgeSec&quot;: 3000,
+    &quot;OriginOverride&quot;: true
+  }
+}' --query 'ResponseHeadersPolicy.Id' --output text)
+</code></pre>
+<blockquote>
+<p><code>OriginOverride: true</code> is deliberate — CloudFront replaces whatever the origin said about CORS with this, on every response, cached or not.</p>
+</blockquote>
+<pre><code class="language-sh">aws cloudfront list-cache-policies --type managed \
+  --query &quot;CachePolicyList.Items[?CachePolicy.CachePolicyConfig.Name=='Managed-CachingOptimized'].CachePolicy.Id&quot; \
+  --output text
+# expect: 658327ea-f89d-4fab-a63d-7e88639e58f6
+
+aws cloudfront list-origin-request-policies --type managed \
+  --query &quot;OriginRequestPolicyList.Items[?OriginRequestPolicy.OriginRequestPolicyConfig.Name=='Managed-CORS-S3Origin'].OriginRequestPolicy.Id&quot; \
+  --output text
+# expect: 88a5eaf4-2fd4-4709-b370-b4c650ea3fcf
+</code></pre>
+<h3>9.5 — The distribution</h3>
+<pre><code class="language-sh">CERT_ARN=$(aws acm list-certificates --region us-east-1 \
+  --query &quot;CertificateSummaryList[?DomainName=='*.k8s.linkifysolutions.com'].CertificateArn&quot; \
+  --output text)
+
+CACHING_OPTIMIZED=658327ea-f89d-4fab-a63d-7e88639e58f6
+CORS_S3_ORIGIN=88a5eaf4-2fd4-4709-b370-b4c650ea3fcf
+
+cat &gt; /tmp/dist.json &lt;&lt;JSON
+{
+  &quot;CallerReference&quot;: &quot;streaming-cdn-$(date +%s)&quot;,
+  &quot;Comment&quot;: &quot;streaming HLS&quot;,
+  &quot;Enabled&quot;: true,
+  &quot;HttpVersion&quot;: &quot;http2and3&quot;,
+  &quot;PriceClass&quot;: &quot;PriceClass_100&quot;,
+  &quot;Aliases&quot;: {&quot;Quantity&quot;: 1, &quot;Items&quot;: [&quot;cdn.k8s.linkifysolutions.com&quot;]},
+  &quot;Origins&quot;: {&quot;Quantity&quot;: 1, &quot;Items&quot;: [{
+    &quot;Id&quot;: &quot;s3-media&quot;,
+    &quot;DomainName&quot;: &quot;${BUCKET}.s3.us-east-1.amazonaws.com&quot;,
+    &quot;OriginAccessControlId&quot;: &quot;${OAC_ID}&quot;,
+    &quot;S3OriginConfig&quot;: {&quot;OriginAccessIdentity&quot;: &quot;&quot;},
+    &quot;CustomHeaders&quot;: {&quot;Quantity&quot;: 0},
+    &quot;ConnectionAttempts&quot;: 3,
+    &quot;ConnectionTimeout&quot;: 10
+  }]},
+  &quot;DefaultCacheBehavior&quot;: {
+    &quot;TargetOriginId&quot;: &quot;s3-media&quot;,
+    &quot;ViewerProtocolPolicy&quot;: &quot;redirect-to-https&quot;,
+    &quot;AllowedMethods&quot;: {&quot;Quantity&quot;: 3, &quot;Items&quot;: [&quot;GET&quot;, &quot;HEAD&quot;, &quot;OPTIONS&quot;],
+      &quot;CachedMethods&quot;: {&quot;Quantity&quot;: 2, &quot;Items&quot;: [&quot;GET&quot;, &quot;HEAD&quot;]}},
+    &quot;Compress&quot;: true,
+    &quot;CachePolicyId&quot;: &quot;${CACHING_OPTIMIZED}&quot;,
+    &quot;OriginRequestPolicyId&quot;: &quot;${CORS_S3_ORIGIN}&quot;,
+    &quot;ResponseHeadersPolicyId&quot;: &quot;${RHP_ID}&quot;
+  },
+  &quot;CacheBehaviors&quot;: {&quot;Quantity&quot;: 1, &quot;Items&quot;: [{
+    &quot;PathPattern&quot;: &quot;hls/live/*.m3u8&quot;,
+    &quot;TargetOriginId&quot;: &quot;s3-media&quot;,
+    &quot;ViewerProtocolPolicy&quot;: &quot;redirect-to-https&quot;,
+    &quot;AllowedMethods&quot;: {&quot;Quantity&quot;: 3, &quot;Items&quot;: [&quot;GET&quot;, &quot;HEAD&quot;, &quot;OPTIONS&quot;],
+      &quot;CachedMethods&quot;: {&quot;Quantity&quot;: 2, &quot;Items&quot;: [&quot;GET&quot;, &quot;HEAD&quot;]}},
+    &quot;Compress&quot;: true,
+    &quot;CachePolicyId&quot;: &quot;${LIVE_CACHE_POLICY_ID}&quot;,
+    &quot;OriginRequestPolicyId&quot;: &quot;${CORS_S3_ORIGIN}&quot;,
+    &quot;ResponseHeadersPolicyId&quot;: &quot;${RHP_ID}&quot;
+  }]},
+  &quot;ViewerCertificate&quot;: {
+    &quot;ACMCertificateArn&quot;: &quot;${CERT_ARN}&quot;,
+    &quot;SSLSupportMethod&quot;: &quot;sni-only&quot;,
+    &quot;MinimumProtocolVersion&quot;: &quot;TLSv1.2_2021&quot;
+  },
+  &quot;Restrictions&quot;: {&quot;GeoRestriction&quot;: {&quot;RestrictionType&quot;: &quot;none&quot;, &quot;Quantity&quot;: 0}}
+}
+JSON
+
+DIST_ID=$(aws cloudfront create-distribution --distribution-config file:///tmp/dist.json \
+  --query 'Distribution.Id' --output text)
+
+DIST_DOMAIN=$(aws cloudfront get-distribution --id &quot;$DIST_ID&quot; \
+  --query 'Distribution.DomainName' --output text)
+
+aws cloudfront wait distribution-deployed --id &quot;$DIST_ID&quot;
+</code></pre>
+<h3>9.6 — The bucket policy that lets only this distribution in</h3>
+<pre><code class="language-sh">cat &gt; /tmp/bucket-policy.json &lt;&lt;JSON
+{
+  &quot;Version&quot;: &quot;2012-10-17&quot;,
+  &quot;Statement&quot;: [{
+    &quot;Sid&quot;: &quot;AllowCloudFrontHLSOnly&quot;,
+    &quot;Effect&quot;: &quot;Allow&quot;,
+    &quot;Principal&quot;: {&quot;Service&quot;: &quot;cloudfront.amazonaws.com&quot;},
+    &quot;Action&quot;: &quot;s3:GetObject&quot;,
+    &quot;Resource&quot;: &quot;arn:aws:s3:::${BUCKET}/hls/*&quot;,
+    &quot;Condition&quot;: {&quot;StringEquals&quot;: {
+      &quot;AWS:SourceArn&quot;: &quot;arn:aws:cloudfront::${ACCOUNT_ID}:distribution/${DIST_ID}&quot;
+    }}
+  }]
+}
+JSON
+
+aws s3api put-bucket-policy --bucket &quot;$BUCKET&quot; --policy file:///tmp/bucket-policy.json
+</code></pre>
+<blockquote>
+<p><code>Resource</code> is scoped to <code>hls/*</code>, not <code>*</code> — that is the entire boundary between a private bucket and a public one.</p>
+</blockquote>
+<h3>9.7 — CORS on the bucket</h3>
+<pre><code class="language-sh">aws s3api put-bucket-cors --bucket &quot;$BUCKET&quot; --cors-configuration '{
+  &quot;CORSRules&quot;: [{
+    &quot;AllowedOrigins&quot;: [&quot;https://stream.k8s.linkifysolutions.com&quot;],
+    &quot;AllowedMethods&quot;: [&quot;GET&quot;, &quot;HEAD&quot;],
+    &quot;AllowedHeaders&quot;: [&quot;Origin&quot;, &quot;Range&quot;, &quot;Access-Control-Request-Method&quot;, &quot;Access-Control-Request-Headers&quot;],
+    &quot;ExposeHeaders&quot;: [&quot;Content-Length&quot;, &quot;Content-Range&quot;, &quot;ETag&quot;, &quot;Accept-Ranges&quot;],
+    &quot;MaxAgeSeconds&quot;: 3000
+  }]
+}'
+</code></pre>
+<blockquote>
+<p><code>Range</code> in <code>AllowedHeaders</code> and <code>Content-Range</code>/<code>Accept-Ranges</code> in <code>ExposeHeaders</code> are load-bearing — without them, seeking in a VOD breaks silently while normal playback looks fine.</p>
+</blockquote>
+<h3>9.8 — DNS</h3>
+<pre><code class="language-sh">ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+  --dns-name k8s.linkifysolutions.com \
+  --query 'HostedZones[0].Id' --output text | cut -d/ -f3)
+
+cat &gt; /tmp/cdn-record.json &lt;&lt;JSON
+{&quot;Changes&quot;: [{
+  &quot;Action&quot;: &quot;UPSERT&quot;,
+  &quot;ResourceRecordSet&quot;: {
+    &quot;Name&quot;: &quot;cdn.k8s.linkifysolutions.com&quot;,
+    &quot;Type&quot;: &quot;A&quot;,
+    &quot;AliasTarget&quot;: {
+      &quot;HostedZoneId&quot;: &quot;Z2FDTNDATAQYW2&quot;,
+      &quot;DNSName&quot;: &quot;${DIST_DOMAIN}&quot;,
+      &quot;EvaluateTargetHealth&quot;: false
+    }
+  }
+}]}
+JSON
+
+aws route53 change-resource-record-sets --hosted-zone-id &quot;$ZONE_ID&quot; \
+  --change-batch file:///tmp/cdn-record.json
+</code></pre>
+<blockquote>
+<p><code>Z2FDTNDATAQYW2</code> is a fixed constant — CloudFront's hosted zone ID for alias records, the same in every account. It looks like a placeholder that should be replaced; it is not.</p>
+</blockquote>
+<h3>9.9 — IAM roles and Pod Identity</h3>
+<pre><code class="language-sh">cat &gt; /tmp/pod-identity-trust.json &lt;&lt;'JSON'
+{&quot;Version&quot;: &quot;2012-10-17&quot;, &quot;Statement&quot;: [{
+  &quot;Effect&quot;: &quot;Allow&quot;,
+  &quot;Principal&quot;: {&quot;Service&quot;: &quot;pods.eks.amazonaws.com&quot;},
+  &quot;Action&quot;: [&quot;sts:AssumeRole&quot;, &quot;sts:TagSession&quot;]
+}]}
+JSON
+
+aws iam create-role --role-name streaming-upload-api \
+  --assume-role-policy-document file:///tmp/pod-identity-trust.json
+
+cat &gt; /tmp/upload-api-s3.json &lt;&lt;JSON
+{&quot;Version&quot;:&quot;2012-10-17&quot;,&quot;Statement&quot;:[
+  {&quot;Sid&quot;:&quot;HeadBucketForHealthCheck&quot;,
+   &quot;Effect&quot;:&quot;Allow&quot;,&quot;Action&quot;:&quot;s3:ListBucket&quot;,
+   &quot;Resource&quot;:&quot;arn:aws:s3:::${BUCKET}&quot;},
+  {&quot;Effect&quot;:&quot;Allow&quot;,
+   &quot;Action&quot;:[&quot;s3:PutObject&quot;,&quot;s3:AbortMultipartUpload&quot;],
+   &quot;Resource&quot;:&quot;arn:aws:s3:::${BUCKET}/raw/*&quot;}
+]}
+JSON
+
+aws iam put-role-policy --role-name streaming-upload-api \
+  --policy-name s3-raw-write --policy-document file:///tmp/upload-api-s3.json
+</code></pre>
+<blockquote>
+<p>The <code>s3:ListBucket</code> statement on the bucket ARN (not <code>/*</code>) is what authorizes <code>head_bucket()</code> for the <code>/readyz</code> check — omit it and readiness returns 403 while every real upload still works.</p>
+</blockquote>
+<pre><code class="language-sh">aws iam create-role --role-name streaming-transcode-worker \
+  --assume-role-policy-document file:///tmp/pod-identity-trust.json
+
+cat &gt; /tmp/transcode-s3.json &lt;&lt;JSON
+{&quot;Version&quot;:&quot;2012-10-17&quot;,&quot;Statement&quot;:[
+  {&quot;Effect&quot;:&quot;Allow&quot;,&quot;Action&quot;:&quot;s3:ListBucket&quot;,
+   &quot;Resource&quot;:&quot;arn:aws:s3:::${BUCKET}&quot;},
+  {&quot;Effect&quot;:&quot;Allow&quot;,&quot;Action&quot;:&quot;s3:GetObject&quot;,
+   &quot;Resource&quot;:&quot;arn:aws:s3:::${BUCKET}/raw/*&quot;},
+  {&quot;Effect&quot;:&quot;Allow&quot;,
+   &quot;Action&quot;:[&quot;s3:PutObject&quot;,&quot;s3:AbortMultipartUpload&quot;],
+   &quot;Resource&quot;:&quot;arn:aws:s3:::${BUCKET}/hls/*&quot;}
+]}
+JSON
+
+aws iam put-role-policy --role-name streaming-transcode-worker \
+  --policy-name s3-raw-read-hls-write --policy-document file:///tmp/transcode-s3.json
+
+for SA in upload-api transcode-worker; do
+  aws eks create-pod-identity-association \
+    --cluster-name streaming \
+    --namespace streaming \
+    --service-account &quot;$SA&quot; \
+    --role-arn &quot;arn:aws:iam::${ACCOUNT_ID}:role/streaming-${SA}&quot;
+done
+</code></pre>
+<blockquote>
+<p><code>S3_ENDPOINT</code>/<code>S3_ACCESS_KEY</code>/<code>S3_SECRET_KEY</code> must stay UNSET on AWS — boto3 checks explicit credentials first, so leaving any of these set anywhere means Pod Identity is attached, working, and completely ignored.</p>
+</blockquote>
+<h3>Verify — Module 9</h3>
+<pre><code class="language-sh">printf '#EXTM3U\n#EXT-X-VERSION:3\n' &gt; /tmp/test.m3u8
+
+aws s3 cp /tmp/test.m3u8 &quot;s3://${BUCKET}/hls/vod/checkpoint/master.m3u8&quot; \
+  --content-type application/vnd.apple.mpegurl \
+  --cache-control &quot;public, max-age=31536000, immutable&quot;
+
+curl -sI -H &quot;Origin: https://stream.k8s.linkifysolutions.com&quot; \
+  https://cdn.k8s.linkifysolutions.com/hls/vod/checkpoint/master.m3u8
+</code></pre>
+<p>Want: <code>HTTP/2 200</code>, the right content-type, <code>access-control-allow-origin</code> present.</p>
+<pre><code class="language-sh">aws s3 cp /tmp/test.m3u8 &quot;s3://${BUCKET}/raw/checkpoint.txt&quot;
+curl -s -o /dev/null -w '%{http_code}\n' https://cdn.k8s.linkifysolutions.com/raw/checkpoint.txt
+</code></pre>
+<p>Want <code>403</code>. A <code>200</code> means the bucket policy is scoped to <code>*</code> instead of <code>hls/*</code> — fix before going further.</p>
+<pre><code class="language-sh">aws s3 cp /tmp/test.m3u8 &quot;s3://${BUCKET}/hls/live/checkpoint/720p/playlist.m3u8&quot; \
+  --content-type application/vnd.apple.mpegurl \
+  --cache-control &quot;no-cache, must-revalidate&quot;
+
+for i in 1 2 3; do
+  curl -sI https://cdn.k8s.linkifysolutions.com/hls/live/checkpoint/720p/playlist.m3u8 \
+    | grep -Ei '^(x-cache|age|cache-control)'
+  sleep 2
+done
+</code></pre>
+<p>Want <code>x-cache: Miss from cloudfront</code> on every request — an <code>age</code> that climbs past 2 means the path pattern didn't match, and it will look exactly like a frozen live stream in Module 13.</p>
+<pre><code class="language-sh">aws s3 rm &quot;s3://${BUCKET}/hls/vod/checkpoint/master.m3u8&quot;
+aws s3 rm &quot;s3://${BUCKET}/hls/live/checkpoint/720p/playlist.m3u8&quot;
+aws s3 rm &quot;s3://${BUCKET}/raw/checkpoint.txt&quot;
+</code></pre>
+<p><strong>Placeholders in Module 9:</strong> none — everything is derived via command substitution in the same shell session. <code>CACHING_OPTIMIZED</code>/<code>CORS_S3_ORIGIN</code> are AWS-managed policy IDs, looked up, not invented, and stable across accounts.</p>
+<hr />
+</section>
+<section class="step" id="m10"><div class="step-head"><span class="step-num">10</span><h2>Module 10 — Kafka with Strimzi</h2></div>
+<p><strong>Accomplishes:</strong> Installs the Strimzi operator and stands up a single-node KRaft-mode Kafka cluster (20 GiB gp3) in the <code>kafka</code> namespace with five <code>KafkaTopic</code> resources.</p>
+<h3>10.1 — Install the operator, pinned</h3>
+<pre><code class="language-sh">helm repo add strimzi https://strimzi.io/charts/
+helm repo update
+helm search repo strimzi/strimzi-kafka-operator --versions | head -8
+</code></pre>
+<pre><code class="language-sh">kubectl create namespace kafka --dry-run=client -o yaml | kubectl apply -f -
+
+helm upgrade --install strimzi strimzi/strimzi-kafka-operator \
+  --namespace kafka \
+  --version 0.49.0 \
+  --set watchAnyNamespace=false \
+  --set resources.requests.cpu=200m \
+  --set resources.requests.memory=384Mi \
+  --set resources.limits.memory=384Mi \
+  --wait
+
+kubectl -n kafka rollout status deploy/strimzi-cluster-operator
+</code></pre>
+<h3>10.2 — Check the API version — actually run this</h3>
+<pre><code class="language-sh">kubectl get crd kafkanodepools.kafka.strimzi.io \
+  -o jsonpath='{range .spec.versions[*]}{.name}{&quot; served=&quot;}{.served}{&quot; storage=&quot;}{.storage}{&quot;\n&quot;}{end}'
+</code></pre>
+<p>Must print <code>v1beta2 served=true storage=true</code>. Anything else means the manifests don't match your operator's API.</p>
+<pre><code class="language-sh">kubectl -n kafka get deploy strimzi-cluster-operator \
+  -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name==&quot;STRIMZI_KAFKA_IMAGES&quot;)].value}{&quot;\n&quot;}'
+</code></pre>
+<p>The manifests use Kafka <code>3.9.0</code> — if it's not in this list, pick the highest available version and update <code>k8s/infra/kafka/kafka.yaml</code> to match before applying.</p>
+<h3>10.3 — Confirm the gp3 StorageClass exists</h3>
+<pre><code class="language-sh">kubectl get storageclass
+</code></pre>
+<p>No <code>gp3</code> line means the PVC below sits <code>Pending</code> forever — go back to Module 4.</p>
+<h3>10.4 — Apply the cluster</h3>
+<pre><code class="language-sh">kubectl apply -k k8s/infra/kafka
+kubectl -n kafka wait kafka/streaming --for=condition=Ready --timeout=600s
+kubectl -n kafka get pods -w
+</code></pre>
+<h3>Verify — Module 10</h3>
+<pre><code class="language-sh">kubectl -n kafka get kafka
+kubectl -n kafka get kafkanodepool
+kubectl -n kafka get kafkatopic
+</code></pre>
+<p>Five topics, all <code>READY=True</code>: <code>stream.lifecycle</code> (8), <code>stream.start.requests</code> (8), <code>upload.events</code> (8), <code>transcode.status</code> (3), <code>viewer.analytics</code> (3).</p>
+<pre><code class="language-sh">kubectl -n kafka run kcat --rm -it --restart=Never \
+  --image=edenhill/kcat:1.7.1 -- \
+  -b streaming-kafka-bootstrap.kafka.svc:9092 -L
+
+kubectl -n kafka run kcat-p --rm -i --restart=Never --image=edenhill/kcat:1.7.1 -- \
+  -b streaming-kafka-bootstrap.kafka.svc:9092 -P -t transcode.status &lt;&lt;&lt; '{&quot;event&quot;:&quot;checkpoint&quot;}'
+
+kubectl -n kafka run kcat-c --rm -it --restart=Never --image=edenhill/kcat:1.7.1 -- \
+  -b streaming-kafka-bootstrap.kafka.svc:9092 -C -t transcode.status -o beginning -e
+</code></pre>
+<p><strong>For later modules:</strong> <code>KAFKA_BOOTSTRAP_SERVERS=streaming-kafka-bootstrap.kafka.svc:9092</code>. <code>KAFKA_CLUSTER_ID</code> from the old <code>.env</code> is retired — Strimzi generates and manages it; don't set it anywhere.</p>
+<hr />
+</section>
+<section class="step" id="m11"><div class="step-head"><span class="step-num">11</span><h2>Module 11 — Running the services</h2></div>
+<p><strong>Accomplishes:</strong> Deploys all five Python services plus MediaMTX into the <code>streaming</code> namespace via Kustomize.</p>
+<p><strong>Do Module 14 §14.1 (install KEDA) before this module</strong> — see the note at the top of this page. <code>k8s/apps/base/kustomization.yaml</code> already references the two <code>ScaledJob</code>s, so this module's <code>kubectl apply -k</code> fails with <code>no matches for kind "ScaledJob"</code> without KEDA's CRDs already present.</p>
+<h3>11.1 — Confirm the platform is ready</h3>
+<pre><code class="language-sh">kubectl get externalsecret -n streaming
+kubectl get kafkatopic -n kafka
+</code></pre>
+<blockquote>
+<p>If <code>streaming-db</code> isn't <code>SecretSynced</code>, stop and fix Module 7 first — every Deployment below references <code>POSTGRES_DSN</code> from it.</p>
+</blockquote>
+<h3>11.2 — Fill in the placeholder</h3>
+<pre><code class="language-sh">ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+sed -i.bak &quot;s/&lt;accountid&gt;/${ACCOUNT_ID}/&quot; k8s/apps/overlays/prod/config.env
+rm k8s/apps/overlays/prod/config.env.bak
+</code></pre>
+<blockquote>
+<p><code>&lt;acm-cert-arn&gt;</code> in <code>k8s/apps/overlays/prod/ingress-alb.yaml</code> is Module 12's placeholder — leave it for now.</p>
+</blockquote>
+<h3>11.3 — Take the Module 12 resources out, for now</h3>
+<p>In <code>k8s/apps/overlays/prod/kustomization.yaml</code>, comment out the <code>ingress-alb.yaml</code> resource line. In <code>k8s/apps/mediamtx/overlays/aws/kustomization.yaml</code>, comment out <code>service-rtmp-nlb.yaml</code>.</p>
+<blockquote>
+<p>Applying either now provisions a public load balancer before you've decided what it should do, and both bill by the hour.</p>
+</blockquote>
+<h3>11.4 — Render both roots and read the output</h3>
+<pre><code class="language-sh">kubectl kustomize k8s/apps/overlays/prod | less
+kubectl kustomize k8s/apps/mediamtx/overlays/aws | less
+</code></pre>
+<p>Check: namespace is <code>streaming</code> everywhere, the ConfigMap name has a hash suffix, every <code>configMapKeyRef</code> points at that hashed name, and no object appears in both outputs.</p>
+<h3>11.5 — Apply</h3>
+<pre><code class="language-sh">kubectl apply -k k8s/apps/overlays/prod
+kubectl apply -k k8s/apps/mediamtx/overlays/aws
+</code></pre>
+<h3>11.6 — Restart anything that predates its Pod Identity association</h3>
+<pre><code class="language-sh">kubectl rollout restart -n streaming deploy/upload-api
+</code></pre>
+<blockquote>
+<p>A Pod Identity association only takes effect on pod start — if this pod came up before you created the association in Module 7/9, it's still running with the node role.</p>
+</blockquote>
+<h3>Verify — Module 11</h3>
+<pre><code class="language-sh">kubectl get pods -n streaming
+kubectl get pods -n streaming -l app=web -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName
+kubectl get nodes -L topology.kubernetes.io/zone
+</code></pre>
+<p>The two <code>web</code> pods should be on different nodes, in different zones.</p>
+<pre><code class="language-sh">kubectl exec -n streaming deploy/upload-api -- \
+  python -c &quot;import urllib.request;print(urllib.request.urlopen('http://localhost:8000/readyz').read())&quot;
+</code></pre>
+<p>Want <code>b'{"postgres":"ok","s3":"ok"}'</code>.</p>
+<pre><code class="language-sh">kubectl exec -n streaming deploy/mediamtx -- wget -qO- http://localhost:9997/v3/config/global/get \
+  | python3 -m json.tool | grep -i writequeue
+</code></pre>
+<p><strong>The checkpoint:</strong></p>
+<pre><code class="language-sh">kubectl port-forward -n streaming svc/web 8080:8000
+</code></pre>
+<p><span class="context-chip">BROWSER</span> Open <code>http://localhost:8080</code> — you should see the homepage with empty live-streams/videos sections and working "Get a stream key"/"Upload" links. Do not move on until that page renders.</p>
+<hr />
+</section>
+<section class="step" id="m12"><div class="step-head"><span class="step-num">12</span><h2>Module 12 — Exposing it to the world</h2></div>
+<p><strong>Accomplishes:</strong> Publishes the web UI on an ALB (<code>stream.k8s.linkifysolutions.com</code>) and RTMP ingest on an NLB (<code>rtmp.k8s.linkifysolutions.com:1935</code>), with DNS written automatically by ExternalDNS.</p>
+<h3>12.1 — Put the two resources back</h3>
+<p>Uncomment <code>ingress-alb.yaml</code> in <code>k8s/apps/overlays/prod/kustomization.yaml</code>, and <code>service-rtmp-nlb.yaml</code> in <code>k8s/apps/mediamtx/overlays/aws/kustomization.yaml</code>.</p>
+<h3>12.2 — Fill in the certificate ARN</h3>
+<pre><code class="language-sh">CERT_ARN=$(aws acm list-certificates \
+  --query &quot;CertificateSummaryList[?DomainName=='*.k8s.linkifysolutions.com'].CertificateArn&quot; \
+  --output text)
+
+sed -i.bak &quot;s|&lt;acm-cert-arn&gt;|${CERT_ARN}|&quot; k8s/apps/overlays/prod/ingress-alb.yaml
+rm k8s/apps/overlays/prod/ingress-alb.yaml.bak
+</code></pre>
+<blockquote>
+<p>If <code>$CERT_ARN</code> is empty, Module 5's certificate isn't <code>ISSUED</code> yet.</p>
+</blockquote>
+<h3>12.3 — Confirm the controller is running</h3>
+<pre><code class="language-sh">kubectl get deploy -n kube-system aws-load-balancer-controller
+</code></pre>
+<h3>12.4 — Apply</h3>
+<pre><code class="language-sh">kubectl apply -k k8s/apps/overlays/prod
+kubectl apply -k k8s/apps/mediamtx/overlays/aws
+kubectl get ingress,svc -n streaming -w
+</code></pre>
+<p>Give it 2–4 minutes. <code>EXTERNAL-IP: &lt;pending&gt;</code> for more than five minutes means the controller couldn't create it — check public-subnet tags (<code>kubernetes.io/role/elb=1</code>).</p>
+<h3>12.5 — Raise the NLB listener's idle timeout</h3>
+<pre><code class="language-sh">LB_ARN=$(aws elbv2 describe-load-balancers \
+  --query &quot;LoadBalancers[?contains(DNSName,'streaming-mediamtx')].LoadBalancerArn&quot; \
+  --output text)
+
+LISTENER_ARN=$(aws elbv2 describe-listeners --load-balancer-arn &quot;$LB_ARN&quot; \
+  --query 'Listeners[?Port==`1935`].ListenerArn' --output text)
+
+aws elbv2 modify-listener-attributes --listener-arn &quot;$LISTENER_ARN&quot; \
+  --attributes Key=tcp.idle_timeout.seconds,Value=6000
+</code></pre>
+<blockquote>
+<p>This setting does not live in git and does not survive the NLB being recreated — re-run it after any NLB recreation, since nothing else will tell you it's missing until a stream silently half-opens.</p>
+</blockquote>
+<h3>12.6 — Confirm ExternalDNS wrote the records</h3>
+<pre><code class="language-sh">ZONE_ID=$(aws route53 list-hosted-zones-by-name \
+  --dns-name k8s.linkifysolutions.com --query 'HostedZones[0].Id' --output text)
+
+aws route53 list-resource-record-sets --hosted-zone-id &quot;$ZONE_ID&quot; \
+  --query &quot;ResourceRecordSets[?Type=='A'].[Name,AliasTarget.DNSName]&quot; --output table
+</code></pre>
+<h3>Verify — Module 12</h3>
+<pre><code class="language-sh">curl -I https://stream.k8s.linkifysolutions.com
+curl -sv https://stream.k8s.linkifysolutions.com -o /dev/null 2&gt;&amp;1 | grep -E 'subject:|issuer:|expire'
+curl -sI http://stream.k8s.linkifysolutions.com | head -3
+</code></pre>
+<p>Want <code>HTTP/2 200</code>, a cert for <code>*.k8s.linkifysolutions.com</code>, and a 301 redirect from plain HTTP.</p>
+<pre><code class="language-sh">nc -vz rtmp.k8s.linkifysolutions.com 1935
+</code></pre>
+<blockquote>
+<p>Proves DNS + a healthy target + security groups only — not that the RTMP handshake works. That's Module 13.</p>
+</blockquote>
+<pre><code class="language-sh">TG_ARN=$(aws elbv2 describe-target-groups --load-balancer-arn &quot;$LB_ARN&quot; \
+  --query 'TargetGroups[0].TargetGroupArn' --output text)
+aws elbv2 describe-target-health --target-group-arn &quot;$TG_ARN&quot; \
+  --query 'TargetHealthDescriptions[].[Target.Id,Target.Port,TargetHealth.State]' --output table
+</code></pre>
+<p>The negative check — private services stay private:</p>
+<pre><code class="language-sh">curl -s -o /dev/null -w '%{http_code}\n' https://stream.k8s.linkifysolutions.com/hooks/auth -X POST
+curl -s -o /dev/null -w '%{http_code}\n' https://stream.k8s.linkifysolutions.com/streamers -X POST
+</code></pre>
+<p>Want <code>404</code> both times.</p>
+<pre><code class="language-sh">kubectl run probe -n default --rm -it --restart=Never \
+  --image=curlimages/curl:8.11.1 --command -- \
+  curl -s -m 5 -o /dev/null -w '%{http_code}\n' \
+  http://ingest-webhook.streaming.svc.cluster.local:8000/livez
+</code></pre>
+<blockquote>
+<p>Exit code 28 (timeout) is the pass, if VPC CNI network policy is enabled — a <code>200</code> means the NetworkPolicy isn't enforced. Run this in <code>default</code>, not <code>streaming</code> (that namespace enforces the <code>restricted</code> Pod Security profile, which a bare <code>kubectl run</code> doesn't satisfy).</p>
+</blockquote>
+<p><strong>Placeholders in Module 12:</strong> none — <code>$CERT_ARN</code> etc. are derived via command substitution.</p>
+<hr />
+</section>
+<section class="step" id="m13"><div class="step-head"><span class="step-num">13</span><h2>Module 13 — Your first stream</h2></div>
+<p><strong>Accomplishes:</strong> Runs the whole path end to end — RTMP publish through EKS into three HLS renditions in S3, played back via CloudFront, plus the VOD upload path.</p>
+<h3>Setup</h3>
+<pre><code class="language-sh">export PGURL=$(kubectl get secret -n streaming streaming-db \
+  -o jsonpath='{.data.POSTGRES_DSN}' | base64 -d)
+
+pg() {
+  kubectl run &quot;pg-$RANDOM&quot; -n default --rm -i --restart=Never --quiet \
+    --image=postgres:16-alpine -- psql &quot;$PGURL&quot; -c &quot;$1&quot;
+}
+
+pg &quot;SELECT count(*) FROM streamers&quot;
+
+export BUCKET=linkify-streaming-media-$(aws sts get-caller-identity --query Account --output text)
+</code></pre>
+<blockquote>
+<p><code>pg()</code> runs in <code>default</code>, not <code>streaming</code> — the <code>streaming</code> namespace enforces the <code>restricted</code> Pod Security profile, which a bare <code>kubectl run</code> doesn't satisfy.</p>
+</blockquote>
+<h3>Step 1 — Create a streamer and get a stream key</h3>
+<pre><code class="language-sh">curl -sS -X POST https://stream.k8s.linkifysolutions.com/streamers/new \
+  -d 'display_name=fatima-test' | grep -o 'rtmp://[^&lt;&quot;]*'
+
+export STREAM_KEY=&lt;the-hex-key-you-just-got-back&gt;
+
+pg &quot;SELECT display_name, left(stream_key, 8) || '...' AS key, created_at FROM streamers ORDER BY created_at DESC LIMIT 1&quot;
+</code></pre>
+<h3>Step 2 — Push RTMP</h3>
+<pre><code class="language-sh">ffmpeg -re \
+  -f lavfi -i testsrc2=size=1920x1080:rate=30 \
+  -f lavfi -i sine=frequency=440 \
+  -c:v libx264 -preset veryfast -b:v 4000k -pix_fmt yuv420p -g 60 \
+  -c:a aac -b:a 128k \
+  -f flv &quot;rtmp://rtmp.k8s.linkifysolutions.com:1935/${STREAM_KEY}&quot;
+</code></pre>
+<blockquote>
+<p><code>-re</code> is not optional — without it ffmpeg pushes the test source as fast as it can encode rather than at real-time speed, corrupting the test. Watch for <code>speed=1x</code> in the output.</p>
+</blockquote>
+<p><span class="context-chip">OBS</span> equivalent — Settings → Stream → Service: Custom. Server: <code>rtmp://rtmp.k8s.linkifysolutions.com:1935/&lt;your STREAM_KEY&gt;</code>. Stream Key: leave <strong>completely blank</strong>.</p>
+<blockquote>
+<p>Critical footgun: the stream key is part of the Server URL path, not a separate credential. Pasting it into both fields produces <code>rtmp://host/&lt;key&gt;/&lt;key&gt;</code>, matches no row in <code>streamers</code>, and OBS just reports "Failed to connect to server."</p>
+</blockquote>
+<h3>Step 3 — Confirm <code>ingest-webhook</code> authorised it and wrote the row</h3>
+<p>In a second terminal, with ffmpeg still running:</p>
+<pre><code class="language-sh">kubectl logs -n streaming -l app=ingest-webhook --tail=20 --prefix
+
+pg &quot;SELECT id, left(path,8)||'...' AS path, status, started_at FROM streams ORDER BY started_at DESC LIMIT 1&quot;
+
+export STREAM_ID=&lt;the-id-from-the-query-above&gt;
+
+kubectl exec -n streaming deploy/mediamtx -- \
+  wget -qO- http://localhost:9997/v3/paths/list | python3 -m json.tool
+</code></pre>
+<p>Pass condition: <code>"ready": true</code>, two tracks, <code>bytesReceived</code> climbing, exactly one reader.</p>
+<h3>Step 4 — Confirm the transcode workload picked it up</h3>
+<pre><code class="language-sh">kubectl logs -n streaming -l app=transcode,mode=live --tail=5
+kubectl logs -n streaming deploy/analytics-worker --tail=5
+</code></pre>
+<h3>Step 5 — Confirm HLS lands in S3</h3>
+<pre><code class="language-sh">aws s3 ls &quot;s3://${BUCKET}/hls/live/${STREAM_ID}/&quot; --recursive | head -20
+</code></pre>
+<p>Run again twenty seconds later — segment numbers must be increasing.</p>
+<pre><code class="language-sh">aws s3api head-object --bucket &quot;$BUCKET&quot; --key &quot;hls/live/${STREAM_ID}/master.m3u8&quot;
+aws s3api head-object --bucket &quot;$BUCKET&quot; \
+  --key &quot;hls/live/${STREAM_ID}/1080p/segment_001.ts&quot; --query '[ContentType,CacheControl]'
+</code></pre>
+<h3>Step 6 — Confirm playback through CloudFront</h3>
+<pre><code class="language-sh">curl -sSI &quot;https://cdn.k8s.linkifysolutions.com/hls/live/${STREAM_ID}/master.m3u8&quot;
+curl -sS &quot;https://cdn.k8s.linkifysolutions.com/hls/live/${STREAM_ID}/master.m3u8&quot;
+curl -sS &quot;https://cdn.k8s.linkifysolutions.com/hls/live/${STREAM_ID}/master.m3u8&quot; | grep -c EXT-X-STREAM-INF
+</code></pre>
+<p>Want three renditions in the master playlist.</p>
+<pre><code class="language-sh">curl -sS -o /dev/null -D - -X OPTIONS \
+  -H 'Origin: https://stream.k8s.linkifysolutions.com' \
+  -H 'Access-Control-Request-Method: GET' \
+  &quot;https://cdn.k8s.linkifysolutions.com/hls/live/${STREAM_ID}/master.m3u8&quot; \
+  | grep -i 'access-control'
+</code></pre>
+<blockquote>
+<p>Safari's native HLS player bypasses CORS for media elements — this preflight check can pass in Safari and fail in Chrome; don't let Safari mislead you.</p>
+</blockquote>
+<p><span class="context-chip">BROWSER</span> Open <code>https://stream.k8s.linkifysolutions.com/watch/stream/&lt;your STREAM_ID&gt;</code> — expect the test pattern playing with the streamer's display name as heading.</p>
+<h3>Step 7 — Stop the stream and confirm teardown</h3>
+<p>Ctrl-C the ffmpeg (or <span class="context-chip">OBS</span>: Stop Streaming).</p>
+<pre><code class="language-sh">kubectl logs -n streaming -l app=ingest-webhook --tail=10 --prefix
+
+pg &quot;SELECT status, started_at, ended_at, ended_at - started_at AS duration FROM streams WHERE id = '$STREAM_ID'&quot;
+
+kubectl logs -n streaming deploy/analytics-worker --tail=5
+
+kubectl exec -n streaming deploy/mediamtx -- \
+  wget -qO- http://localhost:9997/v3/paths/list | grep -o '&quot;itemCount&quot;:[0-9]*'
+</code></pre>
+<blockquote>
+<p>The HLS objects stay in S3 by design — only Module 9's lifecycle rule on <code>hls/live/</code> reclaims them. If that rule was skipped, this is where the bill starts growing quietly. Under the KEDA model (Module 14), also confirm the transcode Job actually completed: <code>kubectl get jobs -n streaming -l app=transcode,mode=live</code>.</p>
+</blockquote>
+<h3>Step 8 — The VOD path</h3>
+<pre><code class="language-sh">ffmpeg -f lavfi -i testsrc2=size=1920x1080:rate=30:duration=30 \
+       -f lavfi -i sine=frequency=440:duration=30 \
+       -c:v libx264 -preset veryfast -pix_fmt yuv420p -c:a aac /tmp/test.mp4
+
+curl -sS -X POST https://stream.k8s.linkifysolutions.com/upload \
+  -F &quot;stream_key=${STREAM_KEY}&quot; \
+  -F &quot;title=verify-vod&quot; \
+  -F &quot;file=@/tmp/test.mp4&quot; | grep -o '&quot;id&quot;:&quot;[^&quot;]*&quot;'
+
+export VIDEO_ID=&lt;the-id-from-the-upload-response&gt;
+
+pg &quot;SELECT title, status, raw_object_key FROM videos WHERE id = '$VIDEO_ID'&quot;
+</code></pre>
+<p>Run the <code>pg</code> query a few times over the next minute or two — status walks <code>uploaded</code> → <code>transcoding</code> → <code>ready</code>.</p>
+<pre><code class="language-sh">aws s3 ls &quot;s3://${BUCKET}/raw/${VIDEO_ID}.mp4&quot;
+aws s3 ls &quot;s3://${BUCKET}/hls/vod/${VIDEO_ID}/&quot; --recursive | wc -l
+curl -sS &quot;https://cdn.k8s.linkifysolutions.com/hls/vod/${VIDEO_ID}/1080p/playlist.m3u8&quot; | tail -3
+aws s3api head-object --bucket &quot;$BUCKET&quot; --key &quot;hls/vod/${VIDEO_ID}/master.m3u8&quot; --query 'CacheControl'
+</code></pre>
+<p><span class="context-chip">BROWSER</span> <code>https://stream.k8s.linkifysolutions.com/watch/video/&lt;your VIDEO_ID&gt;</code>.</p>
+<p><strong>Placeholders in Module 13:</strong> <code>$STREAM_KEY</code>, <code>$STREAM_ID</code>, <code>$VIDEO_ID</code> — each is returned by the command right above where it's first used; substitute your own run's actual values, they will differ from any example shown.</p>
+<hr />
+</section>
+<section class="step" id="m14"><div class="step-head"><span class="step-num">14</span><h2>Module 14 — Transcoding that scales</h2></div>
+<p><strong>Accomplishes:</strong> Installs KEDA so a live/VOD stream creates exactly one Kubernetes Job per unit of work, and a node appears only when work exists.</p>
+<p><strong>All of the code and manifests for this module are already committed</strong> — the <code>transcode-worker</code> claim-one-message rewrite, <code>sweeper.py</code>, <code>ingest-webhook</code>'s admission control, migration <code>002_transcode_claim.sql</code>, the two <code>ScaledJob</code>s, the sweeper <code>CronJob</code>, and the consumer-group bootstrap Job. What's left is installing KEDA itself and verifying the loop.</p>
+<h3>14.1 — Install KEDA — do this before Module 11</h3>
+<pre><code class="language-sh">helm repo add kedacore https://kedacore.github.io/charts
+helm repo update
+helm upgrade --install keda kedacore/keda \
+  --namespace keda --create-namespace \
+  --version 2.19.0 \
+  --set operator.replicaCount=1 \
+  --set metricsServer.replicaCount=1
+
+kubectl get pods -n keda
+</code></pre>
+<blockquote>
+<p>No <code>TriggerAuthentication</code> needed — KEDA's Kafka scaler talks to the plain internal listener on 9092, no TLS, no AWS API calls. The transcode Job pods get AWS credentials from the <code>transcode-worker</code> ServiceAccount's Pod Identity association (Module 7/9) — don't create a new ServiceAccount for this.</p>
+</blockquote>
+<h3>14.2 — Confirm the trigger topic and the consumer-group bootstrap ran</h3>
+<p>Both already applied as part of Module 10's <code>kubectl apply -k k8s/infra/kafka</code> — this is a confirmation, not new work.</p>
+<pre><code class="language-sh">kubectl get kafkatopic -n kafka
+kubectl -n kafka get job kafka-consumer-group-bootstrap
+kubectl -n kafka logs job/kafka-consumer-group-bootstrap
+</code></pre>
+<blockquote>
+<p>With <code>offsetResetPolicy: latest</code>, a group that's never committed an offset makes KEDA compute lag as 0 — the very first stream after a fresh deploy never creates a Job unless this bootstrap Job ran. If it's missing: <code>kubectl apply -k k8s/infra/kafka</code>.</p>
+</blockquote>
+<h3>14.3 — Confirm the ScaledJobs exist</h3>
+<p>Already applied as part of Module 11 (<code>k8s/apps/base/transcode/</code>, referenced from <code>k8s/apps/overlays/prod</code>).</p>
+<pre><code class="language-sh">kubectl get scaledjob -n streaming
+</code></pre>
+<blockquote>
+<p><code>READY=False</code> means <code>kubectl describe scaledjob transcode-live -n streaming</code> shows the Kafka connection error in the condition message.</p>
+</blockquote>
+<h3>Verify — Module 14</h3>
+<p>Watch a real stream go through the whole loop — same push as Module 13, three more terminals:</p>
+<pre><code class="language-sh">kubectl get jobs -n streaming -w
+kubectl get nodes -L karpenter.sh/nodepool,karpenter.sh/capacity-type -w
+kubectl logs -n karpenter deploy/karpenter -f
+</code></pre>
+<p>Start streaming. Within ~5 seconds a Job appears; within ~15 more, Karpenter logs a <code>launched nodeclaim</code>; within 45–60s a node joins labelled <code>transcode-live</code>.</p>
+<pre><code class="language-sh">kubectl logs -n streaming -l app=transcode,mode=live --tail=20
+
+psql &quot;$POSTGRES_DSN&quot; -c \
+  &quot;SELECT id, transcode_status, now() - transcode_heartbeat AS beat_age FROM streams WHERE status = 'live'&quot;
+</code></pre>
+<p><code>beat_age</code> should stay under 15 seconds. Stop the stream — the Job should complete, and ~2 minutes later (Karpenter's <code>consolidateAfter: 2m</code>) the node disappears.</p>
+<pre><code class="language-sh">kubectl get scaledjob -n streaming -o jsonpath='{range .items[*]}{.metadata.name}{&quot;\t&quot;}{.spec.rollout.strategy}{&quot;\n&quot;}{end}'
+</code></pre>
+<blockquote>
+<p>Must print <code>gradual</code> for both — the default strategy kills every running Job (every live stream on the platform) the moment the ScaledJob spec changes, which happens on every future <code>transcode-worker</code> deploy.</p>
+</blockquote>
+<p><strong>Placeholders in Module 14:</strong> none — everything except the KEDA install itself is already in the repo.</p>
+<hr />
+</section>
+<section class="step" id="m15"><div class="step-head"><span class="step-num">15</span><h2>Module 15 — GitOps with ArgoCD</h2></div>
+<p><strong>Accomplishes:</strong> Installs ArgoCD, applies one root Application manifest, and from then on every platform change is a git commit.</p>
+<p><strong>Already done:</strong> <code>.github/workflows/ci.yml</code>'s <code>bump-manifests</code>/<code>manifest-check</code> jobs (replacing the old self-hosted-runner deploy job).</p>
+<h3>15.1 — Install ArgoCD</h3>
+<pre><code class="language-sh">helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update
+helm upgrade --install argocd argo/argo-cd \
+  --namespace argocd --create-namespace \
+  --version 8.5.8 \
+  --set configs.params.&quot;server\.insecure&quot;=true
+</code></pre>
+<blockquote>
+<p><code>server.insecure=true</code> because the ALB (Module 12) terminates TLS — without it you get a redirect loop.</p>
+</blockquote>
+<pre><code class="language-sh">kubectl -n argocd patch cm argocd-cm --type merge \
+  -p '{&quot;data&quot;:{&quot;kustomize.buildOptions&quot;:&quot;--load-restrictor LoadRestrictionsNone&quot;}}'
+kubectl -n argocd rollout restart deploy/argocd-repo-server
+kubectl -n argocd rollout status  deploy/argocd-repo-server
+</code></pre>
+<blockquote>
+<p>Without this, the wave-25 <code>db-migrate</code> Application never syncs and wave 30 never starts — the visible symptom is "the whole platform stopped deploying", not anything mentioning SQL.</p>
+</blockquote>
+<pre><code class="language-sh">kubectl get pods -n argocd
+kubectl -n argocd get secret argocd-initial-admin-secret \
+  -o jsonpath='{.data.password}' | base64 -d; echo
+kubectl port-forward -n argocd svc/argocd-server 8080:80
+</code></pre>
+<p><span class="context-chip">BROWSER</span> <code>http://localhost:8080</code> — user <code>admin</code>, the password just printed.</p>
+<h3>15.2 — Apply the root Application — the last manual <code>kubectl apply</code></h3>
+<pre><code class="language-sh">kubectl apply -f k8s/bootstrap/root-app.yaml
+kubectl get app -n argocd
+</code></pre>
+<p><code>mediamtx</code> sitting <code>OutOfSync</code> is correct — it's the manual-sync Application (restarting MediaMTX drops every live RTMP connection at once). Argo adopts everything already running from Modules 1–14; if a live object doesn't match git, Argo overwrites it with git's version, so read this output carefully the first time.</p>
+<h3>15.3 — ghcr.io image pull <span class="context-chip">CONSOLE</span></h3>
+<pre><code>GitHub -&gt; each of the five kubernetes-streaming-* packages -&gt; Package settings -&gt; Change visibility -&gt; Public
+</code></pre>
+<blockquote>
+<p>Recommended — zero cluster configuration, and the images contain only Python source + apt-installed ffmpeg. If you can't make them public, the <code>ExternalSecret</code>-based <code>imagePullSecret</code> alternative is in <code>docs/aws/15-argocd-gitops.md</code> §5 Option B.</p>
+</blockquote>
+<h3>Verify — Module 15</h3>
+<p>The checkpoint is a full round trip with no <code>kubectl</code> at any point:</p>
+<pre><code class="language-sh">git checkout -b gitops-checkpoint
+# add a harmless log line to services/web/main.py
+git commit -am &quot;web: gitops checkpoint log line&quot;
+git push -u origin gitops-checkpoint
+# open the PR, watch manifest-check pass, merge to master
+</code></pre>
+<pre><code class="language-sh">git fetch origin master &amp;&amp; git log --oneline -3 origin/master
+kubectl get app streaming -n argocd -w
+kubectl get deploy web -n streaming \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{&quot;\n&quot;}'
+kubectl logs -n streaming deploy/web --tail=5 | grep checkpoint
+</code></pre>
+<p><strong>Placeholders in Module 15:</strong> none.</p>
+<hr />
+</section>
+<section class="step" id="m16"><div class="step-head"><span class="step-num">16</span><h2>Module 16 — Monitoring, cost, and teardown</h2></div>
+<p><strong>Accomplishes:</strong> A Prometheus/Grafana stack with Kafka consumer-lag visibility, an itemized ~$238/month cost breakdown, and a teardown procedure that leaves nothing billing.</p>
+<h3>16.1 — Install kube-prometheus-stack</h3>
+<p>Already written as an Argo Application at <code>k8s/platform/kube-prometheus-stack.yaml</code> — fill in its <code>&lt;grafana-admin-password&gt;</code> placeholder and let Argo sync it.</p>
+<pre><code class="language-sh">kubectl -n argocd get application kube-prometheus-stack
+kubectl get pods -n monitoring
+</code></pre>
+<h3>16.2 — Turn on Strimzi's JMX exporter</h3>
+<p>The <code>metricsConfig</code> block is already in <code>k8s/infra/kafka/kafka.yaml</code> and the <code>PodMonitor</code> at <code>k8s/infra/kafka/podmonitor-kafka.yaml</code>. The one thing genuinely left: the JMX rules ConfigMap is a placeholder (<code>k8s/infra/kafka/kafka-metrics-configmap.yaml</code>) — these rules must come from Strimzi's own release, not be hand-written.</p>
+<pre><code class="language-sh">curl -fsSL https://raw.githubusercontent.com/strimzi/strimzi-kafka-operator/0.49.0/examples/metrics/kafka-metrics.yaml
+</code></pre>
+<p>Replace the placeholder <code>data.kafka-metrics-config.yml</code> block in <code>kafka-metrics-configmap.yaml</code> with that file's contents, commit, let Argo sync it. Do the resulting broker restart when nobody is streaming.</p>
+<h3>16.3 — Reach Grafana</h3>
+<pre><code class="language-sh">kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
+</code></pre>
+<p><span class="context-chip">BROWSER</span> <code>http://localhost:3000</code> — admin / the password from the Application's values. Import Strimzi's dashboards (Dashboards → Import → Upload JSON) using <code>examples/metrics/grafana-dashboards/strimzi-kafka.json</code> and <code>strimzi-kafka-exporter.json</code> from the same pinned release.</p>
+<h3>16.4 — The one panel to actually watch</h3>
+<pre><code>sum by (consumergroup, topic) (
+  kafka_consumergroup_lag{consumergroup=~&quot;transcode-live|transcode-vod&quot;}
+)
+</code></pre>
+<blockquote>
+<p>If you add one alert to this whole cluster, make it "lag &gt; 0 for more than 5 minutes".</p>
+</blockquote>
+<h3>Verify — Module 16</h3>
+<pre><code class="language-sh">kubectl get pods -n monitoring
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-prometheus 9090:9090
+</code></pre>
+<p><span class="context-chip">BROWSER</span> Status → Targets → confirm <code>podMonitor/monitoring/kafka-resources/0</code> is <code>UP</code>. Start a stream and watch the lag panel spike to 1 and return to 0 within ~30 seconds.</p>
+<h3>Cost levers worth taking on day one</h3>
+<pre><code class="language-sh"># A. Node group on spot -- $60.74/mo -&gt; $18.25/mo
+eksctl create nodegroup --cluster streaming --name system-spot \
+  --instance-types t3.medium,t3a.medium,t2.medium \
+  --spot --nodes 2 --nodes-min 2 --nodes-max 3 \
+  --node-volume-size 40 --node-volume-type gp3
+eksctl delete nodegroup --cluster streaming --name system   # after the new one is Ready
+</code></pre>
+<pre><code class="language-sh"># C. Scale the node group to zero overnight/weekends (manual version first)
+eksctl scale nodegroup --cluster streaming --name system-spot --nodes 0 --nodes-min 0
+eksctl scale nodegroup --cluster streaming --name system-spot --nodes 2 --nodes-min 2
+</code></pre>
+<blockquote>
+<p>At 0 nodes, Karpenter is also down (it runs on those nodes) — nothing can provision transcode capacity, which is the point. Morning bring-up takes 5–10 minutes.</p>
+</blockquote>
+<pre><code class="language-sh">aws ce get-cost-and-usage \
+  --time-period Start=&quot;$(date -u -v-7d +%Y-%m-%d)&quot;,End=&quot;$(date -u +%Y-%m-%d)&quot; \
+  --granularity DAILY --metrics UnblendedCost \
+  --group-by Type=DIMENSION,Key=SERVICE \
+  --query 'ResultsByTime[-1].Groups[?Metrics.UnblendedCost.Amount&gt;`0.1`].[Keys[0],Metrics.UnblendedCost.Amount]' \
+  --output table
+</code></pre>
+<h3>Teardown — run in this order, or you'll leave things billing</h3>
+<p><strong>1. Kubernetes objects that own AWS resources, first:</strong></p>
+<pre><code class="language-sh">kubectl patch app root -n argocd --type merge -p '{&quot;metadata&quot;:{&quot;finalizers&quot;:null}}'
+kubectl delete app --all -n argocd --cascade=orphan
+
+kubectl delete ingress --all --all-namespaces
+kubectl delete svc --all-namespaces --field-selector spec.type=LoadBalancer
+
+kubectl delete nodepool --all
+kubectl delete ec2nodeclass --all
+
+kubectl delete pvc --all --all-namespaces
+
+sleep 180
+
+aws elbv2 describe-load-balancers --query 'LoadBalancers[].LoadBalancerName' --output text
+aws ec2 describe-instances \
+  --filters &quot;Name=tag:karpenter.sh/nodepool,Values=*&quot; &quot;Name=instance-state-name,Values=running&quot; \
+  --query 'Reservations[].Instances[].InstanceId' --output text
+</code></pre>
+<blockquote>
+<p>Both must come back empty before you go further — this is the checkpoint that saves you money. A load balancer eksctl doesn't know exists (the controller created it) survives cluster deletion and keeps billing $16–18/mo each.</p>
+</blockquote>
+<p><strong>2. The cluster:</strong></p>
+<pre><code class="language-sh">eksctl delete cluster -f infra/eks/cluster.yaml --disable-nodegroup-eviction
+</code></pre>
+<p><strong>3. Karpenter's CloudFormation stack:</strong></p>
+<pre><code class="language-sh">aws cloudformation delete-stack --stack-name Karpenter-streaming
+aws cloudformation wait stack-delete-complete --stack-name Karpenter-streaming
+</code></pre>
+<p><strong>4. RDS:</strong></p>
+<pre><code class="language-sh">aws rds modify-db-instance --db-instance-identifier streaming-db \
+  --no-deletion-protection --apply-immediately
+aws rds delete-db-instance --db-instance-identifier streaming-db \
+  --skip-final-snapshot --delete-automated-backups
+</code></pre>
+<p><strong>5. CloudFront</strong> (must disable before delete, takes ~15 min):</p>
+<pre><code class="language-sh">DIST_ID=&lt;your-distribution-id&gt;
+aws cloudfront get-distribution-config --id &quot;$DIST_ID&quot; &gt; /tmp/dist.json
+ETAG=$(jq -r '.ETag' /tmp/dist.json)
+jq '.DistributionConfig | .Enabled = false' /tmp/dist.json &gt; /tmp/disabled.json
+aws cloudfront update-distribution --id &quot;$DIST_ID&quot; \
+  --if-match &quot;$ETAG&quot; --distribution-config file:///tmp/disabled.json
+aws cloudfront get-distribution --id &quot;$DIST_ID&quot; --query 'Distribution.Status' --output text
+NEW_ETAG=$(aws cloudfront get-distribution-config --id &quot;$DIST_ID&quot; --query ETag --output text)
+aws cloudfront delete-distribution --id &quot;$DIST_ID&quot; --if-match &quot;$NEW_ETAG&quot;
+</code></pre>
+<p><strong>6. S3</strong> (must be truly empty — versions, delete markers, and incomplete multipart uploads all count):</p>
+<pre><code class="language-sh">BUCKET=linkify-streaming-media-&lt;accountid&gt;
+aws s3 rm &quot;s3://$BUCKET&quot; --recursive
+
+aws s3api list-object-versions --bucket &quot;$BUCKET&quot; \
+  --query '{Objects: Versions[].{Key:Key,VersionId:VersionId}}' &gt; /tmp/versions.json
+[ &quot;$(jq '.Objects | length' /tmp/versions.json)&quot; -gt 0 ] &amp;&amp; \
+  aws s3api delete-objects --bucket &quot;$BUCKET&quot; --delete file:///tmp/versions.json
+
+aws s3api list-multipart-uploads --bucket &quot;$BUCKET&quot; \
+  --query 'Uploads[].[Key,UploadId]' --output text | while read -r key uid; do
+    aws s3api abort-multipart-upload --bucket &quot;$BUCKET&quot; --key &quot;$key&quot; --upload-id &quot;$uid&quot;
+  done
+
+aws s3api delete-bucket --bucket &quot;$BUCKET&quot;
+</code></pre>
+<p><strong>7. Secrets Manager</strong> (deleted secrets bill during their recovery window):</p>
+<pre><code class="language-sh">for s in streaming/ghcr streaming/mediamtx streaming/db-endpoint; do
+  aws secretsmanager delete-secret --secret-id &quot;$s&quot; --force-delete-without-recovery
+done
+</code></pre>
+<blockquote>
+<p>The RDS-managed <code>rds!db-...</code> secret is NOT in this list and must not be deleted by hand — it belongs to the instance and goes away with it in step 4.</p>
+</blockquote>
+<p><strong>8. Route 53:</strong></p>
+<pre><code class="language-sh">ZONE_ID=&lt;your-zone-id&gt;
+aws route53 list-resource-record-sets --hosted-zone-id &quot;$ZONE_ID&quot; \
+  --query 'ResourceRecordSets[?Type!=`NS` &amp;&amp; Type!=`SOA`].[Name,Type]' --output table
+aws route53 delete-hosted-zone --id &quot;$ZONE_ID&quot;
+</code></pre>
+<p>Also remove the <code>k8s</code> NS delegation record from the parent <code>linkifysolutions.com</code> zone.</p>
+<p><strong>9. The sweep for things nothing owns:</strong></p>
+<pre><code class="language-sh">aws elbv2 describe-load-balancers --query 'LoadBalancers[].[LoadBalancerName,Type]' --output table
+aws ec2 describe-addresses --query 'Addresses[?AssociationId==null].[PublicIp,AllocationId]' --output table
+aws ec2 describe-volumes --filters Name=status,Values=available \
+  --query 'Volumes[].[VolumeId,Size,CreateTime]' --output table
+aws logs describe-log-groups --query 'logGroups[].[logGroupName,storedBytes]' --output table
+</code></pre>
+<h3>Verify the bill went to zero</h3>
+<p>Wait ~24h (Cost Explorer lags), then:</p>
+<pre><code class="language-sh">aws ce get-cost-and-usage \
+  --time-period Start=&quot;$(date -u -v-2d +%Y-%m-%d)&quot;,End=&quot;$(date -u +%Y-%m-%d)&quot; \
+  --granularity DAILY --metrics UnblendedCost \
+  --group-by Type=DIMENSION,Key=SERVICE \
+  --output table
+</code></pre>
+<p><strong>Placeholders in Module 16:</strong> <code>&lt;grafana-admin-password&gt;</code> in <code>k8s/platform/kube-prometheus-stack.yaml</code>, <code>&lt;your-distribution-id&gt;</code>, <code>&lt;accountid&gt;</code>, <code>&lt;your-zone-id&gt;</code>.</p></section>
+</main>
+</div>
