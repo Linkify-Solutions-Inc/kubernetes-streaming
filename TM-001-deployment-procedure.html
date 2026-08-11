@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TM-LNKFY-STRM-001 · Streaming Platform Deployment Procedure</title>
+<style>
+:root{
+  --paper:#fbfaf7; --ink:#1a1d1f; --ink-2:#4b4f52; --rule:#c9c5bb; --rule-soft:#e4e1d8;
+  --olive:#4a5240; --olive-soft:#eef0e9;
+  --warn:#a4262c; --warn-bg:#faf0f0; --caut:#8a6408; --caut-bg:#faf6e9;
+  --note:#2a5b8f; --note-bg:#eef3f8; --chk:#2f6b3a; --chk-bg:#eef5ef;
+  --code-bg:#f1efe9; --code-ink:#24272a;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#191b1d; --ink:#dcdad2; --ink-2:#a5a49c; --rule:#43464a; --rule-soft:#2e3134;
+    --olive:#9aa588; --olive-soft:#25291f;
+    --warn:#e08387; --warn-bg:#2c1d1e; --caut:#d4b35e; --caut-bg:#2a2415;
+    --note:#8fb4d9; --note-bg:#1c2733; --chk:#8cc79a; --chk-bg:#1c2b20;
+    --code-bg:#232527; --code-ink:#d3d1c9;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#191b1d; --ink:#dcdad2; --ink-2:#a5a49c; --rule:#43464a; --rule-soft:#2e3134;
+  --olive:#9aa588; --olive-soft:#25291f;
+  --warn:#e08387; --warn-bg:#2c1d1e; --caut:#d4b35e; --caut-bg:#2a2415;
+  --note:#8fb4d9; --note-bg:#1c2733; --chk:#8cc79a; --chk-bg:#1c2b20;
+  --code-bg:#232527; --code-ink:#d3d1c9;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:16px/1.65 Charter,Georgia,"Times New Roman",serif;}
+.page{max-width:880px;margin:0 auto;padding:2.5rem 1.5rem 6rem}
+h1,h2,h3,h4,.tm-label{font-family:"Avenir Next Condensed","Helvetica Neue","Arial Narrow",Arial,sans-serif}
+h1{font-size:1.9rem;line-height:1.2;text-wrap:balance;margin:.2rem 0}
+h2{font-size:1.35rem;margin:3rem 0 .8rem;padding-top:1.2rem;border-top:3px solid var(--ink);
+   text-transform:uppercase;letter-spacing:.04em}
+h3{font-size:1.08rem;margin:1.8rem 0 .5rem;color:var(--ink)}
+h4{font-size:.95rem;margin:1.2rem 0 .3rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
+p{margin:.6rem 0;max-width:70ch}
+.tm-head{border:2px solid var(--ink);padding:1.2rem 1.4rem;display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;align-items:flex-start}
+.tm-label{font-size:.8rem;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-2)}
+.tm-num{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.95rem;text-align:right}
+.meta-table{font-size:.85rem;color:var(--ink-2);margin-top:.6rem}
+.meta-table td{padding:.05rem .8rem .05rem 0}
+.eyebrow{color:var(--olive);font-family:"Avenir Next Condensed","Arial Narrow",Arial,sans-serif;
+  text-transform:uppercase;letter-spacing:.14em;font-size:.78rem;margin:0 0 .2rem}
+pre{background:var(--code-bg);color:var(--code-ink);padding: .9rem 1rem;border-left:3px solid var(--olive);
+  overflow-x:auto;font:.83rem/1.55 ui-monospace,Menlo,Consolas,"Courier New",monospace;margin:.8rem 0}
+code{font:.86em ui-monospace,Menlo,Consolas,monospace;background:var(--code-bg);padding:.08em .35em;border-radius:2px}
+pre code{background:none;padding:0}
+.box{border:2px solid;margin:1.1rem 0;max-width:74ch}
+.box .bx-label{font-family:"Avenir Next Condensed","Arial Narrow",Arial,sans-serif;
+  text-transform:uppercase;letter-spacing:.14em;font-size:.78rem;font-weight:700;
+  padding:.3rem .8rem;border-bottom:1px solid}
+.box .bx-body{padding:.6rem .9rem;font-size:.93rem}
+.box .bx-body p{margin:.35rem 0}
+.warning{border-color:var(--warn);background:var(--warn-bg)}
+.warning .bx-label{color:var(--warn);border-color:var(--warn)}
+.caution{border-color:var(--caut);background:var(--caut-bg)}
+.caution .bx-label{color:var(--caut);border-color:var(--caut)}
+.note{border-color:var(--note);background:var(--note-bg)}
+.note .bx-label{color:var(--note);border-color:var(--note)}
+.checkpoint{border-color:var(--chk);background:var(--chk-bg)}
+.checkpoint .bx-label{color:var(--chk);border-color:var(--chk)}
+table.data{border-collapse:collapse;width:100%;font-size:.88rem;margin:.9rem 0}
+table.data th{font-family:"Avenir Next Condensed","Arial Narrow",Arial,sans-serif;text-transform:uppercase;
+  letter-spacing:.05em;font-size:.78rem;text-align:left;border-bottom:2px solid var(--ink);padding:.4rem .6rem}
+table.data td{border-bottom:1px solid var(--rule-soft);padding:.45rem .6rem;vertical-align:top}
+.tblwrap{overflow-x:auto}
+.para-num{color:var(--olive);font-family:ui-monospace,Menlo,monospace;font-size:.85em;margin-right:.5em}
+ol.steps{counter-reset:step;padding-left:0;max-width:74ch}
+ol.steps>li{list-style:none;margin:.9rem 0;padding-left:2.6rem;position:relative}
+ol.steps>li::before{counter-increment:step;content:counter(step);
+  position:absolute;left:0;top:.1rem;width:1.7rem;height:1.7rem;border:2px solid var(--olive);
+  display:flex;align-items:center;justify-content:center;
+  font:700 .85rem "Avenir Next Condensed","Arial Narrow",Arial,sans-serif;color:var(--olive)}
+.toc{columns:2;gap:2.5rem;font-size:.92rem}
+.toc a{color:var(--ink);text-decoration:none;border-bottom:1px dotted var(--rule)}
+.toc div{margin:.25rem 0;break-inside:avoid}
+a{color:var(--note)}
+.dist{font-size:.8rem;color:var(--ink-2);border-top:1px solid var(--rule);margin-top:.8rem;padding-top:.5rem}
+@media (max-width:640px){.toc{columns:1}}
+@media print{body{font-size:11pt}.page{max-width:none}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="tm-head">
+  <div>
+    <p class="tm-label">Technical Manual · Operator Procedure</p>
+    <h1>Streaming Platform<br>AWS/EKS Deployment Procedure</h1>
+    <table class="meta-table"><tbody>
+      <tr><td>Prepared for</td><td>Fatima Nawaz (operator)</td></tr>
+      <tr><td>System</td><td>Linkify kubernetes-streaming platform</td></tr>
+      <tr><td>AWS account</td><td><code>242626138899</code> · region <code>us-east-1</code></td></tr>
+      <tr><td>Basis</td><td>Verified live build &amp; teardown of 2026-08-10/11 (18 documented defects fixed)</td></tr>
+    </tbody></table>
+  </div>
+  <div class="tm-num">
+    TM-LNKFY-STRM-001<br>Rev A · 2026-08-11<br>
+    <span style="font-size:.8rem">Format per MIL-STD-38784 conventions</span>
+  </div>
+  <p class="dist">DISTRIBUTION: Linkify Solutions internal. Companion volume: TM-LNKFY-STRM-002
+  (Technical Description &amp; Theory of Operation). Source of record for every command:
+  <code>BUILDLOG.md</code> in the repository.</p>
+</header>
+
+<h2 id="toc">Contents</h2>
+<div class="toc">
+  <div><a href="#ch1">1 — Introduction &amp; how to use this manual</a></div>
+  <div><a href="#ch2">2 — Workstation preparation (Ubuntu)</a></div>
+  <div><a href="#ch3">3 — Authentication: your AWS identity</a></div>
+  <div><a href="#ch4">4 — Identifier discovery doctrine</a></div>
+  <div><a href="#ch5">5 — Cluster build</a></div>
+  <div><a href="#ch6">6 — Network hardening</a></div>
+  <div><a href="#ch7">7 — Controller IAM prerequisites</a></div>
+  <div><a href="#ch8">8 — Data layer</a></div>
+  <div><a href="#ch9">9 — DNS &amp; TLS (coordinated step)</a></div>
+  <div><a href="#ch10">10 — GitOps bootstrap</a></div>
+  <div><a href="#ch11">11 — End-to-end verification &amp; autoscaling lab</a></div>
+  <div><a href="#ch12">12 — Teardown</a></div>
+  <div><a href="#appA">App. A — Troubleshooting quick reference</a></div>
+  <div><a href="#appB">App. B — Cost table</a></div>
+</div>
+
+<h2 id="ch1">Chapter 1 — Introduction</h2>
+
+<p><span class="para-num">1-1.</span><strong>Purpose.</strong> This manual walks you through building,
+verifying, and tearing down the complete Linkify streaming platform on AWS, from a fresh Ubuntu
+workstation to a live RTMP stream transcoded and served worldwide — and back to a zero-cost account.
+Every command in it was executed and verified in a real build on 2026-08-10/11. Where that build hit a
+defect, this manual either bakes the fix into the repository (you inherit it) or marks the hazard with a
+box.</p>
+
+<p><span class="para-num">1-2.</span><strong>Scope.</strong> Your journey starts at your existing AWS
+identity — the user <code>fatima</code> with the <code>StreamingDeploy</code> permission set, already
+created for you. Account-level administration (creating users, billing, root actions) is out of scope
+and out of your permissions; that is by design, not distrust — the same design keeps <em>everyone's</em>
+blast radius small.</p>
+
+<p><span class="para-num">1-3.</span><strong>How to use this manual.</strong> Work strictly in order —
+chapters are sequenced so that everything a step needs already exists. Three habits are mandatory:</p>
+<ol class="steps">
+  <li><strong>Run every CHECKPOINT.</strong> A green CHECKPOINT box after a step is not optional
+  ceremony; it is how you find out a silent failure happened <em>now</em> instead of three chapters
+  later. If a checkpoint's expected output doesn't match, stop and consult Appendix A.</li>
+  <li><strong>Never copy an identifier from an example.</strong> Anything shaped like
+  <code>vpc-0b9b…</code>, <code>subnet-…</code>, <code>sg-…</code>, or an ARN with a random suffix was
+  generated for a build that no longer exists. Chapter 4 teaches you to discover your own.</li>
+  <li><strong>Run commands from the repository root</strong> (<code>~/linkify/kubernetes-streaming</code>
+  in this manual). Relative paths like <code>-f infra/eks/cluster.yaml</code> resolve from there.</li>
+</ol>
+
+<div class="box warning"><div class="bx-label">Warning — real money</div><div class="bx-body">
+<p>From Chapter 5 onward this procedure creates billable AWS resources: ≈ $0.33/hour while the full
+platform runs (≈ $240/month if forgotten). The teardown in Chapter 12 returns the account to $0 and is
+part of the procedure, not an afterthought. Never end a working session without either completing
+teardown or consciously deciding — out loud, to Aayush — that the platform stays up overnight.</p>
+</div></div>
+
+<div class="box note"><div class="bx-label">Note — when something breaks</div><div class="bx-body">
+<p>Something will break; that is the nature of the exercise. The debugging sequence that solved all 18
+defects in the reference build was always the same: <em>read the actual error</em> (kubectl describe,
+logs, CloudFormation events), locate which layer refused (admission? scheduler? controller? AWS API?),
+and fix the declaration in git rather than the live object. Appendix A maps every symptom seen in the
+reference build to its cause.</p>
+</div></div>
+
+<h2 id="ch2">Chapter 2 — Workstation preparation (Ubuntu)</h2>
+
+<p><span class="para-num">2-1.</span><strong>Tools.</strong> Install the AWS CLI v2, eksctl, kubectl,
+Helm, git, and ffmpeg (used in Chapter 11 to act as a streamer). All from official sources:</p>
+
+<pre><code># AWS CLI v2
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+unzip -q /tmp/awscliv2.zip -d /tmp &amp;&amp; sudo /tmp/aws/install
+
+# eksctl (latest release)
+curl -fsSL "https://github.com/eksctl-io/eksctl/releases/latest/download/eksctl_Linux_amd64.tar.gz" \
+  | tar xz -C /tmp &amp;&amp; sudo mv /tmp/eksctl /usr/local/bin/
+
+# kubectl (current stable)
+curl -fsSLO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo install -m 0755 kubectl /usr/local/bin/kubectl &amp;&amp; rm kubectl
+
+# Helm
+curl -fsSL https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+# git + ffmpeg
+sudo apt-get update &amp;&amp; sudo apt-get install -y git ffmpeg</code></pre>
+
+<div class="box checkpoint"><div class="bx-label">Checkpoint 2-A</div><div class="bx-body">
+<pre><code>aws --version   # aws-cli/2.x
+eksctl version  # 0.229.0 or later
+kubectl version --client   # v1.36.x or later
+helm version --short       # v4.x (v3.15+ also acceptable)
+ffmpeg -version | head -1</code></pre>
+<p>Every command prints a version. The reference build used eksctl 0.229.0, kubectl 1.36.3, helm 4.2.3.</p>
+</div></div>
+
+<p><span class="para-num">2-2.</span><strong>Repository.</strong></p>
+<pre><code>mkdir -p ~/linkify &amp;&amp; cd ~/linkify
+git clone https://github.com/Linkify-Solutions-Inc/kubernetes-streaming.git
+cd kubernetes-streaming</code></pre>
+
+<div class="box note"><div class="bx-label">Note</div><div class="bx-body">
+<p>The <code>archive/</code> directory contains retired documentation from before the verified build.
+Do not use it for anything. If this manual and a file in <code>archive/</code> disagree, this manual wins.</p>
+</div></div>
+
+<h2 id="ch3">Chapter 3 — Authentication: your AWS identity</h2>
+
+<p><span class="para-num">3-1.</span><strong>What you were given.</strong> Aayush created an IAM Identity
+Center user <code>fatima</code> assigned the <code>StreamingDeploy</code> permission set: AWS's
+<code>PowerUserAccess</code> policy (everything <em>except</em> identity and billing administration) plus
+the specific IAM actions eksctl needs to create the cluster's service roles. You can build and destroy
+the entire platform; you cannot create users or see bills. There are no passwords or access keys in any
+file anywhere — your login mints short-lived credentials every session.</p>
+
+<p><span class="para-num">3-2.</span><strong>First login (browser, once).</strong> Open the access
+portal, sign in as <code>fatima</code> with the password from your reset email, and enroll an MFA device
+when prompted:</p>
+<pre><code>https://d-90667b4413.awsapps.com/start</code></pre>
+
+<p><span class="para-num">3-3.</span><strong>CLI wiring (once).</strong></p>
+<pre><code>aws configure sso
+# SSO session name : linkify
+# SSO start URL    : https://d-90667b4413.awsapps.com/start
+# SSO region       : us-east-1
+# (browser opens — sign in, approve the device code)
+# Account          : 242626138899
+# Role             : StreamingDeploy
+# CLI default region: us-east-1
+# Output format    : json
+# Profile name     : streaming-deploy</code></pre>
+
+<p><span class="para-num">3-4.</span><strong>Every later session</strong> starts with one command
+(credentials last 8 hours):</p>
+<pre><code>aws sso login --profile streaming-deploy
+export AWS_PROFILE=streaming-deploy   # so every command in this manual finds it</code></pre>
+
+<div class="box checkpoint"><div class="bx-label">Checkpoint 3-A</div><div class="bx-body">
+<pre><code>aws sts get-caller-identity</code></pre>
+<p>The <code>Arn</code> ends in <code>assumed-role/AWSReservedSSO_StreamingDeploy_&lt;hash&gt;/fatima</code>.
+If it shows anything else, you are the wrong identity — stop.</p>
+</div></div>
+
+<div class="box note"><div class="bx-label">Note — the Identity Center region</div><div class="bx-body">
+<p>Identity Center for this account lives in us-east-1, same as the workloads, and the SSO role ARNs
+therefore have <em>no region segment</em> in their path. If you ever see documentation showing
+<code>…/us-east-2/AWSReservedSSO_…</code> paths, that describes a different account layout — not a bug
+to fix, just a difference to ignore.</p>
+</div></div>
+<h2 id="ch4">Chapter 4 — Identifier discovery doctrine</h2>
+
+<p><span class="para-num">4-1.</span><strong>The rule.</strong> AWS generates a fresh ID for every
+resource it creates. The build this manual is based on was <em>completely destroyed</em>; when you
+rebuild, every generated ID will differ. Identifiers split into exactly two classes:</p>
+
+<div class="tblwrap"><table class="data">
+<thead><tr><th>Class</th><th>Examples</th><th>Your action</th></tr></thead>
+<tbody>
+<tr><td><strong>Stable</strong> (account-scoped names)</td>
+<td>account <code>242626138899</code> · start URL <code>d-90667b4413.awsapps.com/start</code> ·
+policy names like <code>streaming-eso</code> · bucket <code>linkify-streaming-media-242626138899</code></td>
+<td>Use as printed; already correct inside the repository.</td></tr>
+<tr><td><strong>Generated</strong> (per-build)</td>
+<td><code>vpc-…</code>, <code>subnet-…</code>, <code>rtb-…</code>, <code>sg-…</code>,
+<code>vpce-…</code>, RDS endpoint &amp; master-secret name, ACM certificate ARN, load-balancer
+hostnames, CloudFront domain</td>
+<td>Discover with the command given at point of use; substitute into the file named there.</td></tr>
+</tbody></table></div>
+
+<p><span class="para-num">4-2.</span><strong>Substitution registry.</strong> Only three repository files
+carry generated IDs. Each marks the spot with a <code>REBUILD-SENSITIVE</code> comment containing its own
+discovery command — the file teaches you even if you lose this manual:</p>
+
+<div class="tblwrap"><table class="data">
+<thead><tr><th>File</th><th>Value</th><th>Discovery command</th></tr></thead>
+<tbody>
+<tr><td><code>k8s/platform/aws-load-balancer-controller.yaml</code></td><td><code>vpcId</code></td>
+<td><code>aws ec2 describe-vpcs --filters Name=tag:alpha.eksctl.io/cluster-name,Values=streaming --query 'Vpcs[0].VpcId' --output text</code></td></tr>
+<tr><td><code>k8s/infra/secrets/externalsecret-db.yaml</code></td><td>RDS master-secret name (<code>rds!db-…</code>)</td>
+<td><code>aws rds describe-db-instances --db-instance-identifier streaming-db --query 'DBInstances[0].MasterUserSecret.SecretArn' --output text</code> — use the NAME portion (strip the trailing <code>-XXXXXX</code>)</td></tr>
+<tr><td><code>k8s/apps/overlays/prod/ingress-alb.yaml</code></td><td>ACM certificate ARN</td>
+<td><code>aws acm list-certificates --query 'CertificateSummaryList[?DomainName==`*.k8s.linkifysolutions.com`].CertificateArn' --output text</code></td></tr>
+</tbody></table></div>
+
+<p>After each substitution: <code>git add -A &amp;&amp; git commit -m "substitute &lt;what&gt; for this build" &amp;&amp; git push</code>.
+The GitOps engine (Chapter 10) reads GitHub, not your working tree — an unpushed fix does not exist.</p>
+
+<h2 id="ch5">Chapter 5 — Cluster build</h2>
+
+<div class="box caution"><div class="bx-label">Caution — edit before you build</div><div class="bx-body">
+<p>The file <code>infra/eks/cluster.yaml</code> lists a <em>second administrator</em> under
+<code>accessEntries</code> so no single deleted identity can lock everyone out. The cluster's creator
+gets admin automatically, and eksctl fails if the creator also appears in the list. The reference build
+was created by <code>AdminAccess</code> with <code>StreamingDeploy</code> (you) as second admin. You are
+the creator now, so the roles swap — put <strong>AdminAccess</strong> in the list instead:</p>
+<pre><code>aws iam list-roles --path-prefix /aws-reserved/sso.amazonaws.com/ \
+  --query 'Roles[?contains(RoleName,`AdminAccess`)].Arn' --output text</code></pre>
+<p>Replace the <code>principalARN:</code> value in <code>accessEntries</code> with that ARN, then
+commit and push.</p>
+</div></div>
+
+<p><span class="para-num">5-1.</span><strong>Create the cluster.</strong> One declarative file drives
+this: VPC, subnets across two pinned availability zones, one NAT gateway, the EKS control plane,
+access entries, a 4-node system nodegroup, and six add-ons. Expect 15–20 minutes.</p>
+<pre><code>cd ~/linkify/kubernetes-streaming
+eksctl create cluster -f infra/eks/cluster.yaml</code></pre>
+
+<div class="box note"><div class="bx-label">Note — if it fails partway</div><div class="bx-body">
+<p>Do not delete and restart. eksctl builds in units (cluster stack → nodegroup stack → add-ons);
+completed units stand. Resume the failed unit only:
+<code>eksctl create nodegroup -f infra/eks/cluster.yaml</code> or
+<code>eksctl create addon -f infra/eks/cluster.yaml</code>. The reference build recovered from a
+mid-build failure exactly this way — total loss of work: zero.</p>
+</div></div>
+
+<div class="box checkpoint"><div class="bx-label">Checkpoint 5-A</div><div class="bx-body">
+<pre><code>kubectl get nodes            # 4 nodes, all Ready, no EXTERNAL-IP column values
+kubectl get pods -A          # everything Running/Completed
+kubectl top nodes            # numbers appear (proves metrics-server)
+aws eks list-addons --cluster-name streaming --region us-east-1
+# coredns, eks-pod-identity-agent, kube-proxy, vpc-cni, metrics-server, aws-ebs-csi-driver</code></pre>
+<p>The final line of eksctl output reads <code>EKS cluster "streaming" in "us-east-1" region is ready</code>
+and your kubeconfig has been written automatically.</p>
+</div></div>
+
+<h2 id="ch6">Chapter 6 — Network hardening</h2>
+
+<p><span class="para-num">6-1.</span><strong>Discover this build's network</strong> (your first real use
+of Chapter 4):</p>
+<pre><code>VPC=$(aws ec2 describe-vpcs --filters Name=tag:alpha.eksctl.io/cluster-name,Values=streaming \
+  --query 'Vpcs[0].VpcId' --output text)
+aws ec2 describe-route-tables --filters Name=vpc-id,Values=$VPC \
+  --query 'RouteTables[].[RouteTableId,Tags[?Key==`Name`].Value|[0]]' --output text
+aws ec2 describe-subnets --filters Name=vpc-id,Values=$VPC \
+  --query 'Subnets[].[SubnetId,AvailabilityZone,Tags[?Key==`Name`].Value|[0]]' --output text
+CSG=$(aws eks describe-cluster --name streaming \
+  --query 'cluster.resourcesVpcConfig.clusterSecurityGroupId' --output text)
+echo "VPC=$VPC  CSG=$CSG"</code></pre>
+<p>Note the two route tables whose Name contains <code>Private</code> and the two subnets whose Name
+contains <code>Private</code> — they are used in the next two commands.</p>
+
+<p><span class="para-num">6-2.</span><strong>S3 gateway endpoint.</strong> Free, and it routes every HLS
+segment the transcoder writes to S3 <em>around</em> the NAT gateway's $0.045/GB toll — for a streaming
+platform this is the single biggest cost lever in the design:</p>
+<pre><code>aws ec2 create-vpc-endpoint --vpc-id $VPC \
+  --service-name com.amazonaws.us-east-1.s3 --vpc-endpoint-type Gateway \
+  --route-table-ids &lt;rtb-PrivateA&gt; &lt;rtb-PrivateB&gt; \
+  --tag-specifications 'ResourceType=vpc-endpoint,Tags=[{Key=Name,Value=streaming-s3-gateway},{Key=Project,Value=streaming}]'</code></pre>
+
+<p><span class="para-num">6-3.</span><strong>Karpenter discovery tags.</strong> Karpenter finds where to
+launch nodes by tag. Without these, node provisioning in Chapter 11 fails <em>silently</em>:</p>
+<pre><code>aws ec2 create-tags --resources &lt;subnet-PrivateA&gt; &lt;subnet-PrivateB&gt; $CSG \
+  --tags Key=karpenter.sh/discovery,Value=streaming</code></pre>
+
+<p><span class="para-num">6-4.</span><strong>Substitute the VPC ID</strong> into
+<code>k8s/platform/aws-load-balancer-controller.yaml</code> (the <code>vpcId:</code> line), commit, push.</p>
+
+<div class="box checkpoint"><div class="bx-label">Checkpoint 6-A</div><div class="bx-body">
+<pre><code>aws ec2 describe-route-tables --route-table-ids &lt;rtb-PrivateA&gt; &lt;rtb-PrivateB&gt; \
+  --query 'RouteTables[].[RouteTableId,Routes[?starts_with(GatewayId,`vpce-`)].GatewayId|[0]]' --output text
+# both rows show a vpce- id
+aws ec2 describe-tags --filters "Name=key,Values=karpenter.sh/discovery" \
+  --query 'Tags[].[ResourceId,ResourceType,Value]' --output text
+# exactly: 2 subnets + 1 security-group, all value "streaming"</code></pre>
+</div></div>
+
+<h2 id="ch7">Chapter 7 — Controller IAM prerequisites</h2>
+
+<p><span class="para-num">7-1.</span><strong>Load balancer controller.</strong> The controller that turns
+Kubernetes Ingress/Service objects into AWS load balancers needs an IAM policy (published by its
+project, versioned with the chart — <code>v3.5.0</code> here must match the chart pin in
+<code>k8s/platform/aws-load-balancer-controller.yaml</code>) and a service account wired to it:</p>
+<pre><code>curl -fsSL -o /tmp/lbc-iam-policy.json \
+  https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v3.5.0/docs/install/iam_policy.json
+aws iam create-policy --policy-name AWSLoadBalancerControllerIAMPolicy \
+  --policy-document file:///tmp/lbc-iam-policy.json
+eksctl create iamserviceaccount --cluster streaming --region us-east-1 \
+  --namespace kube-system --name aws-load-balancer-controller \
+  --attach-policy-arn arn:aws:iam::242626138899:policy/AWSLoadBalancerControllerIAMPolicy --approve</code></pre>
+
+<p><span class="para-num">7-2.</span><strong>Karpenter.</strong> The node autoscaler needs a node role,
+controller policies, and an interruption queue — all from its official CloudFormation template (version
+must match the chart pin, <code>1.13.0</code>), then a service account with the six policies the
+template creates, then cluster access for the node role:</p>
+<pre><code>curl -fsSL -o /tmp/karpenter-cfn.yaml \
+  https://raw.githubusercontent.com/aws/karpenter-provider-aws/v1.13.0/website/content/en/docs/getting-started/getting-started-with-karpenter/cloudformation.yaml
+aws cloudformation deploy --stack-name Karpenter-streaming \
+  --template-file /tmp/karpenter-cfn.yaml \
+  --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ClusterName=streaming --region us-east-1
+
+# collect the six controller policy ARNs the stack created
+aws iam list-policies --scope Local \
+  --query 'Policies[?contains(PolicyName,`Karpenter`)].Arn' --output text
+
+eksctl create iamserviceaccount --cluster streaming --region us-east-1 \
+  --namespace kube-system --name karpenter \
+  --attach-policy-arn &lt;arn-1&gt; --attach-policy-arn &lt;arn-2&gt; --attach-policy-arn &lt;arn-3&gt; \
+  --attach-policy-arn &lt;arn-4&gt; --attach-policy-arn &lt;arn-5&gt; --attach-policy-arn &lt;arn-6&gt; \
+  --approve
+
+aws eks create-access-entry --cluster-name streaming --region us-east-1 \
+  --principal-arn arn:aws:iam::242626138899:role/KarpenterNodeRole-streaming --type EC2_LINUX</code></pre>
+
+<div class="box checkpoint"><div class="bx-label">Checkpoint 7-A</div><div class="bx-body">
+<pre><code>kubectl get sa aws-load-balancer-controller karpenter -n kube-system \
+  -o jsonpath='{range .items[*]}{.metadata.name}: {.metadata.annotations.eks\.amazonaws\.com/role-arn}{"\n"}{end}'</code></pre>
+<p>Both service accounts print a role ARN annotation.</p>
+</div></div>
+
+<h2 id="ch8">Chapter 8 — Data layer</h2>
+
+<p><span class="para-num">8-1.</span><strong>RDS Postgres</strong> (start first — it takes ~10 minutes;
+continue with 8-2 while it creates). Uses the private subnets and cluster security group discovered in
+Chapter 6:</p>
+<pre><code>aws rds create-db-subnet-group --db-subnet-group-name streaming-db-subnets \
+  --db-subnet-group-description "streaming: private subnets" \
+  --subnet-ids &lt;subnet-PrivateA&gt; &lt;subnet-PrivateB&gt;
+
+DBSG=$(aws ec2 create-security-group --group-name streaming-db \
+  --description "RDS postgres: 5432 from cluster SG only" --vpc-id $VPC --query GroupId --output text)
+aws ec2 authorize-security-group-ingress --group-id $DBSG --protocol tcp --port 5432 --source-group $CSG
+
+aws rds create-db-instance --db-instance-identifier streaming-db \
+  --db-instance-class db.t4g.micro --engine postgres --engine-version 16.11 \
+  --allocated-storage 20 --storage-type gp3 --storage-encrypted \
+  --master-username streaming_admin --manage-master-user-password \
+  --db-name streaming --vpc-security-group-ids $DBSG \
+  --db-subnet-group-name streaming-db-subnets --no-publicly-accessible \
+  --backup-retention-period 1 --no-multi-az --tags Key=Project,Value=streaming</code></pre>
+<div class="box note"><div class="bx-label">Note</div><div class="bx-body">
+<p><code>--manage-master-user-password</code> makes AWS generate, store, and rotate the database
+password in Secrets Manager. No human ever sees it; the cluster reads it via External Secrets. If
+engine version 16.11 is retired by the time you run this, list what exists and take the newest 16.x:
+<code>aws rds describe-db-engine-versions --engine postgres --query 'DBEngineVersions[].EngineVersion' --output text</code></p>
+</div></div>
+
+<p><span class="para-num">8-2.</span><strong>S3 media bucket.</strong></p>
+<pre><code>B=linkify-streaming-media-242626138899
+aws s3api create-bucket --bucket $B
+aws s3api put-public-access-block --bucket $B --public-access-block-configuration \
+  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+aws s3api put-bucket-lifecycle-configuration --bucket $B --lifecycle-configuration '{
+  "Rules":[{"ID":"abort-incomplete-multipart","Status":"Enabled","Filter":{},
+    "AbortIncompleteMultipartUpload":{"DaysAfterInitiation":7}}]}'
+aws s3api put-bucket-cors --bucket $B --cors-configuration '{
+  "CORSRules":[{"AllowedMethods":["GET","HEAD"],"AllowedOrigins":["*"],"AllowedHeaders":["*"],"MaxAgeSeconds":3000}]}'</code></pre>
+
+<p><span class="para-num">8-3.</span><strong>Application IAM policies + Pod Identity.</strong> Three
+policies scope what each workload may touch, then Pod Identity binds each to a
+(namespace, service-account) pair — no keys, no annotations in git:</p>
+<pre><code>cat &gt; /tmp/eso-policy.json &lt;&lt;'EOF'
+{"Version":"2012-10-17","Statement":[{"Effect":"Allow",
+  "Action":["secretsmanager:GetSecretValue","secretsmanager:DescribeSecret","secretsmanager:ListSecretVersionIds"],
+  "Resource":["arn:aws:secretsmanager:us-east-1:242626138899:secret:streaming/*",
+               "arn:aws:secretsmanager:us-east-1:242626138899:secret:rds!db-*"]}]}
+EOF
+cat &gt; /tmp/upload-api-policy.json &lt;&lt;'EOF'
+{"Version":"2012-10-17","Statement":[
+ {"Effect":"Allow","Action":["s3:PutObject","s3:GetObject","s3:AbortMultipartUpload"],
+  "Resource":"arn:aws:s3:::linkify-streaming-media-242626138899/raw/*"},
+ {"Effect":"Allow","Action":"s3:ListBucket",
+  "Resource":"arn:aws:s3:::linkify-streaming-media-242626138899"}]}
+EOF
+cat &gt; /tmp/transcode-policy.json &lt;&lt;'EOF'
+{"Version":"2012-10-17","Statement":[
+ {"Effect":"Allow","Action":"s3:GetObject","Resource":"arn:aws:s3:::linkify-streaming-media-242626138899/raw/*"},
+ {"Effect":"Allow","Action":["s3:PutObject","s3:DeleteObject"],"Resource":"arn:aws:s3:::linkify-streaming-media-242626138899/hls/*"},
+ {"Effect":"Allow","Action":"s3:ListBucket","Resource":"arn:aws:s3:::linkify-streaming-media-242626138899"}]}
+EOF
+aws iam create-policy --policy-name streaming-eso --policy-document file:///tmp/eso-policy.json
+aws iam create-policy --policy-name streaming-upload-api --policy-document file:///tmp/upload-api-policy.json
+aws iam create-policy --policy-name streaming-transcode-worker --policy-document file:///tmp/transcode-policy.json
+
+eksctl create podidentityassociation --cluster streaming --region us-east-1 \
+  --namespace external-secrets --service-account-name external-secrets \
+  --permission-policy-arns arn:aws:iam::242626138899:policy/streaming-eso
+eksctl create podidentityassociation --cluster streaming --region us-east-1 \
+  --namespace streaming --service-account-name upload-api \
+  --permission-policy-arns arn:aws:iam::242626138899:policy/streaming-upload-api
+eksctl create podidentityassociation --cluster streaming --region us-east-1 \
+  --namespace streaming --service-account-name transcode-worker \
+  --permission-policy-arns arn:aws:iam::242626138899:policy/streaming-transcode-worker</code></pre>
+<div class="box note"><div class="bx-label">Note — why ListBucket is unconditioned</div><div class="bx-body">
+<p>The reference build first scoped upload-api's <code>s3:ListBucket</code> with a <code>raw/*</code>
+prefix condition. Its own readiness probe then failed with 403: the probe calls
+<code>HeadBucket</code>, which performs an unprefixed <code>ListBucket</code> check. The policy above
+is the corrected version. Lesson: an app's health checks are part of its permission surface.</p>
+</div></div>
+
+<p><span class="para-num">8-4.</span><strong>Generated secrets.</strong> Two credentials are minted here
+and live only in Secrets Manager:</p>
+<pre><code>aws secretsmanager create-secret --name streaming/mediamtx \
+  --secret-string "{\"apiUser\":\"mediamtx-api\",\"apiPassword\":\"$(openssl rand -base64 24 | tr -d '/+=' | head -c 28)\"}"
+aws secretsmanager create-secret --name streaming/grafana \
+  --secret-string "{\"username\":\"admin\",\"password\":\"$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)\"}"</code></pre>
+
+<p><span class="para-num">8-5.</span><strong>When RDS reports <code>available</code></strong>
+(<code>aws rds describe-db-instances --db-instance-identifier streaming-db --query 'DBInstances[0].DBInstanceStatus'</code>),
+record its two generated values:</p>
+<pre><code># endpoint -&gt; goes into this secret:
+EP=$(aws rds describe-db-instances --db-instance-identifier streaming-db \
+  --query 'DBInstances[0].Endpoint.Address' --output text)
+aws secretsmanager create-secret --name streaming/db-endpoint \
+  --secret-string "{\"host\":\"$EP\",\"port\":\"5432\",\"dbname\":\"streaming\"}"
+
+# master-secret NAME -&gt; substitute into k8s/infra/secrets/externalsecret-db.yaml (Chapter 4 registry)
+aws rds describe-db-instances --db-instance-identifier streaming-db \
+  --query 'DBInstances[0].MasterUserSecret.SecretArn' --output text</code></pre>
+<p>Edit <code>externalsecret-db.yaml</code>, commit, push.</p>
+
+<p><span class="para-num">8-6.</span><strong>CloudFront.</strong> An Origin Access Control lets the CDN
+— and nothing else — read the bucket; the distribution caches video segments aggressively and playlists
+not at all (a live playlist changes every few seconds):</p>
+<pre><code>OAC=$(aws cloudfront create-origin-access-control --origin-access-control-config \
+  'Name=streaming-s3-oac,Description=OAC for HLS bucket,SigningProtocol=sigv4,SigningBehavior=always,OriginAccessControlOriginType=s3' \
+  --query 'OriginAccessControl.Id' --output text)
+
+cat &gt; /tmp/cf-dist.json &lt;&lt;EOF
+{
+  "CallerReference": "streaming-cdn-$(date +%s)",
+  "Comment": "streaming: HLS delivery from S3 hls/ prefix",
+  "Enabled": true, "PriceClass": "PriceClass_100",
+  "Origins": {"Quantity": 1, "Items": [{
+    "Id": "s3-hls",
+    "DomainName": "linkify-streaming-media-242626138899.s3.us-east-1.amazonaws.com",
+    "OriginAccessControlId": "$OAC", "S3OriginConfig": {"OriginAccessIdentity": ""}}]},
+  "DefaultCacheBehavior": {"TargetOriginId": "s3-hls", "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {"Quantity": 2, "Items": ["GET","HEAD"],
+      "CachedMethods": {"Quantity": 2, "Items": ["GET","HEAD"]}},
+    "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6", "Compress": true},
+  "CacheBehaviors": {"Quantity": 1, "Items": [{
+    "PathPattern": "*.m3u8", "TargetOriginId": "s3-hls", "ViewerProtocolPolicy": "redirect-to-https",
+    "AllowedMethods": {"Quantity": 2, "Items": ["GET","HEAD"],
+      "CachedMethods": {"Quantity": 2, "Items": ["GET","HEAD"]}},
+    "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad", "Compress": true}]}
+}
+EOF
+aws cloudfront create-distribution --distribution-config file:///tmp/cf-dist.json \
+  --query 'Distribution.[Id,DomainName]' --output text
+# note BOTH values: the Id goes into the bucket policy below; the DomainName is your playback URL
+
+aws s3api put-bucket-policy --bucket linkify-streaming-media-242626138899 --policy '{
+  "Version":"2012-10-17","Statement":[{
+    "Sid":"CloudFrontOACRead","Effect":"Allow",
+    "Principal":{"Service":"cloudfront.amazonaws.com"},
+    "Action":"s3:GetObject",
+    "Resource":"arn:aws:s3:::linkify-streaming-media-242626138899/hls/*",
+    "Condition":{"StringEquals":{"AWS:SourceArn":"arn:aws:cloudfront::242626138899:distribution/&lt;YOUR-DIST-ID&gt;"}}}]}'</code></pre>
+
+<div class="box checkpoint"><div class="bx-label">Checkpoint 8-A</div><div class="bx-body">
+<pre><code>aws rds describe-db-instances --db-instance-identifier streaming-db --query 'DBInstances[0].DBInstanceStatus' --output text   # available
+aws secretsmanager list-secrets --query 'SecretList[?starts_with(Name,`streaming/`)].Name' --output text
+# streaming/mediamtx streaming/grafana streaming/db-endpoint
+aws eks list-pod-identity-associations --cluster-name streaming --region us-east-1 \
+  --query 'associations[].[namespace,serviceAccount]' --output text
+# external-secrets/external-secrets, streaming/upload-api, streaming/transcode-worker (+ kube-system/ebs-csi-controller-sa)</code></pre>
+</div></div>
+<h2 id="ch9">Chapter 9 — DNS &amp; TLS (coordinated step)</h2>
+
+<p><span class="para-num">9-1.</span><strong>Create the zone and certificate.</strong> The platform's
+public names live under <code>k8s.linkifysolutions.com</code>. You create the Route53 zone and request
+a wildcard certificate; validation is automatic once the parent domain delegates to your zone:</p>
+<pre><code>ZID=$(aws route53 create-hosted-zone --name k8s.linkifysolutions.com \
+  --caller-reference streaming-$RANDOM$RANDOM --query 'HostedZone.Id' --output text)
+aws route53 get-hosted-zone --id $ZID --query 'DelegationSet.NameServers' --output text | tr '\t' '\n'
+# ^ FOUR nameserver hostnames — send these to Aayush (9-2)
+
+CERT=$(aws acm request-certificate --domain-name "*.k8s.linkifysolutions.com" \
+  --subject-alternative-names k8s.linkifysolutions.com --validation-method DNS \
+  --query CertificateArn --output text)
+sleep 15
+aws acm describe-certificate --certificate-arn $CERT \
+  --query 'Certificate.DomainValidationOptions[0].ResourceRecord.[Name,Value]' --output text
+# put that CNAME into your zone (substitute the Name and Value you just got):
+aws route53 change-resource-record-sets --hosted-zone-id $ZID --change-batch '{
+  "Changes":[{"Action":"UPSERT","ResourceRecordSet":{
+    "Name":"&lt;validation-record-Name&gt;","Type":"CNAME","TTL":300,
+    "ResourceRecords":[{"Value":"&lt;validation-record-Value&gt;"}]}}]}'</code></pre>
+
+<div class="box caution"><div class="bx-label">Caution — Aayush performs this part</div><div class="bx-body">
+<p>The parent domain <code>linkifysolutions.com</code> is hosted on Cloudflare, which you do not have
+access to. Send Aayush the four nameserver hostnames. He adds four <strong>NS</strong> records in
+Cloudflare — each named <code>k8s</code>, one per value, proxy OFF ("DNS only"). Until this happens the
+certificate stays <code>PENDING_VALIDATION</code> and the web Ingress cannot come up; <em>everything
+else in this manual proceeds regardless.</em></p>
+</div></div>
+
+<p><span class="para-num">9-2.</span><strong>Substitute the certificate ARN</strong> into
+<code>k8s/apps/overlays/prod/ingress-alb.yaml</code> (Chapter 4 registry), commit, push. Later, when
+delegation is live, confirm issuance:
+<code>aws acm describe-certificate --certificate-arn $CERT --query 'Certificate.Status'</code> →
+<code>ISSUED</code>.</p>
+
+<h2 id="ch10">Chapter 10 — GitOps bootstrap</h2>
+
+<p><span class="para-num">10-1.</span><strong>Install ArgoCD.</strong> Note the second
+<code>--set-string</code>: the db-migrate component reads SQL files from outside its kustomize root,
+which ArgoCD refuses without this global option — the reference build lost 20 minutes to it:</p>
+<pre><code>helm repo add argo https://argoproj.github.io/argo-helm &amp;&amp; helm repo update
+helm install argocd argo/argo-cd --version 10.3.2 --namespace argocd --create-namespace \
+  --set configs.params."server\.insecure"=true \
+  --set-string 'configs.cm.kustomize\.buildOptions=--load-restrictor LoadRestrictionsNone' \
+  --wait --timeout 5m</code></pre>
+
+<p><span class="para-num">10-2.</span><strong>Register Karpenter's OCI chart registry</strong> (the one
+chart not in a plain HTTP repo):</p>
+<pre><code>kubectl apply -f - &lt;&lt;'YAML'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: karpenter-oci-repo
+  namespace: argocd
+  labels: {argocd.argoproj.io/secret-type: repository}
+stringData: {name: karpenter, url: public.ecr.aws/karpenter, type: helm, enableOCI: "true"}
+YAML</code></pre>
+
+<p><span class="para-num">10-3.</span><strong>The bootstrap moment.</strong> This is the only manifest a
+human ever applies by hand. Everything after it is a git commit:</p>
+<pre><code>kubectl apply -f k8s/bootstrap/root-app.yaml
+watch kubectl get applications -n argocd</code></pre>
+
+<p><span class="para-num">10-4.</span><strong>What convergence looks like.</strong> Sixteen Applications
+appear and settle over ~10 minutes, in waves (storage/platform → secrets/node-pools → Kafka →
+db-migrate → services → MediaMTX). Kafka takes longest: its broker needs Strimzi to accept the CR,
+a 20 GiB volume, and roughly 2 GiB of free memory. Expected end-state:</p>
+<div class="tblwrap"><table class="data">
+<thead><tr><th>Application</th><th>Expected</th><th>Meaning</th></tr></thead>
+<tbody>
+<tr><td>all except <code>streaming</code>, <code>mediamtx</code></td><td>Synced / Healthy</td><td>normal</td></tr>
+<tr><td><code>streaming</code></td><td>Synced / Progressing</td>
+<td>normal until the ACM cert is ISSUED (Chapter 9) — the Ingress waits in the last sync-wave, blocking nothing</td></tr>
+<tr><td><code>mediamtx</code></td><td>OutOfSync / Missing</td>
+<td>normal — it is manual-sync by design because syncing it creates the billable NLB. Trigger it now:</td></tr>
+</tbody></table></div>
+<pre><code>kubectl patch application mediamtx -n argocd --type merge \
+  -p '{"operation":{"initiatedBy":{"username":"admin"},"sync":{"revision":"master"}}}'</code></pre>
+
+<div class="box checkpoint"><div class="bx-label">Checkpoint 10-A</div><div class="bx-body">
+<pre><code>kubectl get applications -n argocd    # per the table above
+kubectl get pods -n streaming          # every pod 1/1 Running (db-migrate Completed)
+kubectl get externalsecrets -A         # every row SecretSynced / True
+kubectl get svc mediamtx-rtmp -n streaming \
+  -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'   # an elb.amazonaws.com hostname = your RTMP endpoint</code></pre>
+</div></div>
+
+<div class="box warning"><div class="bx-label">Warning — mandatory Kafka checkpoint</div><div class="bx-body">
+<p>Before your first stream, verify the KEDA consumer groups exist. If the bootstrap hook was disturbed,
+this failure is <em>completely silent</em>: streams publish fine and no transcoder ever starts, with
+zero errors anywhere.</p>
+<pre><code>kubectl exec -n kafka streaming-dual-0 -c kafka -- \
+  bin/kafka-consumer-groups.sh --bootstrap-server localhost:9092 --list
+# MUST list: transcode-live, transcode-vod (analytics-worker appears once apps run)</code></pre>
+<p>Missing? Re-run the hook with a fresh sync:
+<code>kubectl patch application kafka -n argocd --type merge -p '{"operation":{"initiatedBy":{"username":"admin"},"sync":{"revision":"master"}}}'</code>
+and re-check.</p>
+</div></div>
+
+<h2 id="ch11">Chapter 11 — End-to-end verification &amp; autoscaling lab</h2>
+
+<p><span class="para-num">11-1.</span><strong>Create a streamer</strong> (a real database write through
+the real API):</p>
+<pre><code>kubectl port-forward -n streaming svc/upload-api 18000:8000 &amp;
+curl -s -X POST localhost:18000/streamers -H 'Content-Type: application/json' \
+  -d '{"display_name":"fatima-test"}'
+# note the "stream_key" in the response</code></pre>
+
+<p><span class="para-num">11-2.</span><strong>Set the stage.</strong> This is the lab you're really here
+for: watching infrastructure materialize from workload pressure. Open <em>three terminals</em> with
+watches, and Grafana in a browser:</p>
+<pre><code># terminal 1 — jobs born from Kafka lag:        kubectl get jobs -n streaming -w
+# terminal 2 — machines born from pending pods:  kubectl get nodeclaims -w
+# terminal 3 — the cluster's node list:          kubectl get nodes -w
+
+# Grafana (password: aws secretsmanager get-secret-value --secret-id streaming/grafana)
+kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80 &amp;
+# open http://localhost:3000 — dashboard "Kubernetes / Compute Resources / Node"
+# and watch Kafka consumer-group lag under the Prometheus data source</code></pre>
+
+<p><span class="para-num">11-3.</span><strong>Stream.</strong> ffmpeg plays the role of OBS
+(<code>&lt;NLB&gt;</code> = the hostname from Checkpoint 10-A; <code>&lt;stream_key&gt;</code> from 11-1):</p>
+<pre><code>ffmpeg -re -f lavfi -i "testsrc=size=1280x720:rate=30" -f lavfi -i "sine=frequency=440" \
+  -c:v libx264 -preset veryfast -b:v 2500k -g 60 -c:a aac -b:a 128k -t 420 \
+  -f flv "rtmp://&lt;NLB&gt;:1935/&lt;stream_key&gt;"</code></pre>
+
+<p><span class="para-num">11-4.</span><strong>What you will see</strong> — the reference build's real
+timeline, which yours should match within seconds:</p>
+<div class="tblwrap"><table class="data">
+<thead><tr><th>T +</th><th>Terminal</th><th>Event</th></tr></thead>
+<tbody>
+<tr><td>~35 s</td><td>1</td><td>Job <code>transcode-live-…</code> appears — KEDA saw the Kafka message your stream produced</td></tr>
+<tr><td>~40 s</td><td>2</td><td>NodeClaim appears (<code>c6a.xlarge</code>) — the Job fits no existing node, Karpenter is buying one</td></tr>
+<tr><td>~65 s</td><td>3</td><td>A node you never asked for joins the cluster and goes Ready (46 s from Job to capacity)</td></tr>
+<tr><td>~80 s</td><td>S3</td><td>First HLS segments land: <code>aws s3 ls s3://linkify-streaming-media-242626138899/hls/ --recursive</code></td></tr>
+<tr><td>end + ~1 min</td><td>1</td><td>Job → Complete (worker saw the stream end)</td></tr>
+<tr><td>end + ~3 min</td><td>2, 3</td><td>Karpenter consolidates: NodeClaim and node vanish. Total node lifetime ≈ 10 min ≈ $0.03</td></tr>
+</tbody></table></div>
+
+<div class="box note"><div class="bx-label">Note — the cold-start trade</div><div class="bx-body">
+<p>The first ~77 seconds of a brand-new stream are not in the HLS output — that's the scale-from-zero
+price. Viewers of an already-running stream never notice. Eliminating it means paying for an idle warm
+node around the clock. Question worth pondering during the wait: at what stream frequency does the warm
+node become the cheaper option?</p>
+</div></div>
+
+<p><span class="para-num">11-5.</span><strong>Playback.</strong> Find your stream's UUID in the S3
+listing and play it through CloudFront (domain from 8-6; any HLS player, or Safari directly):</p>
+<pre><code>curl "https://&lt;your-cf-domain&gt;.cloudfront.net/hls/live/&lt;stream-uuid&gt;/master.m3u8"
+# an ABR master playlist with 1080p/720p/480p renditions = the full pipeline works</code></pre>
+
+<div class="box checkpoint"><div class="bx-label">Checkpoint 11-A — platform verified</div><div class="bx-body">
+<p>You streamed RTMP into a load balancer, a webhook authenticated your key against Postgres, an event
+crossed Kafka, KEDA cut a Job, Karpenter bought a machine, ffmpeg transcoded three renditions to S3,
+and CloudFront served them back over HTTPS. Every box in the architecture diagram just earned its place.</p>
+</div></div>
+
+<h2 id="ch12">Chapter 12 — Teardown</h2>
+
+<p><span class="para-num">12-1.</span><strong>Phase A — in-cluster</strong> (ordering is load-bearing;
+the reference build derived each rule the hard way — see the header of
+<code>scripts/teardown.sh</code> for the full annotated sequence):</p>
+<ol class="steps">
+  <li>Disarm the root app's self-healing so deletions stick:<br>
+  <code>kubectl patch application root -n argocd --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'</code></li>
+  <li>Delete the load-balancer-owning apps while the LB controller still lives:<br>
+  <code>kubectl delete application streaming mediamtx -n argocd</code><br>
+  Verify: <code>aws elbv2 describe-load-balancers</code> returns an empty list before continuing.</li>
+  <li>Delete CR consumers before their operators (else finalizers wedge namespaces):<br>
+  <code>kubectl delete application kafka db-migrate secrets karpenter-pools -n argocd</code></li>
+  <li>Delete everything else, explicitly:<br>
+  <code>kubectl delete application root -n argocd; kubectl delete applications --all -n argocd</code><br>
+  Wait until <code>kubectl get applications -n argocd</code> is empty and <code>kubectl get pvc -A</code> is empty.</li>
+  <li><code>helm uninstall argocd -n argocd</code>, then delete leftover namespaces:<br>
+  <code>kubectl delete ns argocd external-secrets karpenter keda monitoring</code></li>
+</ol>
+
+<div class="box note"><div class="bx-label">Note — two known wedges</div><div class="bx-body">
+<p><strong>Namespace stuck Terminating, reason DiscoveryFailed:</strong> a dead aggregated API poisons
+discovery. <code>kubectl get apiservices | awk '$3=="False"'</code> → delete the dead one
+(typically <code>v1beta1.external.metrics.k8s.io</code>).<br>
+<strong>KafkaTopics refuse deletion:</strong> their operator died first.
+<code>kubectl patch kafkatopic &lt;name&gt; -n kafka --type merge -p '{"metadata":{"finalizers":null}}'</code></p>
+</div></div>
+
+<p><span class="para-num">12-2.</span><strong>Phase B — AWS side.</strong> One script, discovery-based,
+~25–35 minutes, ends by printing the zero-cost verification (every list empty):</p>
+<pre><code>AWS_PROFILE=streaming-deploy bash scripts/teardown.sh</code></pre>
+
+<div class="box checkpoint"><div class="bx-label">Checkpoint 12-A — the account is empty</div><div class="bx-body">
+<p>The script's final section prints CloudFormation stacks, EC2 instances, load balancers, EBS volumes,
+VPCs, NAT gateways, and RDS instances. <strong>Every one must be empty.</strong> Anything left is money
+leaking — hunt it down before you stop. Finally, tell Aayush to remove the four <code>k8s</code> NS
+records from Cloudflare.</p>
+</div></div>
+
+<h2 id="appA">Appendix A — Troubleshooting quick reference</h2>
+<p>Every defect from the reference build, by symptom. Full case studies: TM-002, Chapter 5.</p>
+<div class="tblwrap"><table class="data">
+<thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+<tbody>
+<tr><td>eksctl: "could not find private subnets for zones"</td><td>AZ list mismatch between config sections</td><td>Already pinned in cluster.yaml; resume with <code>create nodegroup</code></td></tr>
+<tr><td>CloudFormation: "tags… Member must have length ≥ 1"</td><td>empty tag value in a manifest</td><td>remove the empty-valued tag</td></tr>
+<tr><td>Pods Pending: "Too many pods"</td><td>t3.medium 17-pod cap</td><td><code>eksctl scale nodegroup … --nodes 4</code> (and match cluster.yaml)</td></tr>
+<tr><td>Pods Pending: "Insufficient memory" and Karpenter says "did not tolerate taint"</td><td>big pod, full system nodes; Karpenter pools are transcode-only by design</td><td>scale system group within maxSize; rethink instance size at 5+</td></tr>
+<tr><td>PVC Pending: "storageclass gp3 not found"</td><td>storage app missing / unlisted in kustomization</td><td>every file in <code>k8s/argocd/apps/</code> must be listed in its <code>kustomization.yaml</code></td></tr>
+<tr><td>Kafka CR NotReady: UnsupportedKafkaVersionException</td><td>Kafka pin outside operator's shipped range</td><td>check <code>STRIMZI_KAFKA_IMAGES</code> env on the operator; align kafka.yaml AND the bootstrap job image</td></tr>
+<tr><td>Pushed fix "not taking effect" via ArgoCD</td><td>a Running sync operation holds the lock (often waiting on unreachable health)</td><td>inspect <code>.status.operationState</code>; terminate: <code>kubectl patch application &lt;app&gt; -n argocd --type merge -p '{"status":{"operationState":{"phase":"Terminating"}}}'</code></td></tr>
+<tr><td>Strimzi: "Failed to parse metrics configuration"</td><td>metrics ConfigMap content empty/comments-only</td><td>refetch the example ConfigMap for the pinned Strimzi release</td></tr>
+<tr><td>Job "Running" forever, zero pods, no logs</td><td>PodSecurity admission rejection — evidence only in <code>kubectl describe job</code></td><td>add the missing <code>securityContext</code> field it names (e.g. seccompProfile)</td></tr>
+<tr><td>Pod crashloop: "missing required environment variables"</td><td>Deployment wires env vars one-by-one; one absent</td><td>add the env var; the app names every missing one at once</td></tr>
+<tr><td>readyz 503 with S3 "Invalid bucket name … &lt;placeholder&gt;"</td><td>a placeholder survived somewhere</td><td><code>grep -rn "&lt;" k8s/ --include="*.env"</code> — placeholders live in more than one file</td></tr>
+<tr><td>readyz 503 with S3 403 on HeadBucket</td><td>ListBucket prefix-conditioned</td><td>policy in 8-3 is already corrected</td></tr>
+<tr><td>Stream publishes fine; no transcode Job; no errors anywhere</td><td>consumer group never bootstrapped + scaleToZeroOnInvalidOffset</td><td>the Warning box in Chapter 10; re-sync kafka app</td></tr>
+<tr><td>Bootstrap job ImagePullBackOff on strimzi image</td><td>image tag <code>&lt;strimzi&gt;-kafka-&lt;version&gt;</code> combination doesn't exist</td><td>align with the operator's shipped versions (same check as Kafka pin)</td></tr>
+<tr><td>Ingress never healthy; whole app sync stuck</td><td>ACM cert pending — external dependency in an early sync wave</td><td>already moved to last wave; cert needs the Cloudflare step</td></tr>
+<tr><td>Namespaces stuck Terminating: DiscoveryFailed</td><td>dead aggregated APIService</td><td>delete it (12-1 note)</td></tr>
+</tbody></table></div>
+
+<h2 id="appB">Appendix B — Cost table</h2>
+<div class="tblwrap"><table class="data">
+<thead><tr><th>Resource</th><th>Rate</th><th>Monthly if left running</th></tr></thead>
+<tbody>
+<tr><td>EKS control plane</td><td>$0.10/hr</td><td>$73</td></tr>
+<tr><td>4 × t3.medium system nodes</td><td>$0.166/hr</td><td>$121</td></tr>
+<tr><td>NAT gateway (single)</td><td>$0.045/hr + $0.045/GB</td><td>$33 + data</td></tr>
+<tr><td>RDS db.t4g.micro + 20 GB</td><td>~$0.021/hr</td><td>~$15</td></tr>
+<tr><td>NLB (MediaMTX) + ALB (web)</td><td>~$0.0225/hr each</td><td>~$33</td></tr>
+<tr><td>Route53 zone</td><td>—</td><td>$0.50</td></tr>
+<tr><td>Secrets Manager (4 secrets)</td><td>—</td><td>$1.60</td></tr>
+<tr><td>Karpenter transcode nodes</td><td>c6a.xlarge $0.154/hr</td><td><strong>only while streams run</strong> (~$0.03 per 10-min stream)</td></tr>
+<tr><td>S3 + CloudFront</td><td>usage-based</td><td>pennies at lab scale</td></tr>
+<tr><td><strong>Total platform</strong></td><td><strong>≈ $0.33/hr</strong></td><td><strong>≈ $280 — which is why Chapter 12 exists</strong></td></tr>
+</tbody></table></div>
+
+<p class="dist" style="margin-top:3rem">END OF TM-LNKFY-STRM-001. Theory of operation, YAML-by-YAML
+description, and the 18 defect case studies: TM-LNKFY-STRM-002.</p>
+</div>
+</body>
+</html>

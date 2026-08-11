@@ -1,0 +1,606 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>TM-LNKFY-STRM-002 · Streaming Platform Technical Description</title>
+<style>
+:root{
+  --paper:#fbfaf7; --ink:#1a1d1f; --ink-2:#4b4f52; --rule:#c9c5bb; --rule-soft:#e4e1d8;
+  --olive:#4a5240; --olive-soft:#eef0e9;
+  --warn:#a4262c; --warn-bg:#faf0f0; --caut:#8a6408; --caut-bg:#faf6e9;
+  --note:#2a5b8f; --note-bg:#eef3f8; --chk:#2f6b3a; --chk-bg:#eef5ef;
+  --code-bg:#f1efe9; --code-ink:#24272a;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#191b1d; --ink:#dcdad2; --ink-2:#a5a49c; --rule:#43464a; --rule-soft:#2e3134;
+    --olive:#9aa588; --olive-soft:#25291f;
+    --warn:#e08387; --warn-bg:#2c1d1e; --caut:#d4b35e; --caut-bg:#2a2415;
+    --note:#8fb4d9; --note-bg:#1c2733; --chk:#8cc79a; --chk-bg:#1c2b20;
+    --code-bg:#232527; --code-ink:#d3d1c9;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#191b1d; --ink:#dcdad2; --ink-2:#a5a49c; --rule:#43464a; --rule-soft:#2e3134;
+  --olive:#9aa588; --olive-soft:#25291f;
+  --warn:#e08387; --warn-bg:#2c1d1e; --caut:#d4b35e; --caut-bg:#2a2415;
+  --note:#8fb4d9; --note-bg:#1c2733; --chk:#8cc79a; --chk-bg:#1c2b20;
+  --code-bg:#232527; --code-ink:#d3d1c9;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);
+  font:16px/1.65 Charter,Georgia,"Times New Roman",serif;}
+.page{max-width:880px;margin:0 auto;padding:2.5rem 1.5rem 6rem}
+h1,h2,h3,h4,.tm-label{font-family:"Avenir Next Condensed","Helvetica Neue","Arial Narrow",Arial,sans-serif}
+h1{font-size:1.9rem;line-height:1.2;text-wrap:balance;margin:.2rem 0}
+h2{font-size:1.35rem;margin:3rem 0 .8rem;padding-top:1.2rem;border-top:3px solid var(--ink);
+   text-transform:uppercase;letter-spacing:.04em}
+h3{font-size:1.08rem;margin:1.8rem 0 .5rem;color:var(--ink)}
+h4{font-size:.95rem;margin:1.2rem 0 .3rem;text-transform:uppercase;letter-spacing:.05em;color:var(--ink-2)}
+p{margin:.6rem 0;max-width:70ch}
+.tm-head{border:2px solid var(--ink);padding:1.2rem 1.4rem;display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;align-items:flex-start}
+.tm-label{font-size:.8rem;text-transform:uppercase;letter-spacing:.12em;color:var(--ink-2)}
+.tm-num{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.95rem;text-align:right}
+.meta-table{font-size:.85rem;color:var(--ink-2);margin-top:.6rem}
+.meta-table td{padding:.05rem .8rem .05rem 0}
+.eyebrow{color:var(--olive);font-family:"Avenir Next Condensed","Arial Narrow",Arial,sans-serif;
+  text-transform:uppercase;letter-spacing:.14em;font-size:.78rem;margin:0 0 .2rem}
+pre{background:var(--code-bg);color:var(--code-ink);padding: .9rem 1rem;border-left:3px solid var(--olive);
+  overflow-x:auto;font:.83rem/1.55 ui-monospace,Menlo,Consolas,"Courier New",monospace;margin:.8rem 0}
+code{font:.86em ui-monospace,Menlo,Consolas,monospace;background:var(--code-bg);padding:.08em .35em;border-radius:2px}
+pre code{background:none;padding:0}
+.box{border:2px solid;margin:1.1rem 0;max-width:74ch}
+.box .bx-label{font-family:"Avenir Next Condensed","Arial Narrow",Arial,sans-serif;
+  text-transform:uppercase;letter-spacing:.14em;font-size:.78rem;font-weight:700;
+  padding:.3rem .8rem;border-bottom:1px solid}
+.box .bx-body{padding:.6rem .9rem;font-size:.93rem}
+.box .bx-body p{margin:.35rem 0}
+.warning{border-color:var(--warn);background:var(--warn-bg)}
+.warning .bx-label{color:var(--warn);border-color:var(--warn)}
+.caution{border-color:var(--caut);background:var(--caut-bg)}
+.caution .bx-label{color:var(--caut);border-color:var(--caut)}
+.note{border-color:var(--note);background:var(--note-bg)}
+.note .bx-label{color:var(--note);border-color:var(--note)}
+.checkpoint{border-color:var(--chk);background:var(--chk-bg)}
+.checkpoint .bx-label{color:var(--chk);border-color:var(--chk)}
+table.data{border-collapse:collapse;width:100%;font-size:.88rem;margin:.9rem 0}
+table.data th{font-family:"Avenir Next Condensed","Arial Narrow",Arial,sans-serif;text-transform:uppercase;
+  letter-spacing:.05em;font-size:.78rem;text-align:left;border-bottom:2px solid var(--ink);padding:.4rem .6rem}
+table.data td{border-bottom:1px solid var(--rule-soft);padding:.45rem .6rem;vertical-align:top}
+.tblwrap{overflow-x:auto}
+.para-num{color:var(--olive);font-family:ui-monospace,Menlo,monospace;font-size:.85em;margin-right:.5em}
+ol.steps{counter-reset:step;padding-left:0;max-width:74ch}
+ol.steps>li{list-style:none;margin:.9rem 0;padding-left:2.6rem;position:relative}
+ol.steps>li::before{counter-increment:step;content:counter(step);
+  position:absolute;left:0;top:.1rem;width:1.7rem;height:1.7rem;border:2px solid var(--olive);
+  display:flex;align-items:center;justify-content:center;
+  font:700 .85rem "Avenir Next Condensed","Arial Narrow",Arial,sans-serif;color:var(--olive)}
+.toc{columns:2;gap:2.5rem;font-size:.92rem}
+.toc a{color:var(--ink);text-decoration:none;border-bottom:1px dotted var(--rule)}
+.toc div{margin:.25rem 0;break-inside:avoid}
+a{color:var(--note)}
+.dist{font-size:.8rem;color:var(--ink-2);border-top:1px solid var(--rule);margin-top:.8rem;padding-top:.5rem}
+@media (max-width:640px){.toc{columns:1}}
+@media print{body{font-size:11pt}.page{max-width:none}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header class="tm-head">
+  <div>
+    <p class="tm-label">Technical Manual · Theory of Operation</p>
+    <h1>Streaming Platform<br>Technical Description &amp; Theory of Operation</h1>
+    <table class="meta-table"><tbody>
+      <tr><td>Audience</td><td>Operators and students of the system (DevOps course depth)</td></tr>
+      <tr><td>System</td><td>Linkify kubernetes-streaming platform</td></tr>
+      <tr><td>Companion</td><td>TM-LNKFY-STRM-001 (the build procedure this volume explains)</td></tr>
+      <tr><td>Basis</td><td>Verified live build, stream test &amp; teardown of 2026-08-10/11</td></tr>
+    </tbody></table>
+  </div>
+  <div class="tm-num">
+    TM-LNKFY-STRM-002<br>Rev A · 2026-08-11<br>
+    <span style="font-size:.8rem">Format per MIL-STD-38784 conventions</span>
+  </div>
+  <p class="dist">DISTRIBUTION: Linkify Solutions internal. This volume answers <em>why</em>; TM-001
+  answers <em>how</em>. Read them together: procedure without theory produces button-pushers, theory
+  without procedure produces philosophers, and neither can run a platform alone.</p>
+</header>
+
+<h2 id="toc">Contents</h2>
+<div class="toc">
+  <div><a href="#ch1">1 — The ideas underneath everything</a></div>
+  <div><a href="#ch2">2 — System architecture &amp; the life of a stream</a></div>
+  <div><a href="#ch3">3 — Repository tour</a></div>
+  <div><a href="#ch4">4 — The YAML, file by file</a></div>
+  <div><a href="#ch5">5 — Eighteen defects: case studies</a></div>
+  <div><a href="#ch6">6 — Autoscaling economics</a></div>
+  <div><a href="#ch7">7 — CI/CD: how code becomes a running platform</a></div>
+  <div><a href="#ch8">8 — Glossary</a></div>
+</div>
+
+<h2 id="ch1">Chapter 1 — The ideas underneath everything</h2>
+
+<p><span class="para-num">1-1.</span><strong>Containers, images, pods.</strong> A <em>container</em> is
+a normal Linux process wearing blinders: kernel namespaces limit what it can see (its own filesystem,
+network, process list) and cgroups limit what it can use (CPU, memory). It is not a virtual machine —
+there is no second kernel — which is why one starts in milliseconds. An <em>image</em> is the frozen
+filesystem a container starts from, built once by a <code>Dockerfile</code>, layered so that shipping a
+one-line code change re-transfers kilobytes, not gigabytes. Our five services each build to an image
+pushed to GitHub's registry (GHCR); the transcode image is the heavyweight (~1.5 GB) because it carries
+ffmpeg. A <em>pod</em> is Kubernetes' unit of scheduling: one or more containers that share a network
+identity and fate. Nearly every pod here holds one container; the Kafka broker pod holds sidecars.</p>
+
+<p><span class="para-num">1-2.</span><strong>Kubernetes in one paragraph.</strong> You hand Kubernetes a
+<em>desired state</em> — "two replicas of web, version X, 256 MiB each" — and controllers work in loops
+to make reality match, forever. A node dies; its pods reappear elsewhere. This <em>reconciliation</em>
+model is the single most important idea in the platform: nothing in this system is ever "installed",
+things are <em>declared</em>, and machinery converges. Every defect chapter 5 dissects is at bottom a
+declaration the machinery could not satisfy — and every fix is a better declaration, never a manual
+poke at a live object.</p>
+
+<p><span class="para-num">1-3.</span><strong>Infrastructure as code.</strong> The same philosophy
+applied below Kubernetes: <code>infra/eks/cluster.yaml</code> declares the VPC, control plane, node
+group, and add-ons; eksctl compiles it to CloudFormation stacks (AWS's own reconciliation engine).
+The payoff you experienced directly in TM-001: the entire environment was destroyed and rebuilt from
+the same files. The discipline it demands: if you click something into existence in the console, it is
+invisible to the files, survives no rebuild, and is a lie waiting to be discovered. The reference build
+enforces this so hard that even the <em>teardown</em> is a version-controlled script.</p>
+
+<p><span class="para-num">1-4.</span><strong>GitOps.</strong> CI/CD's traditional shape is
+<em>push-based</em>: a pipeline holds cluster credentials and runs <code>kubectl apply</code>. GitOps
+inverts it: an agent <em>inside</em> the cluster (ArgoCD) watches the git repository and pulls reality
+toward it. Three consequences run through everything you did in TM-001: (1) git is the sole entry
+point — the build's only hand-applied manifest is the one that installs the watcher itself; (2) the
+current system state is reviewable as a diff and revertible as a commit; (3) drift heals itself — a
+manual change to a live object gets overwritten on the next sync, which is a feature, and which is also
+why TM-001's teardown begins by <em>disarming</em> that self-healing. The "app-of-apps" pattern layers
+this: one root Application whose only job is to sync a directory of other Application manifests.</p>
+
+<p><span class="para-num">1-5.</span><strong>CI and CD are different machines here.</strong>
+CI (GitHub Actions, <code>.github/workflows/ci.yml</code>) proves and packages: tests run, images
+build, tags land in the registry, and a one-line kustomize edit records the new tag in git. CD is
+ArgoCD noticing that commit. The pipeline never touches the cluster; the cluster never touches the
+pipeline. Their only shared surface is the repository — which is precisely what makes the system
+auditable: <em>everything that ever happened is a commit.</em></p>
+
+<p><span class="para-num">1-6.</span><strong>Autoscaling, two-layered.</strong> Workload autoscaling
+(KEDA) answers "how many copies of the work should exist?" by watching queue pressure — Kafka consumer
+lag — and cutting Kubernetes Jobs to match, down to zero. Infrastructure autoscaling (Karpenter)
+answers "how many machines should exist?" by watching for pods that fit nowhere and buying/returning
+EC2 capacity in response. Neither knows the other exists; they compose through the scheduler. Chapter 6
+walks the real measured timeline of both layers firing.</p>
+
+<p><span class="para-num">1-7.</span><strong>Secrets, without secrets in git.</strong> The chain is:
+AWS Secrets Manager holds the value → External Secrets Operator (ESO) reads it and materializes a
+Kubernetes Secret → the pod mounts it. Authentication uses EKS Pod Identity: AWS binds an IAM role to a
+(cluster, namespace, service-account) triple, and the SDK inside the pod picks up short-lived
+credentials automatically. Zero keys on disk, zero passwords in git, rotation without redeploys. The
+older mechanism (IRSA — role ARN annotated on the service account, trust via the cluster's OIDC
+provider) survives where controllers still require it: the load balancer controller and Karpenter.
+Knowing which of the two you are wiring is a recurring exam question in real life.</p>
+
+<h2 id="ch2">Chapter 2 — System architecture &amp; the life of a stream</h2>
+
+<p><span class="para-num">2-1.</span><strong>The cast.</strong> Five in-house services (all Python/FastAPI):
+<code>web</code> (UI: create streamers, upload videos, watch), <code>upload-api</code> (the platform's
+API and S3 gatekeeper), <code>ingest-webhook</code> (MediaMTX's brain: authenticates stream keys,
+emits lifecycle events), <code>transcode-worker</code> (ffmpeg wrapped in a Kafka consumer),
+<code>analytics-worker</code> (folds events into Postgres). Around them, infrastructure:
+<code>MediaMTX</code> (RTMP ingest server), Kafka (the event backbone, run by the Strimzi operator),
+Postgres (RDS), S3 + CloudFront (media storage and delivery), and the platform operators (ArgoCD, ESO,
+KEDA, Karpenter, load balancer controller, Prometheus/Grafana).</p>
+
+<p><span class="para-num">2-2.</span><strong>Life of a live stream</strong> — the exact path your
+Chapter 11 test exercised, worth internalizing because every ops question ("why is X down?") is a
+question about one arrow of it:</p>
+<ol class="steps">
+  <li>OBS/ffmpeg publishes RTMP to the NLB → MediaMTX. MediaMTX does not decide anything itself: it
+  calls <code>ingest-webhook /hooks/auth</code> with the stream key.</li>
+  <li>ingest-webhook checks the key against Postgres. Valid → MediaMTX accepts; a row's UUID becomes
+  the stream's public identity (the secret key never appears in any URL).</li>
+  <li>On publish, ingest-webhook writes one message to Kafka topic <code>stream.start.requests</code>
+  and lifecycle events to <code>stream.lifecycle</code>.</li>
+  <li>KEDA, polling that topic's consumer lag, sees 1 pending message and creates one
+  <code>transcode-live</code> Job (ceiling: 8 concurrent, matching the topic's partitions).</li>
+  <li>The Job's pod demands a transcode-tainted node; none exists; Karpenter launches one (c6a.xlarge,
+  46 s in the reference run).</li>
+  <li>The worker consumes the message, pulls the live RTMP feed from MediaMTX, and ffmpeg emits an
+  adaptive ladder (1080p/720p/480p) of 4-second HLS segments straight to
+  <code>s3://…/hls/live/&lt;uuid&gt;/</code> — via the S3 gateway endpoint, dodging NAT fees.</li>
+  <li>Viewers fetch <code>master.m3u8</code> through CloudFront; playlists are never cached (they
+  change every segment), segments are cached hard (they never change).</li>
+  <li>Stream ends → unpublish hook → worker exits → Job completes → ~2 min later Karpenter deletes the
+  now-idle node. Meanwhile analytics-worker has been folding
+  <code>transcode.status</code>/<code>viewer.analytics</code> events into Postgres.</li>
+</ol>
+
+<p><span class="para-num">2-3.</span><strong>Why Kafka sits in the middle.</strong> The webhook could
+have started transcoders directly — an HTTP call. Then a transcoder crash loses the stream, a burst of
+streams overwhelms whatever receives the calls, and adding a second consumer (analytics) means touching
+the webhook. The queue decouples all three axes: durability (the message outlives any consumer crash),
+backpressure (8 partitions <em>are</em> the concurrency ceiling — the queue absorbs the ninth stream
+until a slot frees), and fan-out (analytics subscribes without anyone's permission). The price is
+operational: Kafka was, by a wide margin, the most defect-dense component of the build (five of the
+eighteen case studies).</p>
+
+<p><span class="para-num">2-4.</span><strong>Network posture.</strong> Everything computes in private
+subnets; the internet reaches exactly three front doors (NLB for RTMP, ALB for HTTPS, CloudFront for
+media), and the pods reach out through one NAT gateway — except S3 traffic, which the free gateway
+endpoint keeps off the meter. The Postgres security group admits port 5432 from the cluster's security
+group only; there is no bastion, no SSH, no public database, and kubectl reaches the API server over
+TLS with IAM-authenticated, MFA-backed, 8-hour credentials.</p>
+<h2 id="ch3">Chapter 3 — Repository tour</h2>
+
+<p><span class="para-num">3-1.</span>The repository <em>is</em> the platform; everything else is
+machinery that reads it. Layout, in the order the build consumes it:</p>
+
+<div class="tblwrap"><table class="data">
+<thead><tr><th>Path</th><th>Role</th></tr></thead>
+<tbody>
+<tr><td><code>services/</code></td><td>Five Python services, one Dockerfile each. CI builds these into images; nothing at runtime reads this directory.</td></tr>
+<tr><td><code>postgres/migrations/</code></td><td>Numbered SQL files — the single source of schema truth, shared by docker-compose (dev) and the db-migrate Job (cluster).</td></tr>
+<tr><td><code>infra/eks/cluster.yaml</code></td><td>The layer below Kubernetes: VPC, control plane, nodes, add-ons. Consumed by eksctl, never by ArgoCD.</td></tr>
+<tr><td><code>k8s/bootstrap/</code></td><td>One file: the root Application. The only manifest a human applies.</td></tr>
+<tr><td><code>k8s/argocd/apps/</code></td><td>The app-of-apps: one Application manifest per platform component, filename prefix = sync wave.</td></tr>
+<tr><td><code>k8s/platform/</code></td><td>Operators, each an Application wrapping an upstream Helm chart at a pinned version.</td></tr>
+<tr><td><code>k8s/infra/</code></td><td>Configuration <em>for</em> those operators: storage classes, Karpenter node pools, the Kafka cluster, secrets wiring.</td></tr>
+<tr><td><code>k8s/apps/</code></td><td>Our workloads, as kustomize base + dev/prod overlays; MediaMTX alongside with its own base/overlay.</td></tr>
+<tr><td><code>scripts/</code></td><td><code>teardown.sh</code> (discovery-based destruction + $0 verification), <code>check_ceiling_sync.sh</code> (CI guard, §7-4).</td></tr>
+<tr><td><code>BUILDLOG.md</code> / <code>TEARDOWN.md</code></td><td>The verified command record and the resource-vs-delete-command ledger that this manual and TM-001 were written from.</td></tr>
+<tr><td><code>archive/</code></td><td>Pre-verification documentation. Historical only; marked non-authoritative.</td></tr>
+</tbody></table></div>
+
+<h2 id="ch4">Chapter 4 — The YAML, file by file</h2>
+
+<h3>4-1. <code>infra/eks/cluster.yaml</code> — the ground floor</h3>
+<p>One declaration, two CloudFormation stacks. Its stanzas, and why each is the way it is:</p>
+<div class="tblwrap"><table class="data">
+<thead><tr><th>Stanza</th><th>What it does, and the decision inside it</th></tr></thead>
+<tbody>
+<tr><td><code>metadata</code></td><td>Names cluster <code>streaming</code>, pins K8s 1.35 and region; tags everything <code>Project: streaming</code> so Cost Explorer can slice the bill per project.</td></tr>
+<tr><td><code>availabilityZones</code></td><td>Pinned to two AZs. Left unpinned, eksctl picks AZs <em>at random per run</em> — which desynced from the nodegroup's AZ list and killed the first build (case study #1). Pinning makes the file deterministic.</td></tr>
+<tr><td><code>autoModeConfig: enabled: false</code></td><td>Future eksctl versions flip clusters to "Auto Mode" by default, which stops honoring the nodegroup/add-on stanzas. Pinned so a newer eksctl builds the same cluster.</td></tr>
+<tr><td><code>accessConfig</code></td><td><code>authenticationMode: API</code>: cluster admission is controlled by auditable EKS access-entry API objects, not the legacy in-cluster ConfigMap that generations of operators have locked themselves out with. The creator gets admin automatically; <code>accessEntries</code> adds a <em>second</em> admin (a different SSO role) so no single deleted identity strands the cluster — and must never duplicate the creator (eksctl errors).</td></tr>
+<tr><td><code>vpc</code></td><td>10.42.0.0/16, public subnets only for load balancers and NAT, <code>nat.gateway: Single</code> ($33/mo instead of $99 — accepting that one AZ failure cuts private egress), API endpoint public+private so laptops reach it but node traffic stays internal.</td></tr>
+<tr><td><code>iam.withOIDC</code></td><td>Creates the OIDC provider that IRSA trusts. Pod Identity is the modern default, but LBC and Karpenter still want IRSA — so both mechanisms coexist deliberately.</td></tr>
+<tr><td><code>managedNodeGroups.system</code></td><td>4 × t3.medium, private, encrypted gp3, <em>untainted</em>. The count is a scar: 2 hit the 17-pods-per-node CNI limit (case #4), 3 couldn't offer the Kafka broker a contiguous 2 GiB (case #10). The comment in the file says what to do instead of a 5th node: bigger instances.</td></tr>
+<tr><td><code>cloudWatch</code></td><td>Only <code>api</code>, <code>audit</code>, <code>authenticator</code> control-plane logs (authenticator is the one that explains access-entry failures), 7-day retention because the default is forever-at-a-price.</td></tr>
+<tr><td><code>addons</code></td><td>All six declared explicitly — including metrics-server, which eksctl would install implicitly; implicit behavior caused enough trouble (cases 1–3) that the file now says everything out loud. The EBS CSI driver gets its IAM via a <code>podIdentityAssociations</code> block right here.</td></tr>
+</tbody></table></div>
+
+<h3>4-2. <code>k8s/bootstrap/root-app.yaml</code> — the ignition key</h3>
+<p>An Application pointing at <code>k8s/argocd/apps/</code> on GitHub master. Its
+<code>resources-finalizer</code> makes deletion cascade (without it, deleting root orphans everything).
+Its comment carries the whole GitOps contract: <em>"the one and only manifest a human ever applies with
+kubectl. From here on, everything is a git commit."</em> Note it reads GitHub, not your laptop — an
+unpushed commit does not exist (TM-001 repeats this at every substitution for this reason).</p>
+
+<h3>4-3. <code>k8s/argocd/apps/</code> — the app-of-apps</h3>
+<p>Filename prefixes mirror the <code>sync-wave</code> annotations inside: platform operators and
+storage at wave 0, secrets and Karpenter pools at 10, Kafka at 20, schema migration at 25, our services
+at 30, MediaMTX at 40. Waves are ArgoCD's dependency mechanism: wave N+1 does not apply until wave N is
+healthy. Two hard-won rules live in this directory's comments: the <code>kustomization.yaml</code>
+means <em>a file not listed in it does not exist</em>, no matter that it sits in the directory (case
+#9); and <code>40-mediamtx.yaml</code> has an empty <code>syncPolicy</code> — deliberately manual,
+because syncing it is the act that creates a billable NLB, and money-creating actions get a human
+finger on them.</p>
+
+<h3>4-4. <code>k8s/platform/</code> — six operators, six pins</h3>
+<div class="tblwrap"><table class="data">
+<thead><tr><th>File</th><th>Chart / pin</th><th>The interesting part</th></tr></thead>
+<tbody>
+<tr><td><code>aws-load-balancer-controller.yaml</code></td><td>eks/aws-load-balancer-controller 3.5.0</td>
+<td>Turns Ingress/Service objects into ALBs/NLBs. <code>vpcId</code> is set explicitly because metadata
+auto-discovery fails intermittently under the secure IMDS hop limit with an error that names neither.
+<code>serviceAccount.create: false</code> — eksctl made the IRSA-annotated account; letting Helm make
+its own yields a controller with no AWS permissions.</td></tr>
+<tr><td><code>external-secrets.yaml</code></td><td>external-secrets 2.9.0</td>
+<td>Installs ESO + CRDs. The ClusterSecretStore it powers is in <code>k8s/infra/secrets/</code>.</td></tr>
+<tr><td><code>karpenter.yaml</code></td><td>OCI: public.ecr.aws/karpenter 1.13.0</td>
+<td>The one OCI-hosted chart — hence the registry Secret in TM-001 §10-2. Values name the interruption
+queue from the CloudFormation stack and, again, refuse Helm-created service accounts.</td></tr>
+<tr><td><code>keda.yaml</code></td><td>kedacore/keda 2.19.0</td>
+<td>Pinned tightly ("KEDA minors move fast and change CRD fields"). Installs the ScaledJob CRD and the
+external-metrics API service — the same API service whose corpse wedged teardown (case #18d).</td></tr>
+<tr><td><code>kube-prometheus-stack.yaml</code></td><td>prometheus-community 88.2.0</td>
+<td>Prometheus + Grafana + exporters. Two footguns disarmed in its values: the two
+<code>…SelectorNilUsesHelmValues: false</code> lines (without them Prometheus silently ignores every
+ServiceMonitor it didn't install itself — the #1 "my metrics are missing" cause), and Grafana
+credentials read from an ESO-materialized Secret rather than a chart value the root app would
+fight over (case-study adjacent: the archived approach used <code>argocd app set</code>, which
+selfHeal reverts). Alertmanager is off: no receivers, nobody on call, why pay its memory bill.</td></tr>
+<tr><td><code>strimzi-operator.yaml</code></td><td>strimzi 0.49.0</td>
+<td>The Kafka operator. Its pin governs which Kafka versions may exist (cases #6, #17): the operator
+ships specific broker images and nothing else.</td></tr>
+</tbody></table></div>
+
+<h3>4-5. <code>k8s/infra/</code> — configuration for the operators</h3>
+<div class="tblwrap"><table class="data">
+<thead><tr><th>File</th><th>What it declares</th></tr></thead>
+<tbody>
+<tr><td><code>storage/storageclass-gp3.yaml</code></td><td>The default StorageClass: gp3 at free-tier IOPS, encrypted, <code>WaitForFirstConsumer</code> (EBS is single-AZ; binding early would pin pods to whatever AZ the volume landed in), <code>allowVolumeExpansion</code>. Lived at an unsynced path once — case #5.</td></tr>
+<tr><td><code>karpenter/ec2nodeclass.yaml</code></td><td>What a transcode node <em>is</em>: latest AL2023 AMI via alias, the CloudFormation-created node role, subnets/SGs found by the <code>karpenter.sh/discovery</code> tag (never by ID — rebuild-proof), and a 200 GiB gp3 scratch disk sized for worst-case VOD ffmpeg output with the math shown in a comment.</td></tr>
+<tr><td><code>karpenter/nodepool-live.yaml</code> / <code>nodepool-vod.yaml</code></td><td>Two pools, both tainted <code>workload=transcode:NoSchedule</code> so nothing ordinary lands on them. Live: on-demand compute-optimized (a dropped frame is visible). VOD: spot-eligible in principle — the comment explains why spot stays off until interruption handling is proven.</td></tr>
+<tr><td><code>kafka/nodepool-dual.yaml</code></td><td>A <em>Strimzi</em> KafkaNodePool (naming collision with Karpenter pools is unfortunate but upstream): one node holding both KRaft controller and broker roles — a learning-scale cluster; splitting roles pays off only at 3+ nodes. JBOD storage on a 20 GiB gp3 claim, <code>deleteClaim: false</code> (deleting the pool must not delete data), and the <code>karpenter.sh/do-not-disrupt</code> annotation: a "helpful" consolidation of a single-broker Kafka is a total outage.</td></tr>
+<tr><td><code>kafka/kafka.yaml</code></td><td>The Kafka CR: version 4.1.1 (pinned <em>with</em> the operator — the file carries the command to check what the operator ships), one plaintext in-cluster listener (everything that talks to Kafka is inside the VPC; ports 9090/9091 are reserved by Strimzi), metrics wired to the ConfigMap below, entity/topic operators enabled (without the topic operator, KafkaTopic CRs are inert YAML).</td></tr>
+<tr><td><code>kafka/kafka-metrics-configmap.yaml</code></td><td>JMX-exporter rules, verbatim from the pinned Strimzi release's own examples. Hand-editing JMX rules is forbidden by comment; an empty/comment-only version of this file failed the <em>entire</em> Kafka reconcile (case #8).</td></tr>
+<tr><td><code>kafka/topics.yaml</code></td><td>Five KafkaTopics. Partition counts are load-bearing: <code>stream.start.requests</code> has 8 partitions because partitions cap consumer parallelism — this number <em>is</em> the max concurrent live transcodes, and it must agree with the app ceiling (§7-4).</td></tr>
+<tr><td><code>kafka/consumer-group-bootstrap-job.yaml</code></td><td>A PostSync hook Job that commits initial offsets for <code>transcode-live</code>/<code>transcode-vod</code>. Exists because KEDA cannot compute lag for a group that has never committed — and with <code>scaleToZeroOnInvalidOffset</code>, "cannot compute" reads as "no work", silently, forever (case #16). Its image tag moves with the Strimzi/Kafka pins (case #17).</td></tr>
+<tr><td><code>kafka/networkpolicy.yaml</code>, <code>podmonitor-kafka.yaml</code>, <code>namespace.yaml</code></td><td>Broker reachable only from the namespaces that need it; Prometheus scrape wiring (needs the monitoring stack's CRDs from wave 0); the namespace itself.</td></tr>
+<tr><td><code>secrets/clustersecretstore.yaml</code></td><td>ESO ↔ Secrets Manager bridge. Deliberately <em>no</em> <code>auth:</code> block — Pod Identity flows through the SDK's default chain; adding an explicit serviceAccountRef breaks it with an error that looks like an IAM problem (the comment warns).</td></tr>
+<tr><td><code>secrets/externalsecret-db.yaml</code></td><td>The most instructive file in the directory: composes <code>POSTGRES_DSN</code> from two sources — the RDS-managed master secret (username/password, name is REBUILD-SENSITIVE) and the plain <code>streaming/db-endpoint</code> facts secret — with <code>| urlquery</code> on the password because RDS generates punctuation that would otherwise reshape the URL. Password rotation flows through with no redeploy: that is the entire point of the pattern.</td></tr>
+<tr><td><code>secrets/externalsecret-grafana.yaml</code> / <code>externalsecret-mediamtx.yaml</code></td><td>Same pattern for Grafana admin and the MediaMTX control API. Note grafana's explicit <code>namespace: monitoring</code> — Secrets are namespace-local, and this file's Application targets <code>streaming</code>.</td></tr>
+<tr><td><code>secrets/configmap-app.yaml</code></td><td>Public endpoints and addresses (not secrets — kept diffable). Historical note: this file once duplicated keys the kustomize generator also produced, and a placeholder fixed in one copy survived in the other (case #13). Treat it as the cautionary tale about two sources of truth.</td></tr>
+</tbody></table></div>
+
+<h3>4-6. <code>k8s/apps/</code> — the workloads</h3>
+<div class="tblwrap"><table class="data">
+<thead><tr><th>File(s)</th><th>What it declares</th></tr></thead>
+<tbody>
+<tr><td><code>base/namespace.yaml</code></td><td>The <code>streaming</code> namespace with <strong>restricted PodSecurity enforcement</strong> — every pod must be non-root, seccomp'd, capability-dropped. This is what rejected the migrate Job at admission (case #12): the strictness is the point; the case study is the price of one missing field.</td></tr>
+<tr><td><code>base/config.env</code> + overlay <code>config.env</code>s</td><td>Kustomize <code>configMapGenerator</code> input. The generated ConfigMap's name carries a content hash, so changing a value renames it, which rewrites every reference, which rolls every consuming pod — config rollouts with zero controllers. Overlays <code>merge</code> onto base (prod holds the real bucket name and public URLs).</td></tr>
+<tr><td>per-service <code>deployment.yaml</code> + <code>service.yaml</code></td><td>Uniform shape: 2 replicas (stateless), full restricted-PSS securityContext, split probes — <code>/livez</code> trivial ("is the process wedged") vs <code>/readyz</code> dependency-checking ("should it get traffic") — the file comments explain why wiring the dependency check to liveness turns an RDS blip into a restart storm. Env vars are wired one-by-one with <code>configMapKeyRef</code>/<code>secretKeyRef</code>: explicit, but every <code>require()</code> in the app must have a line here (case #13b).</td></tr>
+<tr><td><code>base/upload-api/serviceaccount.yaml</code>, <code>base/transcode-worker/serviceaccount.yaml</code></td><td>Bare ServiceAccounts, deliberately unannotated — Pod Identity binds on the AWS side to the <em>name</em>; rename one and its pods silently fall back to the node role.</td></tr>
+<tr><td><code>base/transcode/scaledjob-live.yaml</code> / <code>scaledjob-vod.yaml</code></td><td>KEDA ScaledJobs: the Kafka trigger (topic, consumer group, <code>lagThreshold: 1</code> = one message → one Job), tolerations for the transcode taint, node selectors per pool, and ffmpeg resource envelopes. The live variant's comment ties its ceiling to the topic partition count and the app's env ceiling — the three-way agreement CI enforces.</td></tr>
+<tr><td><code>base/transcode/sweeper-cronjob.yaml</code></td><td>Belt-and-suspenders: periodically reclaims transcode claims whose worker died mid-job, so a crashed worker's stream can be picked up rather than stranded.</td></tr>
+<tr><td><code>base/db-migrate/</code></td><td>A Job running <code>psql</code> over a ConfigMap generated <em>from</em> <code>postgres/migrations/*.sql</code> — one schema source for compose and cluster. Reading outside the kustomize root requires the repo-server's <code>--load-restrictor</code> option (case #11). Deliberately its own Application at wave 25, and deliberately <em>not</em> a hook — the file's comment explains both.</td></tr>
+<tr><td><code>overlays/prod/ingress-alb.yaml</code></td><td>The HTTPS front door: internet-facing ALB, target-type <code>ip</code> (straight to pod IPs — no NodePort double-hop), one shared ALB via <code>group.name</code> (every un-grouped Ingress is its own $16/mo), HTTP→HTTPS redirect, the REBUILD-SENSITIVE certificate ARN, a 1800 s idle timeout for uploads, and — scar tissue — <code>sync-wave: "2"</code>: its health depends on an <em>external</em> event (cert validation), and externally-gated resources go in the last wave so they cannot hold the sync lock (case #14).</td></tr>
+<tr><td><code>overlays/dev/</code></td><td>The same base squeezed onto a laptop: single replicas, tiny resources, no ALB.</td></tr>
+<tr><td><code>mediamtx/base/</code> + <code>overlays/aws/</code></td><td>The RTMP server: config file with auth delegated to ingest-webhook (<code>runOnReady</code>/hooks), a PodDisruptionBudget, and in the AWS overlay the NLB Service (<code>service-rtmp-nlb.yaml</code>) — TCP 1935 straight through, plus placement pinning. This overlay is what the manual-sync mediamtx Application deploys.</td></tr>
+</tbody></table></div>
+<h2 id="ch5">Chapter 5 — Eighteen defects: case studies</h2>
+
+<p>Everything below actually happened, in this order, in one build. None are exotic; all are the daily
+texture of platform work. Each entry ends with the transferable lesson — the part worth memorizing.</p>
+
+<h3>Case 1 — The random availability zones</h3>
+<p><strong>Symptom:</strong> nodegroup creation failed: <em>"could not find private subnets for zones
+[us-east-1a us-east-1b]"</em> — yet the config looked reasonable.
+<strong>Cause:</strong> cluster-level AZs were unpinned, so eksctl chose two at random (1f, 1a); the
+nodegroup stanza independently pinned (1a, 1b). Two sections of one file disagreed about geography.
+<strong>Fix:</strong> pin <code>availabilityZones</code> once at cluster level; subordinate lists must
+be subsets. <strong>Lesson:</strong> anything a tool "helpfully" chooses for you is a different choice
+every run. Declarative means <em>fully</em> declared.</p>
+
+<h3>Case 2 — The empty tag</h3>
+<p><strong>Symptom:</strong> CloudFormation rejected the nodegroup: <em>"tags.6.member.value… length
+greater than or equal to 1"</em>. <strong>Cause:</strong> <code>karpenter.sh/discovery: ""</code> on
+the nodegroup — an empty-valued tag, illegal in the CreateStack API, and semantically useless anyway
+(Karpenter only manages nodes it created; a managed nodegroup needs no opt-out).
+<strong>Fix:</strong> delete the tag. <strong>Lesson:</strong> when a mechanism is "cleverly" disabled
+by an empty value, first ask whether the mechanism applied at all.</p>
+
+<h3>Case 3 — The relative path</h3>
+<p><strong>Symptom:</strong> <em>"no such file or directory: infra/eks/cluster.yaml"</em>.
+<strong>Cause:</strong> command run from <code>~</code>. <strong>Fix/Lesson:</strong> repo-relative
+paths mean repo-root working directory. Trivial — and the most common failure new operators hit, which
+is why TM-001 states it in Chapter 1.</p>
+
+<h3>Case 4 — Seventeen pods per node</h3>
+<p><strong>Symptom:</strong> app pods Pending: <em>"0/2 nodes are available: 2 Too many pods"</em> —
+with CPU and memory half idle. <strong>Cause:</strong> on the default VPC-CNI addressing mode, pod
+capacity is an <em>IP arithmetic</em> limit — 17 on t3.medium — and the platform layer alone
+(ArgoCD, monitoring, ESO, KEDA, operators, kube-system) consumes two nodes of slots before any app
+runs. Karpenter cannot help: its pools are transcode-tainted on purpose.
+<strong>Fix:</strong> third node. <strong>Lesson:</strong> nodes have <em>three</em> capacities — CPU,
+memory, pod slots — and the invisible third one binds first on small instances. (Prefix delegation
+raises it, at the cost of a nodegroup roll.)</p>
+
+<h3>Case 5 — The file nothing synced</h3>
+<p><strong>Symptom:</strong> PVCs Pending: <em>"storageclass gp3 not found"</em> — yet
+<code>storageclass-gp3.yaml</code> sat right there in the repo.
+<strong>Cause:</strong> it sat at a path no Application's <code>source.path</code> covered. GitOps has
+no "apply this too" — a manifest outside every Application is simply not part of the cluster.
+<strong>Fix:</strong> move it under a new wave-0 <code>storage</code> Application.
+<strong>Lesson:</strong> in GitOps, existence = being inside some Application's path. An orphaned
+manifest is documentation cosplaying as configuration.</p>
+
+<h3>Case 6 — The Kafka version the operator refused</h3>
+<p><strong>Symptom:</strong> Kafka CR NotReady: <em>UnsupportedKafkaVersionException: 3.9.0.
+Supported: [4.0.0 … 4.1.1]</em>. <strong>Cause:</strong> the CR's version pin predated the operator's
+pin; Strimzi ships specific broker images per release and 0.49 had dropped 3.9.
+<strong>Fix:</strong> 4.1.1, and drop the <code>metadataVersion</code> pin (fresh cluster → operator
+defaults it correctly). <strong>Lesson:</strong> pins that reference each other move together; the file
+now carries the command that lists what the operator actually ships.</p>
+
+<h3>Case 7 — The lock held against its own fix</h3>
+<p><strong>Symptom:</strong> case 6's fix was pushed… and the live CR stayed at 3.9.0. No error
+anywhere. <strong>Cause:</strong> the kafka Application's <em>first</em> sync was still "Running":
+its PostSync hook made ArgoCD wait for all resources healthy; the topics could never be healthy while
+the CR was rejected; and ArgoCD will not start a new sync while one runs. The broken state held the
+lock against the commit that would fix it. <strong>Fix:</strong> terminate the operation
+(<code>status.operationState.phase: Terminating</code>); auto-sync then applied the fix.
+<strong>Lesson:</strong> when a pushed fix "isn't taking effect" under ArgoCD, read
+<code>.status.operationState</code> <em>before</em> pushing harder. It happened again two hours later
+(case 14) — this pattern is worth over-learning.</p>
+
+<h3>Case 8 — The ConfigMap made of comments</h3>
+<p><strong>Symptom:</strong> Strimzi: <em>"Failed to parse metrics configuration… No content to map"</em>
+— and the <em>whole</em> Kafka reconcile failed, not just metrics.
+<strong>Cause:</strong> the metrics ConfigMap was a placeholder whose data was YAML comments only —
+syntactically present, semantically empty. <strong>Fix:</strong> the verbatim example ConfigMap from
+the pinned Strimzi release. <strong>Lesson:</strong> a placeholder that parses is worse than a missing
+file; and operators may fail the whole resource on a "peripheral" config error.</p>
+
+<h3>Case 9 — The kustomization that ignored a file</h3>
+<p><strong>Symptom:</strong> case 5's fix (a new Application file) changed nothing; root reported
+Synced. <strong>Cause:</strong> <code>k8s/argocd/apps/</code> contains a <code>kustomization.yaml</code>,
+so ArgoCD renders the directory <em>through kustomize</em> — and kustomize includes only what
+<code>resources:</code> lists. The new file was invisible, and "Synced" was truthful about the wrong
+question. <strong>Fix:</strong> list it. <strong>Lesson:</strong> file in that directory ⇔ line in
+that list, always both — and green statuses answer precisely the question asked, not the one you meant.</p>
+
+<h3>Case 10 — Two gigabytes with nowhere to sit</h3>
+<p><strong>Symptom:</strong> broker pod Pending: <em>"3 Insufficient memory"</em> plus Karpenter's
+<em>"did not tolerate taint"</em>. <strong>Cause:</strong> the broker requests a contiguous 2 GiB; every
+t3.medium with platform pods aboard had less free; the autoscaler's pools are deliberately not for
+stateful brokers. <strong>Fix:</strong> fourth node (the declared maxSize). <strong>Lesson:</strong>
+scheduling is bin-packing; a big request needs a big <em>hole</em>, not big aggregate capacity. The
+config comment now says: at a hypothetical 5th node, change instance size instead (2 × t3.large =
+same price as 4 × t3.medium, double the holes).</p>
+
+<h3>Case 11 — The migration that couldn't read its own SQL</h3>
+<p><strong>Symptom:</strong> db-migrate Application stuck sync-status Unknown; render error citing
+<code>../../../../postgres/migrations/…</code>. <strong>Cause:</strong> kustomize's load restrictor
+(a security default) forbids reading outside the kustomization root; sharing one schema directory
+between compose and cluster requires the repo-server-wide option.
+<strong>Fix:</strong> <code>kustomize.buildOptions: --load-restrictor LoadRestrictionsNone</code> in
+the ArgoCD Helm values — where it survives upgrades. TM-001 bakes it into the install command.
+<strong>Lesson:</strong> "a global setting" in a design note is a task, not a fact — someone must set
+it somewhere specific.</p>
+
+<h3>Case 12 — The Job that ran with zero pods</h3>
+<p><strong>Symptom:</strong> db-migrate "Running" for six minutes; <code>kubectl get pods</code>: none;
+logs: none. <strong>Cause:</strong> the namespace enforces restricted PodSecurity; the Job's container
+lacked <code>seccompProfile</code>; pods were rejected <em>at admission</em> — before existing, before
+logging. The only evidence: <code>kubectl describe job</code> → FailedCreate events.
+<strong>Fix:</strong> one securityContext field. <strong>Lesson:</strong> the least discoverable
+failure shape in Kubernetes. When a controller seems busy but produces nothing, describe the
+<em>controller's</em> object, not its (nonexistent) children.</p>
+
+<h3>Case 13 — The placeholder that lived twice (and the env var that lived zero times)</h3>
+<p><strong>Symptom:</strong> upload-api never Ready (S3 check: <em>Invalid bucket name
+"…&lt;accountid&gt;"</em>); ingest-webhook crashlooping (<em>missing required environment variables</em>).
+<strong>Cause (a):</strong> the bucket-name placeholder existed in <em>two</em> files; the fix landed
+in the redundant one. <strong>Cause (b):</strong> the Deployment wires env vars one-by-one and one of
+the app's three <code>require()</code>s had no line. <strong>Fix:</strong> real value in the file that
+matters; the missing <code>configMapKeyRef</code>. <strong>Lesson:</strong>
+<code>grep -rn "&lt;placeholder&gt;"</code> the whole tree before declaring a substitution done; and
+explicit env wiring is a contract — the app names all missing vars at once precisely so you fix them in
+one pass, use that.</p>
+
+<h3>Case 14 — The Ingress that held every rollout hostage</h3>
+<p><strong>Symptom:</strong> config fixes queued for an hour; the streaming app's operation "Running —
+waiting for healthy state of Ingress/streaming". <strong>Cause:</strong> the Ingress cannot be healthy
+until an ACM certificate validates — an event <em>outside the cluster</em> (DNS delegation pending) —
+and it sat in an early sync wave with resources sequenced after it. Case 7's lock mechanism, external
+edition. <strong>Fix:</strong> real cert ARN + move the Ingress to the last wave, where nothing waits
+on it. <strong>Lesson:</strong> resources whose health depends on the outside world go in the final
+wave. Order by dependency, not by importance.</p>
+
+<h3>Case 15 — The health check the policy didn't cover</h3>
+<p><strong>Symptom:</strong> upload-api readyz: S3 403 on HeadBucket — with correct bucket name and a
+policy that "obviously" allowed its work. <strong>Cause:</strong> least-privilege scoping gave
+<code>ListBucket</code> only under a <code>raw/*</code> prefix condition; <code>HeadBucket</code>
+performs an unprefixed ListBucket check. The app's <em>probe</em> needed more than the app's
+<em>work</em>. <strong>Fix:</strong> unconditioned ListBucket (object writes stay prefix-scoped).
+<strong>Lesson:</strong> test least-privilege against the whole process — health checks included —
+not against the happy path.</p>
+
+<h3>Case 16 — The success that did nothing</h3>
+<p><strong>Symptom:</strong> a five-minute live stream published flawlessly. No transcoder ever
+started. Zero errors in any log. <strong>Cause:</strong> the consumer groups had never been
+bootstrapped (their hook died in case 7's terminations); KEDA cannot compute lag for a group with no
+committed offsets, and <code>scaleToZeroOnInvalidOffset: true</code> converts "cannot compute" into
+"no work". Every component was individually correct. <strong>Fix:</strong> re-run the hook; verify
+groups exist. <strong>Lesson:</strong> the worst failures are compositions of correct parts. For any
+scale-from-zero trigger, verify the <em>trigger's own prerequisites</em> — TM-001 makes the group
+check a mandatory pre-stream checkpoint because this failure will never announce itself.</p>
+
+<h3>Case 17 — The image tag that never existed</h3>
+<p><strong>Symptom:</strong> the bootstrap hook, once finally running, sat in ImagePullBackOff for 40
+minutes: <code>quay.io/strimzi/kafka:0.49.0-kafka-3.9.0 not found</code>.
+<strong>Cause:</strong> the job's image tag encodes <em>both</em> pins (operator-kafka); case 6's fix
+updated one file and not this one. <strong>Fix:</strong> align; comment now warns the tag moves with
+both pins. <strong>Lesson:</strong> when you bump a version, grep for it — pins hide in job images,
+CI files, and docs, not just the obvious CR.</p>
+
+<h3>Case 18 — Teardown is a dependency graph too</h3>
+<p>Four sub-lessons from unwinding the platform, now encoded as the ordered procedure in
+<code>scripts/teardown.sh</code>:
+<strong>(a)</strong> a live root app <em>resurrects</em> deleted children — disarm selfHeal first;
+<strong>(b)</strong> apps that own load balancers die first, while the controller that can release
+them still lives — or AWS keeps billing for orphans;
+<strong>(c)</strong> CR consumers before operators — an operator deleted before its CRs leaves
+finalizers no one can service and namespaces wedged Terminating;
+<strong>(d)</strong> aggregated APIServices outlive their backends and poison cluster-wide discovery —
+the dead registration must be deleted by hand.
+<strong>Lesson:</strong> deletion order is creation order reversed, <em>including</em> the implicit
+edges (controllers, finalizers, API registrations) that creation got for free.</p>
+<h2 id="ch6">Chapter 6 — Autoscaling economics</h2>
+
+<p><span class="para-num">6-1.</span><strong>The measured timeline.</strong> One live stream, real
+clock, 2026-08-11 (this is the reference for TM-001's lab):</p>
+<div class="tblwrap"><table class="data">
+<thead><tr><th>Clock</th><th>Event</th><th>Layer</th></tr></thead>
+<tbody>
+<tr><td>01:35:55</td><td>RTMP publish begins; webhook writes one Kafka message</td><td>app</td></tr>
+<tr><td>01:36:30</td><td>KEDA cuts Job <code>transcode-live-4nxz2</code>; Karpenter NodeClaim (c6a.xlarge, on-demand) launching</td><td>KEDA → Karpenter</td></tr>
+<tr><td>01:36:44</td><td>EC2 instance joined the cluster, NotReady</td><td>EC2/kubelet</td></tr>
+<tr><td>01:36:54</td><td>Node Ready — <strong>46 s from Job to schedulable capacity</strong></td><td>Karpenter</td></tr>
+<tr><td>01:37:12</td><td>First HLS segment in S3 — <strong>77 s stream-start → playable</strong></td><td>ffmpeg</td></tr>
+<tr><td>01:42:55</td><td>Stream ends; unpublish hook fires</td><td>app</td></tr>
+<tr><td>01:43:45</td><td>Job Complete (worker saw stream end and exited)</td><td>KEDA</td></tr>
+<tr><td>01:45:58</td><td>Node cordoned — consolidation begins ~2 min after idle</td><td>Karpenter</td></tr>
+<tr><td>01:47:05</td><td>NodeClaim and EC2 instance gone. Node lifetime 10.4 min ≈ <strong>$0.027</strong></td><td>Karpenter</td></tr>
+</tbody></table></div>
+
+<p><span class="para-num">6-2.</span><strong>The cold-start ledger.</strong> Those 77 seconds decompose
+as ~35 s KEDA polling latency + 24 s machine + ~18 s image pull, ffmpeg spin-up, and the first 4-second
+segment. Two facts sharpen the trade: only the <em>first viewer of a just-started stream</em>
+experiences it, and the first ~77 s of the broadcast are simply absent from the HLS output (the worker
+joins a live feed). The alternative — one warm transcode node always on — costs c6a.xlarge × 730 h ≈
+<strong>$112/month</strong>. At ~$0.03 marginal cost per cold start, warm capacity breaks even only
+past ~3,700 stream-starts a month. For a learning platform the answer is obvious; for a business, this
+one table is the pricing meeting.</p>
+
+<p><span class="para-num">6-3.</span><strong>Why two autoscalers and not one.</strong> KEDA reasons
+about <em>work</em> (queue depth), Karpenter about <em>capacity</em> (unschedulable pods). Collapsing
+them means either the queue-watcher must understand EC2 or the machine-buyer must understand Kafka.
+Composed through the scheduler, each stays simple, and the coupling is exactly one signal: a Pending
+pod. Notice also what deliberately does <em>not</em> autoscale: the system nodegroup (the platform
+floor is a fixed cost) and the Kafka broker (stateful, <code>do-not-disrupt</code>; scaling data
+systems is a decision, not a reflex).</p>
+
+<h2 id="ch7">Chapter 7 — CI/CD: how code becomes a running platform</h2>
+
+<p><span class="para-num">7-1.</span><strong>CI (<code>.github/workflows/ci.yml</code>).</strong> On
+every push: lint + unit tests for the services that have them, then — only for services whose files
+actually changed — a Docker build pushed to GHCR tagged both <code>latest</code> and
+<code>sha-&lt;commit&gt;</code>. Path-filtering matters: an infra-only commit builds zero images and
+finishes in under a minute, which you saw in the reference build's history.</p>
+
+<p><span class="para-num">7-2.</span><strong>The handoff commit.</strong> CI's last act on a service
+change is <code>kustomize edit set image …:sha-abc1234</code> inside
+<code>k8s/apps/overlays/prod</code> — a one-line, machine-writable, human-reviewable git commit. That
+commit is the <em>entire</em> interface between CI and CD. ArgoCD notices it like any other commit and
+rolls the deployment. Rollback is <code>git revert</code>. Deployment history is <code>git log</code>.
+No pipeline holds cluster credentials; nothing can deploy that isn't in git.</p>
+
+<p><span class="para-num">7-3.</span><strong>Registry visibility.</strong> The five images are public
+on GHCR — chosen during the reference build over maintaining pull-secret machinery (a classic
+security-vs-friction call; the code was public anyway). Consequence worth knowing: the cluster needs
+zero registry credentials, and one whole class of ImagePullBackOff is structurally impossible.</p>
+
+<p><span class="para-num">7-4.</span><strong>The ceiling-sync guard.</strong>
+<code>scripts/check_ceiling_sync.sh</code> runs in CI and fails the build if
+<code>MAX_CONCURRENT_LIVE_STREAMS</code> (app config), the transcode-live ScaledJob ceiling, and the
+topic partition count drift apart. Three files must agree for the backpressure story in §2-3 to hold;
+CI is where that agreement is enforced, because humans forget and reviews miss it. This tiny script is
+the purest expression of CI's real job: <em>make the repository unable to lie to itself.</em></p>
+
+<h2 id="ch8">Chapter 8 — Glossary</h2>
+<div class="tblwrap"><table class="data"><tbody>
+<tr><td><strong>ABR / HLS</strong></td><td>Adaptive bitrate streaming over HTTP: video cut into small segments at several qualities, listed in playlists (<code>.m3u8</code>); players hop qualities per network conditions.</td></tr>
+<tr><td><strong>Access entry</strong></td><td>EKS API object granting an IAM principal cluster permissions; replaces the legacy aws-auth ConfigMap.</td></tr>
+<tr><td><strong>Application (ArgoCD)</strong></td><td>A CR pairing "this git path" with "this cluster destination", plus sync policy.</td></tr>
+<tr><td><strong>Finalizer</strong></td><td>A marker delaying an object's deletion until some controller completes cleanup. Powers cascades; wedges namespaces when its controller dies first.</td></tr>
+<tr><td><strong>IRSA / Pod Identity</strong></td><td>Two generations of "pods get IAM roles without keys": IRSA via OIDC + SA annotation; Pod Identity via AWS-side (cluster, ns, SA) binding.</td></tr>
+<tr><td><strong>KRaft</strong></td><td>Kafka's built-in consensus (no ZooKeeper). Our single node is both controller and broker.</td></tr>
+<tr><td><strong>Kustomize base / overlay</strong></td><td>Patch-based config reuse: one base, per-environment overlays; generators hash ConfigMaps into rolling updates.</td></tr>
+<tr><td><strong>NLB / ALB</strong></td><td>AWS load balancers: NLB forwards raw TCP (RTMP); ALB speaks HTTP(S), does TLS and routing (web).</td></tr>
+<tr><td><strong>OAC</strong></td><td>Origin Access Control — CloudFront's signed identity to a private S3 origin.</td></tr>
+<tr><td><strong>PSS restricted</strong></td><td>Pod Security Standard rejecting privileged/root/un-seccomp'd pods at admission.</td></tr>
+<tr><td><strong>ScaledJob</strong></td><td>KEDA CR: event-source pressure → Kubernetes Jobs (vs ScaledObject, which resizes Deployments).</td></tr>
+<tr><td><strong>Sync wave</strong></td><td>ArgoCD ordering annotation; wave N must be healthy before N+1 applies.</td></tr>
+<tr><td><strong>Taint / toleration</strong></td><td>Node-side repellent + pod-side permission slip; how transcode nodes stay exclusive.</td></tr>
+</tbody></table></div>
+
+<p class="dist" style="margin-top:3rem">END OF TM-LNKFY-STRM-002. Procedure: TM-LNKFY-STRM-001.
+Verified command record: <code>BUILDLOG.md</code>. Resource ledger: <code>TEARDOWN.md</code>.
+Teardown implementation: <code>scripts/teardown.sh</code>.</p>
+</div>
+</body>
+</html>
