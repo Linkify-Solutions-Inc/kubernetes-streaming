@@ -405,3 +405,13 @@ git push   # root app reads GitHub master, not the local tree
 kubectl apply -f k8s/bootstrap/root-app.yaml   # the ONLY by-hand kubectl apply
 kubectl get applications -n argocd             # watch waves 0..40 converge
 ```
+
+GOTCHA 19 (reference teardown, 2026-08-11): the eksctl cluster stack's VPC
+deletion failed with "has dependencies" — the streaming-db security group
+lives in eksctl's VPC and references the cluster SG, and the script deleted
+it only after eksctl ran. Everything billable inside the stack had already
+deleted; one delete-stack retry after removing the SG succeeded.
+FIX: scripts/teardown.sh now detects DELETE_FAILED, removes the RDS
+leftovers, and retries automatically. Lesson: resources created INTO a
+CFN-owned VPC from outside the stack are deletion blockers the stack cannot
+see — track them (TEARDOWN.md) and remove them first.

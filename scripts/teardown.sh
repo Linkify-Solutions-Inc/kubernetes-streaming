@@ -60,6 +60,21 @@ fi
 echo "== [4/9] EKS cluster (~10-15 min; removes nodegroup, VPC, IRSA/pod-identity/addon stacks)"
 eksctl delete cluster --region us-east-1 --name streaming --disable-nodegroup-eviction --wait
 
+echo "== [4b/9] cluster stack retry if the VPC was blocked by the RDS security group"
+# GOTCHA 19 (hit on the reference teardown): the streaming-db SG lives in
+# eksctl's VPC and references the cluster SG, so the VPC delete inside the
+# eksctl stack can fail with "has dependencies" -- its blocker is removed in
+# step 5 below, after which one retry succeeds. Handled automatically here.
+if aws cloudformation describe-stacks --stack-name eksctl-streaming-cluster      --query 'Stacks[0].StackStatus' --output text 2>/dev/null | grep -q DELETE_FAILED; then
+  echo "cluster stack DELETE_FAILED -- removing RDS leftovers first, then retrying"
+  aws rds wait db-instance-deleted --db-instance-identifier streaming-db 2>/dev/null
+  aws rds delete-db-subnet-group --db-subnet-group-name streaming-db-subnets 2>/dev/null
+  DBSG=$(aws ec2 describe-security-groups --filters Name=group-name,Values=streaming-db     --query 'SecurityGroups[0].GroupId' --output text)
+  [ "$DBSG" != "None" ] && aws ec2 delete-security-group --group-id "$DBSG"
+  aws cloudformation delete-stack --stack-name eksctl-streaming-cluster
+  aws cloudformation wait stack-delete-complete --stack-name eksctl-streaming-cluster && echo "cluster stack retry ok"
+fi
+
 echo "== [5/9] RDS leftovers"
 aws rds wait db-instance-deleted --db-instance-identifier streaming-db 2>/dev/null
 aws rds delete-db-subnet-group --db-subnet-group-name streaming-db-subnets 2>/dev/null && echo subnet-group-ok
