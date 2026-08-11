@@ -329,6 +329,42 @@ was dead weight anyway: no Deployment ever referenced an imagePullSecret, so
 private pulls would have failed even WITH the secret — the archived design
 had a latent bug here.
 
+## Phase 9 — End-to-end verification (VERIFIED 2026-08-11)
+
+Create a streamer (via port-forward pre-DNS):
+```
+kubectl port-forward -n streaming svc/upload-api 18000:8000 &
+curl -s -X POST localhost:18000/streamers -H 'Content-Type: application/json' -d '{"display_name":"e2e-test"}'
+# -> {"id":"...","display_name":"e2e-test","stream_key":"<32-hex>"}
+```
+MANDATORY checkpoint BEFORE first stream (GOTCHA 16 — silent otherwise):
+```
+kubectl exec -n kafka streaming-dual-0 -c kafka -- bin/kafka-consumer-groups.sh \
+  --bootstrap-server localhost:9092 --list
+# MUST list: transcode-live, transcode-vod (else the bootstrap hook did not run)
+```
+Stream (NLB hostname from `kubectl get svc mediamtx-rtmp -n streaming`):
+```
+ffmpeg -re -f lavfi -i "testsrc=size=1280x720:rate=30" -f lavfi -i "sine=frequency=440" \
+  -c:v libx264 -preset veryfast -b:v 2500k -g 60 -c:a aac -b:a 128k -t 420 \
+  -f flv "rtmp://<NLB>:1935/<stream_key>"
+```
+Observed autoscaling timeline (real, 2026-08-11, for the docs' three-terminal lab):
+```
+01:36:08  baseline: no jobs, no nodeclaims, no transcode nodes, 0 S3 objects
+01:36:30  KEDA Job transcode-live-4nxz2 Running; Karpenter NodeClaim c6a.xlarge launching  (+22s)
+01:36:44  EC2 node joined cluster, NotReady                                                (+36s)
+01:36:54  node Ready — 46s from Job to schedulable capacity                                (+46s)
+01:37:12  first HLS segment in S3 (delta = one-time ~1.5GB ffmpeg image pull)           (+64s)
+01:37:31  19 objects: 1080p/720p/480p ABR ladder + playlists, ~4s cadence
+```
+Playback via CloudFront (no DNS needed — default domain):
+```
+curl https://<cf-domain>/hls/live/<stream-uuid>/master.m3u8   # ABR master, 3 renditions
+curl -o /dev/null -w "%{http_code} %{time_total}s" https://<cf-domain>/hls/live/<stream-uuid>/1080p/segment_000.ts
+# -> 200, ~0.5s for 1.4MB
+```
+
 ## Phase 8 — GitOps bootstrap
 
 ```
