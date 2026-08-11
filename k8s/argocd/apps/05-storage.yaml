@@ -1,0 +1,33 @@
+# Wave 0 — cluster storage classes. Added 2026-08-11: storageclass-gp3.yaml
+# previously sat at k8s/infra/ top level, a path NO Application syncs, so the
+# gp3 class silently never existed and every PVC that named it (Prometheus,
+# Kafka) hung Pending. If a manifest is not under some Application's path, it
+# is not part of the cluster — GitOps has no "kubectl apply I did once" escape
+# hatch, which is the point.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: storage
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Linkify-Solutions-Inc/kubernetes-streaming.git
+    targetRevision: master
+    path: k8s/infra/storage
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 15s
+        factor: 2
+        maxDuration: 5m
