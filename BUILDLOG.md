@@ -250,6 +250,12 @@ operation, auto-sync then applies the new revision:
 Lesson: when "my pushed fix isn't taking effect" under ArgoCD, check
 .status.operationState BEFORE re-pushing harder.
 
+GOTCHA 8: kafka-metrics-configmap.yaml was a placeholder whose data was ONLY
+yaml comments -> parses as empty -> Strimzi fails the WHOLE Kafka reconcile
+("Failed to parse metrics configuration ... No content to map"), not just
+metrics. FIX: replaced verbatim with the ConfigMap document from Strimzi
+0.49.0's examples/metrics/kafka-metrics.yaml (+ namespace: kafka).
+
 DESIGN CLEANUP: images made public -> externalsecret-ghcr.yaml deleted. It
 was dead weight anyway: no Deployment ever referenced an imagePullSecret, so
 private pulls would have failed even WITH the secret — the archived design

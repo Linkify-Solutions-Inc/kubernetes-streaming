@@ -16,8 +16,13 @@ kind: Kustomization
 # See docs/aws/15-argocd-gitops.md.
 namespace: argocd
 
+# GOTCHA (hit 2026-08-11): because this kustomization exists, Argo renders
+# the directory THROUGH kustomize -- a new .yaml dropped in here is silently
+# ignored until it is listed below. The root app even reports Synced while
+# skipping it. Adding a file to this directory means adding a line here.
 resources:
   - 00-platform.yaml # operators and CRDs
+  - 05-storage.yaml # gp3 StorageClass (default class; Kafka + Prometheus PVCs)
   - 10-secrets.yaml # ClusterSecretStore + ExternalSecrets (needs ESO CRDs)
   - 10-karpenter-pools.yaml # EC2NodeClass + NodePools (needs Karpenter CRDs)
   - 20-kafka.yaml # Kafka cluster + topics (needs Strimzi CRDs + gp3 SC)
