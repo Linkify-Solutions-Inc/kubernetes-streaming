@@ -226,6 +226,12 @@ eksctl scale nodegroup --cluster streaming --region us-east-1 --name system --no
 ```
 and cluster.yaml desiredCapacity updated 2 -> 3 to keep file == reality.
 
+GOTCHA 5: k8s/infra/storageclass-gp3.yaml sat at a path NO Application synced
+-> the gp3 class (also the default class) never existed; Prometheus and Kafka
+PVCs would hang Pending forever. FIX: moved to k8s/infra/storage/ + new
+k8s/argocd/apps/05-storage.yaml Application. Lesson for the docs: under
+GitOps, a manifest outside every Application's path simply does not exist.
+
 ## Phase 8 — GitOps bootstrap
 
 ```

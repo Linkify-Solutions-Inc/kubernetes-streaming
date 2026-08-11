@@ -20,8 +20,13 @@ spec:
     # Check what your pinned operator actually ships before changing this:
     #   kubectl -n kafka get deploy strimzi-cluster-operator \
     #     -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="STRIMZI_KAFKA_IMAGES")].value}'
-    version: 3.9.0
-    metadataVersion: 3.9-IV0
+    # 3.9.0 was rejected by Strimzi 0.49 ("Unsupported Kafka.spec.kafka
+    # .version ... Supported: [4.0.0, 4.0.1, 4.1.0, 4.1.1]", hit 2026-08-11)
+    # -- the operator pin and this pin move together, ALWAYS run the command
+    # above when touching either. No explicit metadataVersion: on a fresh
+    # KRaft cluster Strimzi defaults to the newest for this Kafka version,
+    # which is correct and removes a second pin that could disagree.
+    version: 4.1.1
     listeners:
       # Plain, in-cluster, no TLS. Everything that talks to Kafka — the five
       # services in `streaming` and the KEDA operator in `keda` — is inside
