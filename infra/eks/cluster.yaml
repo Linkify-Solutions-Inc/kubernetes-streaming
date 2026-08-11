@@ -8,15 +8,11 @@
 # apply them with eksctl, and keep everything else (add-ons via Helm,
 # workloads via Kustomize) declarative in git too.
 #
-# See docs/aws/03-eks-cluster.md for a walkthrough of every stanza.
-#
-# Substitutions are done: account 242626138899, SSO role
-# AWSReservedSSO_PowerUserAccess_bb0504f4b8ea9359 (see accessEntries below).
-#
-# That permission set is named PowerUserAccess but has been extended with IAM
-# rights: iam:CreateRole, iam:PassRole and iam:AttachRolePolicy all simulate as
-# allowed (checked 2026-08-10), so eksctl can create the roles it needs.
-# Do not assume the stock PowerUserAccess policy applies here -- it does not.
+# Identity setup (rebuilt 2026-08-10): IAM Identity Center lives in us-east-1,
+# instance ssoins-7223ef3085110868, start URL https://d-90667b4413.awsapps.com/start.
+# Two permission sets exist for account 242626138899:
+#   AdminAccess      (AdministratorAccess)              -> user aayush, creates this cluster
+#   StreamingDeploy  (PowerUserAccess + eksctl IAM set) -> user fatima, see accessEntries
 apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
 
@@ -27,6 +23,19 @@ metadata:
   tags:
     Project: streaming
 
+# Pin the VPC's AZs. If omitted, eksctl picks two at random each run: our
+# first run (2026-08-10) got us-east-1f/us-east-1a while the nodegroup below
+# asked for us-east-1a/us-east-1b, and nodegroup creation failed with "could
+# not find private subnets for zones". Pinned to what that run actually built
+# so the file now describes reality AND reproduces deterministically.
+availabilityZones: [us-east-1a, us-east-1f]
+
+# Future eksctl releases turn on EKS Auto Mode by default, which stops
+# creating managed nodegroups and networking add-ons from this file. Pin the
+# behavior this file was written against.
+autoModeConfig:
+  enabled: false
+
 # EKS Access Entries, not the legacy aws-auth ConfigMap. "API" means the
 # ConfigMap is not consulted at all -- one source of truth, auditable in
 # CloudTrail, and recoverable with the EKS API if it is ever wrong.
@@ -35,14 +44,15 @@ accessConfig:
   bootstrapClusterCreatorAdminPermissions: true
   accessEntries:
     # A second admin, so deleting the creating principal cannot lock you out.
-    # This is the SSO *role* ARN (with the aws-reserved path), not the
-    # assumed-role session ARN that `aws sts get-caller-identity` prints.
-    # The region segment below is us-east-2 and that is CORRECT even though the
-    # cluster is us-east-1: it is the *Identity Center* region, not the cluster
-    # region. The two are unrelated -- do not "fix" it to match the region
-    # above. Verified with `aws iam list-roles --path-prefix
-    # /aws-reserved/sso.amazonaws.com/` on 2026-08-10.
-    - principalARN: arn:aws:iam::242626138899:role/aws-reserved/sso.amazonaws.com/us-east-2/AWSReservedSSO_PowerUserAccess_bb0504f4b8ea9359
+    # The creator (aayush's AdminAccess role) gets admin automatically via
+    # bootstrapClusterCreatorAdminPermissions -- do NOT also list it here or
+    # eksctl fails on the duplicate. This entry is fatima's StreamingDeploy
+    # role. It is the SSO *role* ARN (aws-reserved path), not the assumed-role
+    # session ARN that `aws sts get-caller-identity` prints. There is no region
+    # segment in the path because Identity Center lives in us-east-1; only
+    # non-us-east-1 instances get one. Verified with `aws iam list-roles
+    # --path-prefix /aws-reserved/sso.amazonaws.com/` on 2026-08-10.
+    - principalARN: arn:aws:iam::242626138899:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_StreamingDeploy_c76ab22657ecbba5
       accessPolicies:
         - policyARN: arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy
           accessScope:
@@ -77,13 +87,17 @@ managedNodeGroups:
     volumeType: gp3
     volumeEncrypted: true
     privateNetworking: true
-    availabilityZones: [us-east-1a, us-east-1b]
+    # Must be a subset of the cluster-level availabilityZones above.
+    availabilityZones: [us-east-1a, us-east-1f]
     labels:
       workload: system
     tags:
+      # No karpenter.sh/discovery tag here: an empty tag value is rejected by
+      # CloudFormation's CreateStack API ("length greater than or equal to 1",
+      # verified 2026-08-10), and it was pointless anyway -- Karpenter only
+      # manages nodes it provisioned itself, so a managed nodegroup needs no
+      # opt-out. Discovery tags go on subnets and the cluster security group.
       Project: streaming
-      # Deliberately empty: Karpenter must not manage or consolidate these.
-      karpenter.sh/discovery: ""
     # Do NOT taint this group. Karpenter, CoreDNS, the load balancer
     # controller, External Secrets, Strimzi and every stateless app pod live
     # here; a taint means adding tolerations to every chart for no benefit at
@@ -101,6 +115,12 @@ cloudWatch:
     logRetentionInDays: 7
 
 addons:
+  # metrics-server: eksctl installs this implicitly during `create cluster`,
+  # but our first run failed before reaching it -- and implicit behavior is
+  # how this file bit us twice already. Declared explicitly so `eksctl create
+  # addon -f` converges the cluster to this list, whole and exact.
+  - name: metrics-server
+    version: latest
   - name: vpc-cni
     version: latest
     configurationValues: |-
