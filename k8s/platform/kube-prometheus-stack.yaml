@@ -24,12 +24,16 @@ spec:
     helm:
       values: |
         grafana:
-          # Set once, by hand, before the first sync:
-          #   argocd app set kube-prometheus-stack --helm-set grafana.adminPassword='<pick-one>'
-          # or move it to an ExternalSecret + valueFrom if you'd rather not
-          # have even a placeholder here. Left unset intentionally rather
-          # than committing a real password to git.
-          adminPassword: "<grafana-admin-password>"
+          # Credentials come from the grafana-admin Secret, materialized by
+          # k8s/infra/secrets/externalsecret-grafana.yaml from Secrets Manager
+          # (streaming/grafana). No password in git, and unlike the archived
+          # `argocd app set` approach, nothing for the root app's selfHeal to
+          # revert. Grafana may restart once or twice at first install until
+          # wave 10 delivers the Secret -- that's the retry loop working.
+          admin:
+            existingSecret: grafana-admin
+            userKey: admin-user
+            passwordKey: admin-password
         prometheus:
           prometheusSpec:
             retention: 7d
