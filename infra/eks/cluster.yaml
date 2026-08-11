@@ -10,9 +10,13 @@
 #
 # See docs/aws/03-eks-cluster.md for a walkthrough of every stanza.
 #
-# Substitute before applying:
-#   <accountid>         your 12-digit AWS account ID
-#   <SSO_ROLE_SUFFIX>   the AWSReservedSSO_... role name from Module 1
+# Substitutions are done: account 242626138899, SSO role
+# AWSReservedSSO_PowerUserAccess_bb0504f4b8ea9359 (see accessEntries below).
+#
+# That permission set is named PowerUserAccess but has been extended with IAM
+# rights: iam:CreateRole, iam:PassRole and iam:AttachRolePolicy all simulate as
+# allowed (checked 2026-08-10), so eksctl can create the roles it needs.
+# Do not assume the stock PowerUserAccess policy applies here -- it does not.
 apiVersion: eksctl.io/v1alpha5
 kind: ClusterConfig
 
@@ -33,7 +37,12 @@ accessConfig:
     # A second admin, so deleting the creating principal cannot lock you out.
     # This is the SSO *role* ARN (with the aws-reserved path), not the
     # assumed-role session ARN that `aws sts get-caller-identity` prints.
-    - principalARN: arn:aws:iam::<accountid>:role/aws-reserved/sso.amazonaws.com/us-east-1/AWSReservedSSO_<SSO_ROLE_SUFFIX>
+    # The region segment below is us-east-2 and that is CORRECT even though the
+    # cluster is us-east-1: it is the *Identity Center* region, not the cluster
+    # region. The two are unrelated -- do not "fix" it to match the region
+    # above. Verified with `aws iam list-roles --path-prefix
+    # /aws-reserved/sso.amazonaws.com/` on 2026-08-10.
+    - principalARN: arn:aws:iam::242626138899:role/aws-reserved/sso.amazonaws.com/us-east-2/AWSReservedSSO_PowerUserAccess_bb0504f4b8ea9359
       accessPolicies:
         - policyARN: arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy
           accessScope:
