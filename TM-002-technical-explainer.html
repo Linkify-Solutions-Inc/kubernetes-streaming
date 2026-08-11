@@ -148,6 +148,18 @@ the same files. The discipline it demands: if you click something into existence
 invisible to the files, survives no rebuild, and is a lie waiting to be discovered. The reference build
 enforces this so hard that even the <em>teardown</em> is a version-controlled script.</p>
 
+<div class="box note"><div class="bx-label">Design choice — why eksctl + CLI, not Terraform or Pulumi</div><div class="bx-body">
+<p>Three tools share the IaC job here: eksctl→CloudFormation for the cluster (declarative, and
+stateless — CloudFormation <em>is</em> the state, so there is no state-backend bootstrap problem),
+GitOps for everything inside Kubernetes, and plain AWS CLI — documented, discovery-based, scripted for
+teardown — for the data layer. Terraform would have unified the AWS side: one apply, one destroy, and
+a dependency graph that automatically prevents deletion-ordering bugs like case 19. It was not used
+because it adds a second declarative language, a state backend, and a layer of abstraction between the
+learner and the actual API calls — the wrong trade for a one-cluster teaching platform, and the right
+first epic if this ever goes to production. Pulumi is the same model with a general-purpose language;
+strictly more machinery than this system needs.</p>
+</div></div>
+
 <p><span class="para-num">1-4.</span><strong>GitOps.</strong> CI/CD's traditional shape is
 <em>push-based</em>: a pipeline holds cluster credentials and runs <code>kubectl apply</code>. GitOps
 inverts it: an agent <em>inside</em> the cluster (ArgoCD) watches the git repository and pulls reality
