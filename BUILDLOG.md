@@ -262,6 +262,18 @@ silently ignores any file not listed in `resources:`. Root even reports
 Synced. FIX: list the new file in kustomization.yaml. Rule: file in that
 directory == line in that list, always both.
 
+GOTCHA 10: broker pod then hit "3 Insufficient memory" — it requests 2Gi and
+no t3.medium with platform pods aboard has that free; Karpenter pools are
+transcode-tainted by design so they can't take it. FIX: system nodegroup
+3 -> 4 (the declared maxSize); a fresh node hosts the broker with headroom.
+
+GOTCHA 11: db-migrate stuck sync=Unknown — its kustomization reads
+../../../../postgres/migrations/*.sql (outside the kustomize root), which the
+repo-server refuses without the global option. FIX (survives chart upgrades):
+  helm upgrade argocd argo/argo-cd -n argocd --reuse-values \
+    --set-string 'configs.cm.kustomize\.buildOptions=--load-restrictor LoadRestrictionsNone'
+The archived docs KNEW this ("a global setting") but never said where to set it.
+
 DESIGN CLEANUP: images made public -> externalsecret-ghcr.yaml deleted. It
 was dead weight anyway: no Deployment ever referenced an imagePullSecret, so
 private pulls would have failed even WITH the secret — the archived design

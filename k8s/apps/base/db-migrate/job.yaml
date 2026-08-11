@@ -70,6 +70,11 @@ spec:
             runAsUser: 70          # "postgres" in the alpine image
             capabilities:
               drop: ["ALL"]
+            # Required by the namespace's restricted PodSecurity enforcement;
+            # without it the Job's pods are rejected at ADMISSION -- no pod,
+            # no logs, only job-controller FailedCreate events (hit 2026-08-11).
+            seccompProfile:
+              type: RuntimeDefault
           volumeMounts:
             - name: migrations
               mountPath: /migrations
