@@ -3,6 +3,14 @@ kind: Ingress
 metadata:
   name: streaming
   annotations:
+    # LAST wave on purpose (ScaledJobs are wave 1). This Ingress cannot be
+    # healthy until the ACM cert validates, which needs the Cloudflare NS
+    # delegation — an EXTERNAL dependency. At wave 0 its pending state held
+    # the whole app's sync operation open ("waiting for healthy state of
+    # Ingress/streaming") and blocked every later config rollout for an hour
+    # (hit 2026-08-11). Nothing sequences after the final wave, so here its
+    # pending state gates nothing.
+    argocd.argoproj.io/sync-wave: "2"
     alb.ingress.kubernetes.io/scheme: internet-facing
     # NLB/ALB -> pod IP directly. With the VPC CNI handing pods real VPC
     # addresses this is free and strictly better than `instance` mode, which
@@ -19,7 +27,12 @@ metadata:
     # The controller synthesises a 301 redirect action on the HTTP listener.
     # Port 80 exists only to send people to 443.
     alb.ingress.kubernetes.io/ssl-redirect: "443"
-    alb.ingress.kubernetes.io/certificate-arn: <acm-cert-arn>
+    # REBUILD-SENSITIVE: cert is per-environment. Rediscover with:
+    #   aws acm list-certificates --region us-east-1 \
+    #     --query 'CertificateSummaryList[?DomainName==`*.k8s.linkifysolutions.com`].CertificateArn' --output text
+    # The ALB only provisions once this cert reaches ISSUED (needs the
+    # Cloudflare NS delegation for k8s.linkifysolutions.com).
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:242626138899:certificate/8f796564-8090-43fd-bdf8-7f94284ab5b1
     alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
 
     alb.ingress.kubernetes.io/healthcheck-path: /livez

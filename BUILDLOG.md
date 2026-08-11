@@ -281,6 +281,19 @@ only job-controller FailedCreate events (`kubectl describe job`, not pod).
 FIX: securityContext.seccompProfile.type: RuntimeDefault in the Job template.
 Least discoverable failure shape of the night — teach `describe job` early.
 
+GOTCHA 13 (two config bugs, one lesson):
+(a) upload-api readyz failed its S3 check — the generated ConfigMap carried
+    S3_BUCKET=linkify-streaming-media-<accountid>. The placeholder lived in
+    TWO places (k8s/infra/secrets/configmap-app.yaml AND
+    k8s/apps/overlays/prod/config.env) and only the first had been fixed.
+    The static configmap-app.yaml is a redundant near-duplicate of the
+    kustomize generator's output — same name, fewer keys — a config fork
+    that should be collapsed to one source.
+(b) ingest-webhook CrashLoop: deployment wires env vars one-by-one; main.py
+    require()s three, the yaml carried two -> sys.exit at import.
+Lesson: grep the WHOLE tree for a placeholder before declaring it fixed;
+`grep -rn "<accountid>" k8s/` costs nothing.
+
 DESIGN CLEANUP: images made public -> externalsecret-ghcr.yaml deleted. It
 was dead weight anyway: no Deployment ever referenced an imagePullSecret, so
 private pulls would have failed even WITH the secret — the archived design
