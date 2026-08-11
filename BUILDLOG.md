@@ -239,6 +239,17 @@ and the Kafka version pin move together — check with:
 FIX: version: 4.1.1, metadataVersion line removed (fresh KRaft cluster ->
 Strimzi defaults it correctly).
 
+GOTCHA 7 (the subtle one): after fixing GOTCHA 6 in git, the live CR stayed
+at 3.9.0. The kafka app's FIRST sync operation was still "Running": its
+PostSync hook (consumer-group-bootstrap-job) makes ArgoCD wait for ALL
+resources healthy; KafkaTopics can never be healthy while the Kafka CR is
+rejected; and ArgoCD will not start a new sync while one is in flight — the
+broken state held the lock against its own fix. FIX: terminate the wedged
+operation, auto-sync then applies the new revision:
+  kubectl patch application kafka -n argocd --type json -p '[{"op":"remove","path":"/operation"}]'
+Lesson: when "my pushed fix isn't taking effect" under ArgoCD, check
+.status.operationState BEFORE re-pushing harder.
+
 DESIGN CLEANUP: images made public -> externalsecret-ghcr.yaml deleted. It
 was dead weight anyway: no Deployment ever referenced an imagePullSecret, so
 private pulls would have failed even WITH the secret — the archived design
