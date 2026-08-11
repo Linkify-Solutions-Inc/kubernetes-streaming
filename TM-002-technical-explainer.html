@@ -350,6 +350,20 @@ ships specific broker images and nothing else.</td></tr>
 <tr><td><code>overlays/dev/</code></td><td>The same base squeezed onto a laptop: single replicas, tiny resources, no ALB.</td></tr>
 <tr><td><code>mediamtx/base/</code> + <code>overlays/aws/</code></td><td>The RTMP server: config file with auth delegated to ingest-webhook (<code>runOnReady</code>/hooks), a PodDisruptionBudget, and in the AWS overlay the NLB Service (<code>service-rtmp-nlb.yaml</code>) — TCP 1935 straight through, plus placement pinning. This overlay is what the manual-sync mediamtx Application deploys.</td></tr>
 </tbody></table></div>
+<h3>4-7. <code>services/</code>, the Dockerfiles, and the compose mirror</h3>
+<p>Each service ships a near-identical Dockerfile: a slim Python base image; <code>requirements.txt</code>
+copied and installed <em>before</em> the source code (so the expensive dependency layer caches across
+code-only rebuilds — the layering idea from §1-1 doing real work); a non-root user (the restricted
+PodSecurity standard in §4-6 assumes it); and a plain <code>uvicorn</code> entrypoint. The transcode
+image alone adds ffmpeg, which is why it weighs ~1.5 GB and dominates cold-start (§6-2).</p>
+<p><code>docker-compose.yml</code> is the whole platform shrunk onto one laptop: the five services,
+one Postgres, one Kafka, one MediaMTX — same images, same env-var names, same
+<code>postgres/migrations/</code> schema files the cluster's db-migrate Job replays. That parity is a
+design decision, not a convenience: a bug reproduced in compose is the same bug the cluster has, minus
+every AWS variable. When something misbehaves in EKS, "does compose do it too?" is the cheapest
+bisection you own — it splits the universe into <em>our code</em> versus <em>the platform around it</em>
+in thirty seconds.</p>
+
 <h2 id="ch5">Chapter 5 — Eighteen defects: case studies</h2>
 
 <p>Everything below actually happened, in this order, in one build. None are exotic; all are the daily
