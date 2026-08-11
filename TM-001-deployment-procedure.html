@@ -81,6 +81,11 @@ ol.steps>li::before{counter-increment:step;content:counter(step);
 .toc div{margin:.25rem 0;break-inside:avoid}
 a{color:var(--note)}
 .dist{font-size:.8rem;color:var(--ink-2);border-top:1px solid var(--rule);margin-top:.8rem;padding-top:.5rem}
+.anatomy{border:1px solid var(--olive);background:var(--olive-soft);margin:.9rem 0;max-width:74ch}
+.anatomy .bx-label{color:var(--olive);border-color:var(--olive)}
+.anatomy dl{margin:.2rem 0;font-size:.9rem}
+.anatomy dt{font:.82rem ui-monospace,Menlo,Consolas,monospace;margin-top:.5rem}
+.anatomy dd{margin:.1rem 0 .2rem 1.2rem}
 @media (max-width:640px){.toc{columns:1}}
 @media print{body{font-size:11pt}.page{max-width:none}}
 </style>
@@ -200,6 +205,14 @@ helm version --short       # v4.x (v3.15+ also acceptable)
 ffmpeg -version | head -1</code></pre>
 <p>Every command prints a version. The reference build used eksctl 0.229.0, kubectl 1.36.3, helm 4.2.3.</p>
 </div></div>
+<div class="box anatomy"><div class="bx-label">Command anatomy — what each tool actually is</div><div class="bx-body"><dl>
+<dt>aws</dt><dd>A signed-HTTP client for every AWS API. Each subcommand family (<code>ec2</code>, <code>rds</code>, <code>s3api</code>…) maps 1:1 to a service's API; nothing is magic, everything is a request you could have made with curl and a signature.</dd>
+<dt>eksctl</dt><dd>A cluster compiler: reads <code>cluster.yaml</code>, emits CloudFormation stacks, waits on them. It keeps no state of its own — the file plus the stacks <em>are</em> the state.</dd>
+<dt>kubectl</dt><dd>The Kubernetes API client. Everything it does — get, apply, delete, logs, port-forward — is an HTTPS call to the cluster's API server, authenticated via your AWS identity.</dd>
+<dt>helm</dt><dd>A package manager for Kubernetes: a "chart" is templated YAML plus defaults; <code>install</code> renders it with your values and applies the result as one tracked release.</dd>
+<dt>ffmpeg</dt><dd>The Swiss-army knife of audio/video. Here it plays two roles: your fake OBS (Chapter 11) and, inside the transcode image, the real encoder.</dd>
+</dl></div></div>
+
 
 <div class="box note"><div class="bx-label">Note — WSL2 is fine</div><div class="bx-body">
 <p>If your Ubuntu is WSL2 on Windows, run everything in this manual inside the WSL terminal,
@@ -250,6 +263,8 @@ when prompted:</p>
 (credentials last 8 hours):</p>
 <pre><code>aws sso login --profile streaming-deploy
 export AWS_PROFILE=streaming-deploy   # so every command in this manual finds it</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — SSO login mechanics</div><div class="bx-body"><p><code>aws configure sso</code> writes two blocks to <code>~/.aws/config</code> — a profile (account + role) and an sso-session (where to log in) — and nothing secret. <code>aws sso login</code> runs a browser device-flow: you authenticate (password + MFA), AWS hands the CLI a short-lived token, and every later command silently exchanges it for role credentials. The ARN in Checkpoint 3-A reads <code>assumed-role/&lt;role&gt;/&lt;you&gt;</code> — you are never "a user with keys", you are a person temporarily wearing a role. Expiry after 8 h shows up as sudden auth errors; the fix is always just <code>aws sso login</code> again.</p></div></div>
+
 
 <div class="box checkpoint"><div class="bx-label">Checkpoint 3-A</div><div class="bx-body">
 <pre><code>aws sts get-caller-identity</code></pre>
@@ -300,6 +315,12 @@ discovery command — the file teaches you even if you lose this manual:</p>
 
 <p>After each substitution: <code>git add -A &amp;&amp; git commit -m "substitute &lt;what&gt; for this build" &amp;&amp; git push</code>.
 The GitOps engine (Chapter 10) reads GitHub, not your working tree — an unpushed fix does not exist.</p>
+<div class="box anatomy"><div class="bx-label">Command anatomy — reading the discovery commands (--query / --filters / --output)</div><div class="bx-body"><p>Every discovery command uses the same three levers, worth learning once:</p><dl>
+<dt>--filters Name=…,Values=…</dt><dd>Server-side narrowing — AWS returns only matching resources (e.g. the VPC carrying our cluster tag).</dd>
+<dt>--query '…'</dt><dd>Client-side reshaping in JMESPath: <code>Vpcs[0].VpcId</code> = first element's field; <code>Roles[?contains(RoleName,`AdminAccess`)].Arn</code> = filter-then-project; <code>[]</code> flattens. Backticks quote literals.</dd>
+<dt>--output text|table|json</dt><dd><code>text</code> for values you'll paste or pipe, <code>table</code> for human eyes, default JSON for everything else.</dd>
+</dl><p>Nothing about these flags changes what exists — discovery is always read-only, which is why you can rerun any of it freely.</p></div></div>
+
 
 <h2 id="ch5">Chapter 5 — Cluster build</h2>
 
@@ -320,6 +341,8 @@ this: VPC, subnets across two pinned availability zones, one NAT gateway, the EK
 access entries, a 4-node system nodegroup, and six add-ons. Expect 15–20 minutes.</p>
 <pre><code>cd ~/linkify/kubernetes-streaming
 eksctl create cluster -f infra/eks/cluster.yaml</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — what eksctl is doing for those 20 minutes</div><div class="bx-body"><p>Two CloudFormation stacks. <code>eksctl-streaming-cluster</code>: the VPC (subnets, route tables, one NAT, internet gateway), the EKS control plane (AWS-managed apiserver+etcd — the $0.10/hr), the OIDC provider, access entries, and the six add-ons. Then <code>eksctl-streaming-nodegroup-system</code>: a launch template + auto-scaling group that boots four EC2 machines which join the cluster. Progress is visible as stack events in the CloudFormation console — when eksctl "hangs", it is politely waiting on a stack, and the console names the resource it's waiting for. It finishes by writing <code>~/.kube/config</code>: the cluster's address plus an instruction to authenticate via your AWS identity — no separate Kubernetes password exists.</p></div></div>
+
 
 <div class="box note"><div class="bx-label">Note — if it fails partway</div><div class="bx-body">
 <p>Do not delete and restart. eksctl builds in units (cluster stack → nodegroup stack → add-ons);
@@ -367,6 +390,8 @@ platform this is the single biggest cost lever in the design:</p>
 launch nodes by tag. Without these, node provisioning in Chapter 11 fails <em>silently</em>:</p>
 <pre><code>aws ec2 create-tags --resources &lt;subnet-PrivateA&gt; &lt;subnet-PrivateB&gt; $CSG \
   --tags Key=karpenter.sh/discovery,Value=streaming</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — gateway endpoints and tags</div><div class="bx-body"><p>A <em>gateway</em> VPC endpoint is a routing trick, not a server: AWS injects a route into the named route tables sending S3-bound traffic (matched by a managed prefix list) across AWS's backbone instead of out the NAT gateway. Free, invisible to applications, no throughput to size — which is why it's the rare optimization with no trade-off. (Its cousin, the <em>interface</em> endpoint, is a billable ENI — not what we use.) <code>create-tags</code> attaches plain key/value metadata; tags do nothing by themselves, but Karpenter <em>searches</em> by them — tagging is how you leave signposts for controllers that arrive later.</p></div></div>
+
 
 <p><span class="para-num">6-4.</span><strong>Substitute the VPC ID</strong> into
 <code>k8s/platform/aws-load-balancer-controller.yaml</code> (the <code>vpcId:</code> line), commit, push.</p>
@@ -416,6 +441,13 @@ eksctl create iamserviceaccount --cluster streaming --region us-east-1 \
 
 aws eks create-access-entry --cluster-name streaming --region us-east-1 \
   --principal-arn arn:aws:iam::242626138899:role/KarpenterNodeRole-streaming --type EC2_LINUX</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — the IAM machinery in this chapter</div><div class="bx-body"><dl>
+<dt>aws iam create-policy</dt><dd>Uploads a JSON permission document as a named, versioned object. Creating it grants nothing — policies are inert until attached to a role.</dd>
+<dt>eksctl create iamserviceaccount</dt><dd>One command, three artifacts (via a small CFN stack): an IAM role whose trust policy accepts tokens from <em>this cluster's</em> OIDC provider for <em>this exact</em> namespace/name; the policy attachment; and the Kubernetes ServiceAccount annotated with the role ARN. That is IRSA end-to-end — pods using the SA exchange their service-account token for AWS credentials, keylessly.</dd>
+<dt>aws cloudformation deploy</dt><dd>Create-or-update with changesets: safe to rerun; shows "no changes" when the stack matches. <code>--capabilities CAPABILITY_NAMED_IAM</code> is you acknowledging the template creates named IAM resources.</dd>
+<dt>aws eks create-access-entry --type EC2_LINUX</dt><dd>Tells the cluster "EC2 instances presenting this role are worker nodes" — the API-mode replacement for the old aws-auth ConfigMap edit. Without it, Karpenter's machines would boot, try to join, and be politely refused.</dd>
+</dl></div></div>
+
 
 <div class="box checkpoint"><div class="bx-label">Checkpoint 7-A</div><div class="bx-body">
 <pre><code>kubectl get sa aws-load-balancer-controller karpenter -n kube-system \
@@ -443,6 +475,13 @@ aws rds create-db-instance --db-instance-identifier streaming-db \
   --db-name streaming --vpc-security-group-ids $DBSG \
   --db-subnet-group-name streaming-db-subnets --no-publicly-accessible \
   --backup-retention-period 1 --no-multi-az --tags Key=Project,Value=streaming</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — create-db-instance, flag by flag</div><div class="bx-body"><dl>
+<dt>subnet group + --no-publicly-accessible</dt><dd>Pins the database inside the private subnets with no public IP; the <em>only</em> path in is port 5432 from the cluster security group (the SG-to-SG rule above — membership-based, no IP lists to maintain).</dd>
+<dt>--engine-version / db.t4g.micro / gp3 / 20 GB</dt><dd>Smallest sensible Postgres: ARM instance (~$0.017/hr), general-purpose SSD at free-tier IOPS.</dd>
+<dt>--manage-master-user-password</dt><dd>The star flag: AWS generates the password, stores it in Secrets Manager under a name <em>it</em> chooses (your Chapter 4 substitution), and can rotate it. No human ever knows it; ESO delivers it to pods; rotation needs no redeploy.</dd>
+<dt>--storage-encrypted / --backup-retention-period 1 / --no-multi-az</dt><dd>Encryption at rest is table stakes; one day of backups and a single AZ are learning-platform economics — production would raise both.</dd>
+</dl></div></div>
+
 <div class="box note"><div class="bx-label">Note</div><div class="bx-body">
 <p><code>--manage-master-user-password</code> makes AWS generate, store, and rotate the database
 password in Secrets Manager. No human ever sees it; the cluster reads it via External Secrets. If
@@ -460,6 +499,13 @@ aws s3api put-bucket-lifecycle-configuration --bucket $B --lifecycle-configurati
     "AbortIncompleteMultipartUpload":{"DaysAfterInitiation":7}}]}'
 aws s3api put-bucket-cors --bucket $B --cors-configuration '{
   "CORSRules":[{"AllowedMethods":["GET","HEAD"],"AllowedOrigins":["*"],"AllowedHeaders":["*"],"MaxAgeSeconds":3000}]}'</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — the four s3api calls</div><div class="bx-body"><dl>
+<dt>create-bucket</dt><dd>Bucket names are <em>globally</em> unique across all AWS customers — hence the account-id suffix.</dd>
+<dt>put-public-access-block</dt><dd>Four switches that make public exposure structurally impossible regardless of any future policy mistake. Viewers never touch S3 directly — CloudFront does.</dd>
+<dt>put-bucket-lifecycle-configuration</dt><dd>One rule: abandoned multipart uploads (a crashed upload's invisible half-transferred parts, which bill as storage) get reaped after 7 days.</dd>
+<dt>put-bucket-cors</dt><dd>Lets browsers on other origins GET segments — required because the player page and the CDN are different hostnames. GET/HEAD only; nobody writes via CORS.</dd>
+</dl></div></div>
+
 
 <p><span class="para-num">8-3.</span><strong>Application IAM policies + Pod Identity.</strong> Three
 policies scope what each workload may touch, then Pod Identity binds each to a
@@ -496,6 +542,8 @@ eksctl create podidentityassociation --cluster streaming --region us-east-1 \
 eksctl create podidentityassociation --cluster streaming --region us-east-1 \
   --namespace streaming --service-account-name transcode-worker \
   --permission-policy-arns arn:aws:iam::242626138899:policy/streaming-transcode-worker</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — pod identity associations</div><div class="bx-body"><p><code>eksctl create podidentityassociation</code> builds a role (trusting <code>pods.eks.amazonaws.com</code>), attaches your policy, and registers the mapping (cluster, namespace, service-account) → role with EKS. At runtime the Pod Identity agent (one of the Chapter 5 add-ons) intercepts the SDK's credential lookup inside any pod running as that service account and serves short-lived role credentials. Compare with IRSA (Chapter 7): same outcome, but the binding lives on the AWS side keyed by <em>names</em> — which is why renaming a ServiceAccount silently unbinds it.</p></div></div>
+
 <div class="box note"><div class="bx-label">Note — why ListBucket is unconditioned</div><div class="bx-body">
 <p>The reference build first scoped upload-api's <code>s3:ListBucket</code> with a <code>raw/*</code>
 prefix condition. Its own readiness probe then failed with 403: the probe calls
@@ -562,6 +610,13 @@ aws s3api put-bucket-policy --bucket linkify-streaming-media-242626138899 --poli
     "Action":"s3:GetObject",
     "Resource":"arn:aws:s3:::linkify-streaming-media-242626138899/hls/*",
     "Condition":{"StringEquals":{"AWS:SourceArn":"arn:aws:cloudfront::242626138899:distribution/&lt;YOUR-DIST-ID&gt;"}}}]}'</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — OAC, the distribution, and the bucket policy</div><div class="bx-body"><dl>
+<dt>Origin Access Control</dt><dd>An identity CloudFront uses to <em>sign</em> its requests to S3 (SigV4, always). The bucket stays sealed; only signed CDN requests pass.</dd>
+<dt>The two cache behaviors</dt><dd>The managed policy IDs are AWS-published constants: <code>658327ea…</code> = CachingOptimized (segments — immutable, cache hard), <code>4135ea2d…</code> = CachingDisabled (<code>*.m3u8</code> — a live playlist changes every few seconds; caching it freezes playback). This split <em>is</em> live-HLS-over-CDN in two lines.</dd>
+<dt>PriceClass_100</dt><dd>North America + Europe edges only — cheaper, fine for a lab.</dd>
+<dt>The bucket policy's Condition</dt><dd>"cloudfront.amazonaws.com may read <code>hls/*</code>" would mean <em>any AWS customer's</em> distribution; the <code>AWS:SourceArn</code> condition narrows it to exactly yours. Note <code>raw/</code> uploads are excluded — the CDN can only ever see finished output.</dd>
+</dl></div></div>
+
 
 <div class="box checkpoint"><div class="bx-label">Checkpoint 8-A</div><div class="bx-body">
 <pre><code>aws rds describe-db-instances --db-instance-identifier streaming-db --query 'DBInstances[0].DBInstanceStatus' --output text   # available
@@ -592,6 +647,8 @@ aws route53 change-resource-record-sets --hosted-zone-id $ZID --change-batch '{
   "Changes":[{"Action":"UPSERT","ResourceRecordSet":{
     "Name":"&lt;validation-record-Name&gt;","Type":"CNAME","TTL":300,
     "ResourceRecords":[{"Value":"&lt;validation-record-Value&gt;"}]}}]}'</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — zones, delegation, and DNS-validated certificates</div><div class="bx-body"><p>A Route53 <em>hosted zone</em> is an authoritative database for one subtree of the DNS. Creating it assigns four AWS nameservers — but the world doesn't know they're in charge until the <em>parent</em> zone (Cloudflare's <code>linkifysolutions.com</code>) publishes NS records pointing <code>k8s</code> at them. That pointer is the delegation, and it is the entire reason Aayush's step exists. ACM's DNS validation is a proof-of-control loop: it gives you a random CNAME only the zone's controller could publish; you publish it (<code>change-resource-record-sets</code> with UPSERT — create-or-overwrite, idempotent); once the delegation makes it publicly resolvable, ACM issues. The certificate then renews itself forever as long as the record stays.</p></div></div>
+
 
 <div class="box caution"><div class="bx-label">Caution — Aayush performs this part</div><div class="bx-body">
 <p>The parent domain <code>linkifysolutions.com</code> is hosted on Cloudflare, which you do not have
@@ -617,6 +674,13 @@ helm install argocd argo/argo-cd --version 10.3.2 --namespace argocd --create-na
   --set configs.params."server\.insecure"=true \
   --set-string 'configs.cm.kustomize\.buildOptions=--load-restrictor LoadRestrictionsNone' \
   --wait --timeout 5m</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — the helm install line</div><div class="bx-body"><dl>
+<dt>--version 10.3.2</dt><dd>Chart pin — same discipline as every pin in this repo: upgrades are decisions, not surprises.</dd>
+<dt>--set configs.params."server\.insecure"=true</dt><dd>ArgoCD's UI serves plain HTTP because you only ever reach it through an authenticated port-forward tunnel; TLS here would be a self-signed formality. The escaped dot means "a key literally named <code>server.insecure</code>", not nesting.</dd>
+<dt>--set-string configs.cm.kustomize\.buildOptions=…</dt><dd>The case-#11 vaccine (see the paragraph above). <code>--set-string</code> keeps the value a literal string.</dd>
+<dt>--wait --timeout 5m</dt><dd>Don't return until the release's pods are actually Ready — turning "install fired" into "install worked".</dd>
+</dl></div></div>
+
 
 <p><span class="para-num">10-2.</span><strong>Register Karpenter's OCI chart registry</strong> (the one
 chart not in a plain HTTP repo):</p>
@@ -650,6 +714,8 @@ a 20 GiB volume, and roughly 2 GiB of free memory. Expected end-state:</p>
 </tbody></table></div>
 <pre><code>kubectl patch application mediamtx -n argocd --type merge \
   -p '{"operation":{"initiatedBy":{"username":"admin"},"sync":{"revision":"master"}}}'</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — kubectl patch, and why it triggers a sync</div><div class="bx-body"><p><code>patch --type merge</code> sends a partial object that the API server merges into the live one — the surgical alternative to editing full YAML. ArgoCD watches its Applications for an <code>operation</code> field appearing; writing one <em>is</em> the "Sync" button, minus the UI. You'll meet patch twice more in this manual: writing <code>status.operationState.phase: Terminating</code> to break a wedged sync lock (Appendix A), and nulling <code>metadata.finalizers</code> to release a stuck resource (Chapter 12) — same verb, three very different levers.</p></div></div>
+
 
 <div class="box checkpoint"><div class="bx-label">Checkpoint 10-A</div><div class="bx-body">
 <pre><code>kubectl get applications -n argocd    # per the table above
@@ -697,6 +763,13 @@ kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80 &am
 <pre><code>ffmpeg -re -f lavfi -i "testsrc=size=1280x720:rate=30" -f lavfi -i "sine=frequency=440" \
   -c:v libx264 -preset veryfast -b:v 2500k -g 60 -c:a aac -b:a 128k -t 420 \
   -f flv "rtmp://&lt;NLB&gt;:1935/&lt;stream_key&gt;"</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — the ffmpeg incantation</div><div class="bx-body"><dl>
+<dt>-re</dt><dd>Real-time pacing — feed frames at playback speed like a camera, not as fast as the CPU allows. Without it you'd "stream" 7 minutes of video in 20 seconds.</dd>
+<dt>-f lavfi -i testsrc… / sine…</dt><dd>Synthetic video (a moving test pattern) and a 440 Hz tone — a camera and microphone made of math.</dd>
+<dt>-c:v libx264 -b:v 2500k -g 60</dt><dd>H.264 at 2.5 Mbps; a keyframe every 60 frames (2 s at 30 fps) — segment boundaries can only fall on keyframes, so this bounds HLS segment timing.</dd>
+<dt>-c:a aac / -f flv / rtmp://</dt><dd>AAC audio in an FLV container, because RTMP — a 2002 protocol that simply refuses to die — carries only FLV. The path component is your stream key: possession of it <em>is</em> authentication, which is why it never appears in viewer-facing URLs.</dd>
+</dl></div></div>
+
 
 <p><span class="para-num">11-4.</span><strong>What you will see</strong> — the reference build's real
 timeline, which yours should match within seconds:</p>
