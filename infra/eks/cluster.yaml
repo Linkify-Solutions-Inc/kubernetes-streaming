@@ -80,7 +80,14 @@ managedNodeGroups:
   - name: system
     instanceType: t3.medium
     amiFamily: AmazonLinux2023
-    desiredCapacity: 2
+    # 3, not 2: t3.medium is capped at 17 pods/node in the CNI's default
+    # addressing mode (ENABLE_PREFIX_DELEGATION=false below), and the platform
+    # layer alone (ArgoCD, monitoring, ESO, KEDA, Strimzi, LBC, Karpenter,
+    # kube-system) fills two nodes' slots -- app pods sat Pending with
+    # "Too many pods" (hit 2026-08-11). Raising density via prefix delegation
+    # instead requires maxPodsPerNode + a nodegroup roll; a third node is the
+    # simpler, cheaper-to-reason-about fix at this scale.
+    desiredCapacity: 3
     minSize: 2
     maxSize: 4
     volumeSize: 40

@@ -144,9 +144,92 @@ eksctl create iamserviceaccount --cluster streaming --region us-east-1 \
 # checkpoint: kubectl get sa aws-load-balancer-controller -n kube-system -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}'  -> role ARN
 ```
 
-Still to do in this phase:
-- Karpenter prerequisites: controller IRSA (needs Karpenter controller policy),
-  node IAM role/instance profile (see k8s/infra/karpenter/ec2nodeclass.yaml),
-  SQS interruption queue `Karpenter-streaming` + EventBridge rules
-- Install ArgoCD; register OCI repo public.ecr.aws/karpenter (--enable-oci)
-- Apply k8s/bootstrap/root-app.yaml and let sync waves converge
+Karpenter prerequisites (done):
+```
+curl -fsSL -o /tmp/karpenter-cfn.yaml https://raw.githubusercontent.com/aws/karpenter-provider-aws/v1.13.0/website/content/en/docs/getting-started/getting-started-with-karpenter/cloudformation.yaml
+aws cloudformation deploy --stack-name Karpenter-streaming --template-file /tmp/karpenter-cfn.yaml \
+  --capabilities CAPABILITY_NAMED_IAM --parameter-overrides ClusterName=streaming --region us-east-1
+# v1.13 template creates KarpenterNodeRole-streaming + SIX controller policies; list them:
+aws iam list-policies --scope Local --query 'Policies[?contains(PolicyName,`Karpenter`)].Arn' --output text
+eksctl create iamserviceaccount --cluster streaming --region us-east-1 --namespace kube-system \
+  --name karpenter --attach-policy-arn <all six ARNs, repeated flag> --approve
+aws eks create-access-entry --cluster-name streaming --region us-east-1 \
+  --principal-arn arn:aws:iam::242626138899:role/KarpenterNodeRole-streaming --type EC2_LINUX
+```
+
+ArgoCD (done):
+```
+helm repo add argo https://argoproj.github.io/argo-helm
+helm install argocd argo/argo-cd --version 10.3.2 --namespace argocd --create-namespace \
+  --set configs.params."server\.insecure"=true --wait
+# OCI repo registration, declarative (no argocd CLI needed):
+kubectl apply -f - <<'YAML'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: karpenter-oci-repo
+  namespace: argocd
+  labels: {argocd.argoproj.io/secret-type: repository}
+stringData: {name: karpenter, url: public.ecr.aws/karpenter, type: helm, enableOCI: "true"}
+YAML
+```
+
+## Phase 7 — Data layer
+
+```
+# RDS (~10 min): subnet group over the two PRIVATE subnets, SG open only to cluster SG
+aws rds create-db-subnet-group --db-subnet-group-name streaming-db-subnets \
+  --db-subnet-group-description "streaming: private subnets" --subnet-ids <priv-a> <priv-f>
+DBSG=$(aws ec2 create-security-group --group-name streaming-db --description "..." --vpc-id $VPC --query GroupId --output text)
+aws ec2 authorize-security-group-ingress --group-id $DBSG --protocol tcp --port 5432 --source-group <cluster-SG>
+aws rds create-db-instance --db-instance-identifier streaming-db --db-instance-class db.t4g.micro \
+  --engine postgres --engine-version 16.11 --allocated-storage 20 --storage-type gp3 --storage-encrypted \
+  --master-username streaming_admin --manage-master-user-password --db-name streaming \
+  --vpc-security-group-ids $DBSG --db-subnet-group-name streaming-db-subnets --no-publicly-accessible \
+  --backup-retention-period 1 --no-multi-az
+# REBUILD-SENSITIVE: managed master secret name -> k8s/infra/secrets/externalsecret-db.yaml
+aws rds describe-db-instances --db-instance-identifier streaming-db --query 'DBInstances[0].MasterUserSecret.SecretArn' --output text
+
+# S3
+aws s3api create-bucket --bucket linkify-streaming-media-242626138899
+aws s3api put-public-access-block --bucket ... (all four blocks true)
+aws s3api put-bucket-lifecycle-configuration ... (abort-incomplete-multipart 7d)
+aws s3api put-bucket-cors ... (GET/HEAD from *)
+
+# Route53 + ACM (user step: add the 4 NS records at Cloudflare, name "k8s", DNS-only)
+aws route53 create-hosted-zone --name k8s.linkifysolutions.com --caller-reference <unique>
+aws acm request-certificate --domain-name "*.k8s.linkifysolutions.com" \
+  --subject-alternative-names k8s.linkifysolutions.com --validation-method DNS
+aws acm describe-certificate ... DomainValidationOptions[0].ResourceRecord  # -> UPSERT CNAME into the zone
+
+# Pod Identity: 3 policies (streaming-eso, streaming-upload-api, streaming-transcode-worker), then
+eksctl create podidentityassociation --cluster streaming --namespace external-secrets \
+  --service-account-name external-secrets --permission-policy-arns .../streaming-eso
+# ... same for streaming/upload-api and streaming/transcode-worker
+
+# Secrets Manager
+aws secretsmanager create-secret --name streaming/mediamtx --secret-string '{"apiUser":"mediamtx-api","apiPassword":"<gen>"}'
+aws secretsmanager create-secret --name streaming/grafana  --secret-string '{"username":"admin","password":"<gen>"}'
+aws secretsmanager create-secret --name streaming/db-endpoint --secret-string '{"host":"<rds-endpoint>","port":"5432","dbname":"streaming"}'  # after RDS available
+aws secretsmanager create-secret --name streaming/ghcr --secret-string '{"username":"<gh-user>","token":"<PAT read:packages>"}'
+
+# CloudFront: OAC + distribution (segments CachingOptimized, *.m3u8 CachingDisabled), then
+# bucket policy: cloudfront.amazonaws.com may GetObject hls/* when SourceArn = this distribution
+```
+
+GOTCHA 4 (hit at first full sync): app pods Pending with "0/2 nodes are
+available: 2 Too many pods". t3.medium = 17 pods max in the CNI's default
+mode; the platform layer fills 2 nodes by itself. Karpenter cannot help — its
+pools are transcode-tainted on purpose. FIX:
+```
+eksctl scale nodegroup --cluster streaming --region us-east-1 --name system --nodes 3
+```
+and cluster.yaml desiredCapacity updated 2 -> 3 to keep file == reality.
+
+## Phase 8 — GitOps bootstrap
+
+```
+git push   # root app reads GitHub master, not the local tree
+kubectl apply -f k8s/bootstrap/root-app.yaml   # the ONLY by-hand kubectl apply
+kubectl get applications -n argocd             # watch waves 0..40 converge
+```
