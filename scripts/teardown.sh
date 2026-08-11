@@ -11,9 +11,16 @@
 #     2. kubectl delete application streaming mediamtx -n argocd
 #        # BEFORE root: the LB controller must still be alive to release the
 #        # ALB/NLB. Verify: aws elbv2 describe-load-balancers -> []
-#     3. kubectl delete application root -n argocd            # cascades the rest
-#        # wait: kubectl get applications -n argocd -> none; kubectl get pvc -A -> none
-#     4. helm uninstall argocd -n argocd
+#     3. kubectl delete application kafka db-migrate secrets karpenter-pools -n argocd
+#        # CONSUMERS BEFORE OPERATORS: KafkaTopic/Kafka CRs carry finalizers
+#        # that only the (Strimzi) operator can clear. Deleting the operator
+#        # first orphans the finalizers and wedges the namespace Terminating
+#        # forever (hit 2026-08-11; unwedge: kubectl patch kafkatopic <t> -n
+#        # kafka --type merge -p '{"metadata":{"finalizers":null}}').
+#     4. kubectl delete application root -n argocd; kubectl delete applications --all -n argocd
+#        # root's cascade does NOT reliably delete grandchildren — delete
+#        # children explicitly. wait: get applications -> none; get pvc -A -> none
+#     5. helm uninstall argocd -n argocd
 #   Phase B: THIS SCRIPT (AWS-side, ~25-35 min).
 #
 # Requires: aws CLI with an admin profile, eksctl. Region us-east-1.

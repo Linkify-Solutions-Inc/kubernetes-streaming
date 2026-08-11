@@ -376,6 +376,23 @@ Node lifetime 10.5 min; c6a.xlarge on-demand cost of the whole transcode: ~$0.03
 Also verified: analytics-worker consumed live_transcode_started/stopped from
 Kafka — the full event pipeline (webhook -> Kafka -> analytics -> Postgres).
 
+## Phase 10 — Teardown (in-cluster half)
+
+GOTCHA 18 (three teardown ordering rules, all hit 2026-08-11):
+(a) Disarm root BEFORE deleting children — selfHeal resurrects them:
+    kubectl patch application root -n argocd --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'
+(b) LB-owning apps (streaming, mediamtx) die FIRST, while the AWS LB
+    controller still lives — else the ALB/NLB is orphaned in AWS (billing
+    forever) or the Ingress finalizer wedges. Verify LBs gone in AWS before
+    proceeding.
+(c) CR consumers before operators: deleting strimzi-operator before the
+    KafkaTopics left their strimzi finalizers unserviceable -> kafka
+    namespace stuck Terminating. Unwedge: patch finalizers null.
+Also: root's cascade did NOT delete grandchildren reliably — delete child
+Applications explicitly and verify count reaches zero.
+Full ordered procedure: scripts/teardown.sh header (Phase A) + the script
+itself (Phase B, AWS side, discovery-based).
+
 ## Phase 8 — GitOps bootstrap
 
 ```
