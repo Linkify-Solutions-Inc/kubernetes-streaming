@@ -390,8 +390,13 @@ GOTCHA 18 (three teardown ordering rules, all hit 2026-08-11):
     namespace stuck Terminating. Unwedge: patch finalizers null.
 Also: root's cascade did NOT delete grandchildren reliably — delete child
 Applications explicitly and verify count reaches zero.
-Full ordered procedure: scripts/teardown.sh header (Phase A) + the script
-itself (Phase B, AWS side, discovery-based).
+(d) Aggregated APIServices outlive their apps: KEDA's
+    v1beta1.external.metrics.k8s.io kept its registration after the backing
+    pod died, which fails API discovery CLUSTER-WIDE and pins every
+    namespace Terminating with DiscoveryFailed. Delete the dead APIService.
+Phase A end-state verified: 4 default namespaces, 0 PVCs, 0 available EBS
+volumes in AWS. Full ordered procedure: scripts/teardown.sh header (Phase A)
++ the script itself (Phase B, AWS side, discovery-based).
 
 ## Phase 8 — GitOps bootstrap
 

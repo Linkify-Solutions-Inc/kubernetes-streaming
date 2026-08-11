@@ -21,6 +21,13 @@
 #        # root's cascade does NOT reliably delete grandchildren — delete
 #        # children explicitly. wait: get applications -> none; get pvc -A -> none
 #     5. helm uninstall argocd -n argocd
+#     6. If namespaces hang Terminating with reason DiscoveryFailed: an
+#        aggregated APIService lost its backend (KEDA's external metrics
+#        server, deleted with its app) and poisons discovery cluster-wide:
+#          kubectl get apiservices | awk '$3=="False"'   # find dead ones
+#          kubectl delete apiservice v1beta1.external.metrics.k8s.io
+#     7. Verify before Phase B: only 4 default namespaces; `kubectl get pvc -A`
+#        empty; `aws ec2 describe-volumes --filters Name=status,Values=available` empty.
 #   Phase B: THIS SCRIPT (AWS-side, ~25-35 min).
 #
 # Requires: aws CLI with an admin profile, eksctl. Region us-east-1.
