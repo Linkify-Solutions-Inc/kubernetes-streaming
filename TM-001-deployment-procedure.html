@@ -201,6 +201,15 @@ ffmpeg -version | head -1</code></pre>
 <p>Every command prints a version. The reference build used eksctl 0.229.0, kubectl 1.36.3, helm 4.2.3.</p>
 </div></div>
 
+<div class="box note"><div class="bx-label">Note — WSL2 is fine</div><div class="bx-body">
+<p>If your Ubuntu is WSL2 on Windows, run everything in this manual inside the WSL terminal,
+unchanged. Two things to know: <code>kubectl port-forward</code> tunnels a pod in AWS to
+<code>localhost</code> — nothing runs on your machine, the terminal is just holding a doorway open —
+and WSL2 forwards localhost to Windows by default, so Grafana at <code>http://localhost:3000</code>
+opens in your normal Windows browser. Only ffmpeg (Chapter 11) does real local work: it plays the
+streamer, pushing video over the internet like OBS would.</p>
+</div></div>
+
 <p><span class="para-num">2-2.</span><strong>Repository.</strong></p>
 <pre><code>mkdir -p ~/linkify &amp;&amp; cd ~/linkify
 git clone https://github.com/Linkify-Solutions-Inc/kubernetes-streaming.git
