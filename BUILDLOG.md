@@ -294,6 +294,36 @@ GOTCHA 13 (two config bugs, one lesson):
 Lesson: grep the WHOLE tree for a placeholder before declaring it fixed;
 `grep -rn "<accountid>" k8s/` costs nothing.
 
+GOTCHA 14: the streaming app's sync wedged for an hour "waiting for healthy
+state of Ingress/streaming". The Ingress (wave 0) can never be healthy until
+the ACM cert validates -- an EXTERNAL dependency (Cloudflare NS delegation)
+-- and ScaledJobs sit in wave 1 behind it, so the operation never finished
+and every later config fix queued behind the lock (same mechanism as GOTCHA
+7, different trigger). FIX: real cert ARN filled in (REBUILD-SENSITIVE,
+discovery command in the file) + Ingress moved to the LAST wave: nothing
+sequences after the final wave, so externally-gated health stops blocking
+rollouts. Rule: resources whose health depends on something outside the
+cluster go in the last wave.
+
+GOTCHA 15: upload-api readyz then failed S3 with 403 Forbidden on HeadBucket.
+The streaming-upload-api policy granted s3:ListBucket only with a raw/*
+prefix CONDITION; HeadBucket performs an unprefixed ListBucket check, so the
+condition failed. FIX: `aws iam create-policy-version --set-as-default` with
+ListBucket unconditioned (object actions stay scoped to raw/*). Lesson:
+least-privilege must be tested against the app's own health checks — the
+probe is part of the permission surface.
+
+GOTCHA 16 (e2e test): 5-min live stream published fine (NLB -> MediaMTX ->
+auth/publish hooks -> Kafka event produced), but NO transcode Job spawned.
+Consumer group transcode-live didn't exist: the consumer-group-bootstrap-job
+is a PostSync hook, and terminating the kafka app's wedged sync operations
+(GOTCHA 7) also killed the hook before it ever ran. With no committed
+offsets + scaleToZeroOnInvalidOffset:true, KEDA reads "no work" forever —
+completely silently. FIX: trigger a clean sync (hooks re-run per sync), then
+verify: kafka-consumer-groups.sh --list must show transcode-live BEFORE the
+first stream. Checkpoint for the docs: this verification is mandatory, the
+failure has zero error output anywhere.
+
 DESIGN CLEANUP: images made public -> externalsecret-ghcr.yaml deleted. It
 was dead weight anyway: no Deployment ever referenced an imagePullSecret, so
 private pulls would have failed even WITH the secret — the archived design
