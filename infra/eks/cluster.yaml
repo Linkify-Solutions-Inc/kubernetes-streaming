@@ -87,7 +87,13 @@ managedNodeGroups:
     # "Too many pods" (hit 2026-08-11). Raising density via prefix delegation
     # instead requires maxPodsPerNode + a nodegroup roll; a third node is the
     # simpler, cheaper-to-reason-about fix at this scale.
-    desiredCapacity: 3
+    # 4 (was 3, was 2 -- both hit 2026-08-11): the third node fixed the
+    # 17-pod cap; the fourth exists because the Kafka broker requests 2Gi and
+    # no t3.medium with platform pods aboard has 2Gi free ("Insufficient
+    # memory"), while Karpenter's pools are transcode-tainted on purpose. A
+    # fresh node (~3.4Gi allocatable) hosts the broker with headroom. If this
+    # group ever needs a 5th node, stop and rethink instance size instead.
+    desiredCapacity: 4
     minSize: 2
     maxSize: 4
     volumeSize: 40

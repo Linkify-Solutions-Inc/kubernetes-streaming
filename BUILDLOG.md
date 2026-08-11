@@ -256,6 +256,12 @@ yaml comments -> parses as empty -> Strimzi fails the WHOLE Kafka reconcile
 metrics. FIX: replaced verbatim with the ConfigMap document from Strimzi
 0.49.0's examples/metrics/kafka-metrics.yaml (+ namespace: kafka).
 
+GOTCHA 9: adding 05-storage.yaml to k8s/argocd/apps/ did NOTHING — that
+directory has a kustomization.yaml, so Argo renders it through kustomize and
+silently ignores any file not listed in `resources:`. Root even reports
+Synced. FIX: list the new file in kustomization.yaml. Rule: file in that
+directory == line in that list, always both.
+
 DESIGN CLEANUP: images made public -> externalsecret-ghcr.yaml deleted. It
 was dead weight anyway: no Deployment ever referenced an imagePullSecret, so
 private pulls would have failed even WITH the secret — the archived design
