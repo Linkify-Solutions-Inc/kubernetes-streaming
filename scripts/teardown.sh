@@ -3,38 +3,78 @@
 # resource by name/tag, so it works for ANY rebuild, not just the original.
 # Companion: TEARDOWN.md (the ledger this script implements).
 #
-# TWO PHASES, IN ORDER:
-#   Phase A (in-cluster, run FIRST — releases AWS load balancers and EBS
-#   volumes that CloudFormation does not own; skipping it strands them):
-#     1. kubectl patch application root -n argocd --type merge \
-#          -p '{"spec":{"syncPolicy":{"automated":null}}}'   # stop selfHeal resurrection
-#     2. kubectl delete application streaming mediamtx -n argocd
-#        # BEFORE root: the LB controller must still be alive to release the
-#        # ALB/NLB. Verify: aws elbv2 describe-load-balancers -> []
-#     3. kubectl delete application kafka db-migrate secrets karpenter-pools -n argocd
-#        # CONSUMERS BEFORE OPERATORS: KafkaTopic/Kafka CRs carry finalizers
-#        # that only the (Strimzi) operator can clear. Deleting the operator
-#        # first orphans the finalizers and wedges the namespace Terminating
-#        # forever (hit 2026-08-11; unwedge: kubectl patch kafkatopic <t> -n
-#        # kafka --type merge -p '{"metadata":{"finalizers":null}}').
-#     4. kubectl delete application root -n argocd; kubectl delete applications --all -n argocd
-#        # root's cascade does NOT reliably delete grandchildren — delete
-#        # children explicitly. wait: get applications -> none; get pvc -A -> none
-#     5. helm uninstall argocd -n argocd
-#     6. If namespaces hang Terminating with reason DiscoveryFailed: an
-#        aggregated APIService lost its backend (KEDA's external metrics
-#        server, deleted with its app) and poisons discovery cluster-wide:
-#          kubectl get apiservices | awk '$3=="False"'   # find dead ones
-#          kubectl delete apiservice v1beta1.external.metrics.k8s.io
-#     7. Verify before Phase B: only 4 default namespaces; `kubectl get pvc -A`
-#        empty; `aws ec2 describe-volumes --filters Name=status,Values=available` empty.
-#   Phase B: THIS SCRIPT (AWS-side, ~25-35 min).
+# TWO PHASES, BOTH EXECUTED BY THIS SCRIPT, IN ORDER:
+#   Phase A (in-cluster): runs automatically when kubectl can reach the
+#     cluster; skipped cleanly when it cannot (already-deleted cluster).
+#     Ordering rules it encodes (each learned the hard way — see BUILDLOG
+#     gotchas 18a-d): disarm root selfHeal; LB-owning apps die while the LB
+#     controller lives; CR consumers before operators; explicit child
+#     deletion; wedge-breakers for orphaned finalizers and dead APIServices.
+#   Phase B (AWS-side, ~25-35 min): everything CloudFormation and the CLI own,
+#     with self-healing retries for the known blockers (gotchas 19-20).
 #
 # Requires: aws CLI with an admin profile, eksctl. Region us-east-1.
 set -uo pipefail
 export AWS_PROFILE="${AWS_PROFILE:-streaming-admin}" AWS_REGION=us-east-1
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 B="linkify-streaming-media-${ACCOUNT}"
+
+wait_empty(){ # wait_empty "desc" "command producing output when NOT done" timeout_s
+  local n=0 t=$(( ${3:-300} / 10 ))
+  while [ -n "$(eval "$2" 2>/dev/null)" ]; do
+    n=$((n+1)); [ "$n" -gt "$t" ] && { echo "TIMEOUT waiting: $1"; return 1; }
+    sleep 10
+  done; echo "ok: $1"
+}
+
+echo "== [A] In-cluster teardown"
+if kubectl cluster-info >/dev/null 2>&1 && kubectl get ns argocd >/dev/null 2>&1; then
+  echo "-- A1: disarm root selfHeal (else it resurrects deleted children)"
+  kubectl patch application root -n argocd --type merge \
+    -p '{"spec":{"syncPolicy":{"automated":null}}}' 2>/dev/null || true
+
+  echo "-- A2: LB-owning apps first, while the LB controller still lives"
+  kubectl delete application streaming mediamtx -n argocd --ignore-not-found --wait=false
+  wait_empty "AWS load balancers released" \
+    "aws elbv2 describe-load-balancers --query 'LoadBalancers[].LoadBalancerName' --output text | tr -d '[:space:]'" 600
+
+  echo "-- A3: CR consumers before their operators"
+  kubectl delete application kafka db-migrate secrets karpenter-pools -n argocd --ignore-not-found --wait=false
+  sleep 30
+  # wedge-breaker: KafkaTopics whose operator died carry unserviceable finalizers
+  for t in $(kubectl get kafkatopics -n kafka --no-headers 2>/dev/null | awk '{print $1}'); do
+    kubectl patch kafkatopic "$t" -n kafka --type merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null
+  done
+
+  echo "-- A4: everything else, explicitly (root cascade does not reliably reach grandchildren)"
+  kubectl delete application root -n argocd --ignore-not-found --wait=false
+  kubectl delete applications --all -n argocd --wait=false 2>/dev/null
+  wait_empty "ArgoCD applications gone" \
+    "kubectl get applications -n argocd --no-headers 2>/dev/null" 600 || {
+      # second wedge pass for anything still stuck on kafka finalizers
+      for t in $(kubectl get kafkatopics -A --no-headers 2>/dev/null | awk '{print $2}'); do
+        kubectl patch kafkatopic "$t" -n kafka --type merge -p '{"metadata":{"finalizers":null}}' 2>/dev/null
+      done
+      wait_empty "ArgoCD applications gone (retry)" \
+        "kubectl get applications -n argocd --no-headers 2>/dev/null" 300
+    }
+
+  echo "-- A5: ArgoCD itself, then leftover namespaces"
+  helm uninstall argocd -n argocd --wait --timeout 5m 2>/dev/null || true
+  kubectl delete ns argocd external-secrets karpenter keda monitoring kafka streaming \
+    --ignore-not-found --wait=false 2>/dev/null
+  # wedge-breaker: dead aggregated APIServices poison discovery cluster-wide
+  for a in $(kubectl get apiservices --no-headers 2>/dev/null | awk '$3=="False"{print $1}'); do
+    kubectl delete apiservice "$a" 2>/dev/null && echo "deleted dead APIService $a"
+  done
+  wait_empty "PVCs gone (EBS released)" "kubectl get pvc -A --no-headers 2>/dev/null" 600
+  wait_empty "extra namespaces gone" \
+    "kubectl get ns --no-headers 2>/dev/null | grep -vE '^(default|kube-system|kube-public|kube-node-lease) '" 600
+  echo "-- Phase A complete: cluster is bare"
+else
+  echo "-- cluster unreachable or already bare: skipping Phase A"
+fi
+
 
 echo "== [1/9] S3 gateway endpoint (BEFORE cluster delete or the VPC's CFN stack delete fails)"
 VPCE=$(aws ec2 describe-vpc-endpoints --filters Name=tag:Name,Values=streaming-s3-gateway \
@@ -69,8 +109,15 @@ if aws cloudformation describe-stacks --stack-name eksctl-streaming-cluster     
   echo "cluster stack DELETE_FAILED -- removing RDS leftovers first, then retrying"
   aws rds wait db-instance-deleted --db-instance-identifier streaming-db 2>/dev/null
   aws rds delete-db-subnet-group --db-subnet-group-name streaming-db-subnets 2>/dev/null
-  DBSG=$(aws ec2 describe-security-groups --filters Name=group-name,Values=streaming-db     --query 'SecurityGroups[0].GroupId' --output text)
-  [ "$DBSG" != "None" ] && aws ec2 delete-security-group --group-id "$DBSG"
+  # remove EVERY non-default SG still in the eksctl VPC: the streaming-db SG
+  # AND the orphaned eks-cluster-sg-* that EKS leaves behind when something
+  # referenced it at cluster-delete time (both blocked the VPC on 2026-08-11)
+  EVPC=$(aws cloudformation describe-stack-resources --stack-name eksctl-streaming-cluster     --logical-resource-id VPC --query 'StackResources[0].PhysicalResourceId' --output text 2>/dev/null)
+  if [ -n "$EVPC" ] && [ "$EVPC" != "None" ]; then
+    for G in $(aws ec2 describe-security-groups --filters Name=vpc-id,Values=$EVPC         --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text); do
+      aws ec2 delete-security-group --group-id "$G" && echo "deleted blocking SG $G"
+    done
+  fi
   aws cloudformation delete-stack --stack-name eksctl-streaming-cluster
   aws cloudformation wait stack-delete-complete --stack-name eksctl-streaming-cluster && echo "cluster stack retry ok"
 fi
