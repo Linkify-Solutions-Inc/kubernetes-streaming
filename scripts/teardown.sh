@@ -134,6 +134,11 @@ for p in AWSLoadBalancerControllerIAMPolicy streaming-eso streaming-upload-api s
   aws iam delete-policy --policy-arn "$ARN" 2>/dev/null && echo "policy $p ok"
 done
 
+echo "== [8b/9] orphaned Elastic IPs (GOTCHA 20: the NAT EIP can survive its NAT gateway; unassociated EIPs bill ~\$3.60/mo)"
+for A in $(aws ec2 describe-addresses --query 'Addresses[?AssociationId==null].AllocationId' --output text); do
+  aws ec2 release-address --allocation-id "$A" && echo "released $A"
+done
+
 echo "== [9/9] VERIFY ZERO-COST STATE (every line below should be empty)"
 echo "--- CFN stacks:";   aws cloudformation list-stacks --query 'StackSummaries[?StackStatus!=`DELETE_COMPLETE`].[StackName,StackStatus]' --output text
 echo "--- EC2 instances:"; aws ec2 describe-instances --filters Name=instance-state-name,Values=running,pending,stopping,stopped --query 'Reservations[].Instances[].InstanceId' --output text
@@ -141,5 +146,6 @@ echo "--- Load balancers:"; aws elbv2 describe-load-balancers --query 'LoadBalan
 echo "--- EBS volumes:";  aws ec2 describe-volumes --query 'Volumes[].VolumeId' --output text
 echo "--- VPCs:";         aws ec2 describe-vpcs --query 'Vpcs[].VpcId' --output text
 echo "--- NAT gateways:"; aws ec2 describe-nat-gateways --filter Name=state,Values=available,pending --query 'NatGateways[].NatGatewayId' --output text
+echo "--- Elastic IPs:";  aws ec2 describe-addresses --query 'Addresses[].AllocationId' --output text
 echo "--- RDS:";          aws rds describe-db-instances --query 'DBInstances[].DBInstanceIdentifier' --output text
 echo "== DONE. Manual leftover: remove the 4 'k8s' NS records from Cloudflare."

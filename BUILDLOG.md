@@ -415,3 +415,10 @@ FIX: scripts/teardown.sh now detects DELETE_FAILED, removes the RDS
 leftovers, and retries automatically. Lesson: resources created INTO a
 CFN-owned VPC from outside the stack are deletion blockers the stack cannot
 see — track them (TEARDOWN.md) and remove them first.
+
+GOTCHA 20 (final verification): the NAT gateway's Elastic IP survived NAT
+deletion — an unassociated EIP that bills ~$3.60/mo and appears on NO default
+checklist. FIX: teardown.sh now releases unassociated EIPs and verifies the
+EIP list is empty. FINAL STATE 2026-08-11: stacks/VPCs/EC2/LBs/EBS/NAT/RDS/
+EIPs ALL EMPTY — account verified at $0. Total build+run+teardown spend for
+the whole exercise: ~$3.
