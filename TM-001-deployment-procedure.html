@@ -804,9 +804,12 @@ and CloudFront served them back over HTTPS. Every box in the architecture diagra
 
 <h2 id="ch12">Chapter 12 — Teardown</h2>
 
-<p><span class="para-num">12-1.</span><strong>Phase A — in-cluster</strong> (ordering is load-bearing;
-the reference build derived each rule the hard way — see the header of
-<code>scripts/teardown.sh</code> for the full annotated sequence):</p>
+<p><span class="para-num">12-1.</span><strong>One command does everything.</strong> The script runs
+both phases — in-cluster first (automatically, when kubectl can reach the cluster), then AWS-side —
+with self-healing retries for every blocker the reference teardown hit:</p>
+<pre><code>AWS_PROFILE=streaming-deploy bash scripts/teardown.sh</code></pre>
+<p><span class="para-num">12-2.</span><strong>What Phase A does, and why the order is load-bearing</strong>
+(you are not required to run these by hand — read them to understand what the script is doing):</p>
 <ol class="steps">
   <li>Disarm the root app's self-healing so deletions stick:<br>
   <code>kubectl patch application root -n argocd --type merge -p '{"spec":{"syncPolicy":{"automated":null}}}'</code></li>
@@ -830,9 +833,10 @@ discovery. <code>kubectl get apiservices | awk '$3=="False"'</code> → delete t
 <code>kubectl patch kafkatopic &lt;name&gt; -n kafka --type merge -p '{"metadata":{"finalizers":null}}'</code></p>
 </div></div>
 
-<p><span class="para-num">12-2.</span><strong>Phase B — AWS side.</strong> One script, discovery-based,
-~25–35 minutes, ends by printing the zero-cost verification (every list empty):</p>
-<pre><code>AWS_PROFILE=streaming-deploy bash scripts/teardown.sh</code></pre>
+<p><span class="para-num">12-3.</span><strong>Phase B</strong> then unwinds the AWS side
+(~25–35 minutes; CloudFront and eksctl dominate), self-healing the two known blockers — security
+groups left in the VPC, and the NAT's orphaned Elastic IP — before printing the zero-cost
+verification (every list must be empty, including Elastic IPs).</p>
 
 <div class="box checkpoint"><div class="bx-label">Checkpoint 12-A — the account is empty</div><div class="bx-body">
 <p>The script's final section prints CloudFormation stacks, EC2 instances, load balancers, EBS volumes,
