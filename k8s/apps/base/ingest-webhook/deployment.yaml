@@ -60,6 +60,13 @@ spec:
                 configMapKeyRef:
                   name: streaming-config
                   key: KAFKA_BOOTSTRAP_SERVERS
+            # main.py require()s exactly three vars; this one was never wired
+            # and the pod exited at import time (hit 2026-08-11).
+            - name: MAX_CONCURRENT_LIVE_STREAMS
+              valueFrom:
+                configMapKeyRef:
+                  name: streaming-config
+                  key: MAX_CONCURRENT_LIVE_STREAMS
           startupProbe:
             httpGet:
               path: /livez

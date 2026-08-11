@@ -274,6 +274,13 @@ repo-server refuses without the global option. FIX (survives chart upgrades):
     --set-string 'configs.cm.kustomize\.buildOptions=--load-restrictor LoadRestrictionsNone'
 The archived docs KNEW this ("a global setting") but never said where to set it.
 
+GOTCHA 12: db-migrate Job "ran" 6+ min with zero pods — the streaming
+namespace enforces restricted PodSecurity, the Job's container was missing
+seccompProfile, so pods were rejected AT ADMISSION: no pod object, no logs,
+only job-controller FailedCreate events (`kubectl describe job`, not pod).
+FIX: securityContext.seccompProfile.type: RuntimeDefault in the Job template.
+Least discoverable failure shape of the night — teach `describe job` early.
+
 DESIGN CLEANUP: images made public -> externalsecret-ghcr.yaml deleted. It
 was dead weight anyway: no Deployment ever referenced an imagePullSecret, so
 private pulls would have failed even WITH the secret — the archived design
