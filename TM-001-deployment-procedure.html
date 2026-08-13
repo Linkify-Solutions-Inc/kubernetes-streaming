@@ -324,16 +324,31 @@ The GitOps engine (Chapter 10) reads GitHub, not your working tree — an unpush
 
 <h2 id="ch5">Chapter 5 — Cluster build</h2>
 
-<div class="box caution"><div class="bx-label">Caution — edit before you build</div><div class="bx-body">
+<div class="box caution"><div class="bx-label">Caution — check the access entry BEFORE you build</div><div class="bx-body">
 <p>The file <code>infra/eks/cluster.yaml</code> lists a <em>second administrator</em> under
 <code>accessEntries</code> so no single deleted identity can lock everyone out. The cluster's creator
-gets admin automatically, and eksctl fails if the creator also appears in the list. The reference build
-was created by <code>AdminAccess</code> with <code>StreamingDeploy</code> (you) as second admin. You are
-the creator now, so the roles swap — put <strong>AdminAccess</strong> in the list instead:</p>
+gets admin automatically (<code>bootstrapClusterCreatorAdminPermissions</code>), and eksctl refuses to
+also list the creator in <code>accessEntries</code>. The correct entry therefore depends on <em>who
+creates</em> the cluster — find out first, do not guess:</p>
+<ol class="steps">
+  <li>Your creator role is the one in your <code>aws sts get-caller-identity</code> Arn (Checkpoint 3-A).
+  Run it.</li>
+  <li><strong>Creator is <code>AdminAccess</code></strong> (profile <code>streaming-admin</code>): the file
+  is <em>already correct</em> — <code>StreamingDeploy</code> is the second admin. <strong>Do not edit
+  anything.</strong> Creating with the file as-committed is verified to work.</li>
+  <li><strong>Creator is <code>StreamingDeploy</code></strong> (profile <code>streaming-deploy</code>): you
+  are the listed second admin, so you must swap the entry to the <em>other</em> admin. Run exactly, then
+  paste the printed ARN into <code>principalARN:</code>:</li>
+</ol>
 <pre><code>aws iam list-roles --path-prefix /aws-reserved/sso.amazonaws.com/ \
-  --query 'Roles[?contains(RoleName,`AdminAccess`)].Arn' --output text</code></pre>
-<p>Replace the <code>principalARN:</code> value in <code>accessEntries</code> with that ARN, then
-commit and push.</p>
+  --query 'Roles[?contains(RoleName,`AdminAccess`)].Arn' --output text
+# expect: arn:aws:iam::242626138899:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdminAccess_&lt;hash&gt;</code></pre>
+<p><strong>Verify your paste before building.</strong> The value must be a <em>role</em> ARN, never your
+<code>assumed-role</code> session ARN (the trap Chapter 4 calls out). A wrong ARN fails the access-entry
+step with an error naming the principal ARN. Sanity-check it, then commit and push (an unpushed edit does
+not exist):</p>
+<pre><code>echo '&lt;the ARN you pasted&gt;' | grep -q 'role/aws-reserved/sso.amazonaws.com/' &amp;&amp; echo OK || echo BAD
+git add infra/eks/cluster.yaml &amp;&amp; git commit -m "cluster: swap second admin for StreamingDeploy creator" &amp;&amp; git push origin master</code></pre>
 </div></div>
 
 <p><span class="para-num">5-1.</span><strong>Create the cluster.</strong> One declarative file drives

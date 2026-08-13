@@ -47,7 +47,9 @@ accessConfig:
     # The creator (aayush's AdminAccess role) gets admin automatically via
     # bootstrapClusterCreatorAdminPermissions -- do NOT also list it here or
     # eksctl fails on the duplicate. This entry is fatima's StreamingDeploy
-    # role. It is the SSO *role* ARN (aws-reserved path), not the assumed-role
+    # role. If StreamingDeploy is the CREATOR instead (fatima deploys), swap
+    # this entry to the AdminAccess role ARN (TM-001 Ch 5 caution): the
+    # creator must never appear in this list. It is the SSO *role* ARN (aws-reserved path), not the assumed-role
     # session ARN that `aws sts get-caller-identity` prints. There is no region
     # segment in the path because Identity Center lives in us-east-1; only
     # non-us-east-1 instances get one. Verified with `aws iam list-roles

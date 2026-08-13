@@ -86,6 +86,20 @@ aws rds delete-db-instance --db-instance-identifier streaming-db \
   --skip-final-snapshot --delete-automated-backups \
   --query 'DBInstance.DBInstanceStatus' --output text 2>/dev/null || echo "already gone"
 
+echo "== [2b/9] wait for RDS fully gone, then remove its SG (GOTCHA 19 prevention)"
+# The streaming-db SG references the cluster SG via its ingress rule. If it
+# still exists when eksctl deletes the cluster, the VPC delete inside the
+# eksctl stack fails with "has dependencies" -> DELETE_FAILED (hit twice,
+# 2026-08-11 reference build and 2026-08-12 rebuild). The SG cannot be deleted
+# until RDS is gone, so wait for the DB first, then delete the subnet group +
+# SG BEFORE eksctl runs. Step 4b stays as a safety net for any OTHER SG that
+# still blocks the VPC.
+aws rds wait db-instance-deleted --db-instance-identifier streaming-db 2>/dev/null
+aws rds delete-db-subnet-group --db-subnet-group-name streaming-db-subnets 2>/dev/null && echo "subnet-group ok"
+RDS_SG=$(aws ec2 describe-security-groups --filters Name=group-name,Values=streaming-db \
+  --query 'SecurityGroups[0].GroupId' --output text)
+[ "$RDS_SG" != "None" ] && [ -n "$RDS_SG" ] && aws ec2 delete-security-group --group-id "$RDS_SG" && echo "deleted streaming-db SG $RDS_SG (pre-eksctl)"
+
 echo "== [3/9] CloudFront disable (async; delete comes later)"
 DIST=$(aws cloudfront list-distributions \
   --query "DistributionList.Items[?Origins.Items[0].DomainName=='${B}.s3.us-east-1.amazonaws.com'].Id | [0]" --output text)
