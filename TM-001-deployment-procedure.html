@@ -199,11 +199,11 @@ sudo apt-get update &amp;&amp; sudo apt-get install -y git ffmpeg</code></pre>
 
 <div class="box checkpoint"><div class="bx-label">Checkpoint 2-A</div><div class="bx-body">
 <pre><code>aws --version   # aws-cli/2.x
-eksctl version  # 0.229.0 or later
+eksctl version  # 0.230.0 or later
 kubectl version --client   # v1.36.x or later
 helm version --short       # v4.x (v3.15+ also acceptable)
 ffmpeg -version | head -1</code></pre>
-<p>Every command prints a version. The reference build used eksctl 0.229.0, kubectl 1.36.3, helm 4.2.3.</p>
+<p>Every command prints a version. The reference build used eksctl 0.230.0, kubectl 1.36.3, helm 4.2.3.</p>
 </div></div>
 <div class="box anatomy"><div class="bx-label">Command anatomy — what each tool actually is</div><div class="bx-body"><dl>
 <dt>aws</dt><dd>A signed-HTTP client for every AWS API. Each subcommand family (<code>ec2</code>, <code>rds</code>, <code>s3api</code>…) maps 1:1 to a service's API; nothing is magic, everything is a request you could have made with curl and a signature.</dd>

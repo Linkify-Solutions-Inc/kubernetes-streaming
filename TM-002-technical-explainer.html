@@ -271,7 +271,7 @@ machinery that reads it. Layout, in the order the build consumes it:</p>
 <div class="tblwrap"><table class="data">
 <thead><tr><th>Stanza</th><th>What it does, and the decision inside it</th></tr></thead>
 <tbody>
-<tr><td><code>metadata</code></td><td>Names cluster <code>streaming</code>, pins K8s 1.35 and region; tags everything <code>Project: streaming</code> so Cost Explorer can slice the bill per project.</td></tr>
+<tr><td><code>metadata</code></td><td>Names cluster <code>streaming</code>, pins K8s 1.36 and region; tags everything <code>Project: streaming</code> so Cost Explorer can slice the bill per project.</td></tr>
 <tr><td><code>availabilityZones</code></td><td>Pinned to two AZs. Left unpinned, eksctl picks AZs <em>at random per run</em> — which desynced from the nodegroup's AZ list and killed the first build (case study #1). Pinning makes the file deterministic.</td></tr>
 <tr><td><code>autoModeConfig: enabled: false</code></td><td>Future eksctl versions flip clusters to "Auto Mode" by default, which stops honoring the nodegroup/add-on stanzas. Pinned so a newer eksctl builds the same cluster.</td></tr>
 <tr><td><code>accessConfig</code></td><td><code>authenticationMode: API</code>: cluster admission is controlled by auditable EKS access-entry API objects, not the legacy in-cluster ConfigMap that generations of operators have locked themselves out with. The creator gets admin automatically; <code>accessEntries</code> adds a <em>second</em> admin (a different SSO role) so no single deleted identity strands the cluster — and must never duplicate the creator (eksctl errors).</td></tr>

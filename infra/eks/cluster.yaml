@@ -19,7 +19,7 @@ kind: ClusterConfig
 metadata:
   name: streaming
   region: us-east-1
-  version: "1.35"
+  version: "1.36"
   tags:
     Project: streaming
 
