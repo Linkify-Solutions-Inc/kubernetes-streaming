@@ -39,7 +39,7 @@ spec:
         # rediscover and re-substitute before syncing:
         #   aws ec2 describe-vpcs --filters Name=tag:alpha.eksctl.io/cluster-name,Values=streaming \
         #     --query 'Vpcs[0].VpcId' --output text
-        vpcId: "vpc-0c8c1ca2c02600a0c"
+        vpcId: "vpc-001d1814da8d07607"
         # eksctl already created this ServiceAccount with the IRSA
         # annotation attached (Module 5, "create the IRSA-backed
         # ServiceAccount"). Letting Helm create its own here produces a
