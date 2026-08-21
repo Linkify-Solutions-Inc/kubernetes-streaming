@@ -201,7 +201,7 @@ API and S3 gatekeeper), <code>ingest-webhook</code> (MediaMTX's brain: authentic
 emits lifecycle events), <code>transcode-worker</code> (ffmpeg wrapped in a Kafka consumer),
 <code>analytics-worker</code> (folds events into Postgres). Around them, infrastructure:
 <code>MediaMTX</code> (RTMP ingest server), Kafka (the event backbone, run by the Strimzi operator),
-Postgres (RDS), S3 + CloudFront (media storage and delivery), and the platform operators (ArgoCD, ESO,
+Postgres (RDS), S3 (media storage; <code>hls/</code> served publicly in the no-DNS build), and the platform operators (ArgoCD, ESO,
 KEDA, Karpenter, load balancer controller, Prometheus/Grafana).</p>
 
 <p><span class="para-num">2-2.</span><strong>Life of a live stream</strong> — the exact path your
@@ -221,8 +221,8 @@ question about one arrow of it:</p>
   <li>The worker consumes the message, pulls the live RTMP feed from MediaMTX, and ffmpeg emits an
   adaptive ladder (1080p/720p/480p) of 4-second HLS segments straight to
   <code>s3://…/hls/live/&lt;uuid&gt;/</code> — via the S3 gateway endpoint, dodging NAT fees.</li>
-  <li>Viewers fetch <code>master.m3u8</code> through CloudFront; playlists are never cached (they
-  change every segment), segments are cached hard (they never change).</li>
+  <li>Viewers fetch <code>master.m3u8</code> straight from S3 — the <code>hls/</code> prefix is public
+  by the Chapter 8 policy, so no CDN or DNS is needed.</li>
   <li>Stream ends → unpublish hook → worker exits → Job completes → ~2 min later Karpenter deletes the
   now-idle node. Meanwhile analytics-worker has been folding
   <code>transcode.status</code>/<code>viewer.analytics</code> events into Postgres.</li>
@@ -238,7 +238,7 @@ operational: Kafka was, by a wide margin, the most defect-dense component of the
 eighteen case studies).</p>
 
 <p><span class="para-num">2-4.</span><strong>Network posture.</strong> Everything computes in private
-subnets; the internet reaches exactly three front doors (NLB for RTMP, ALB for HTTPS, CloudFront for
+subnets; the internet reaches exactly three front doors (NLB for RTMP, ALB for HTTP, S3 for
 media), and the pods reach out through one NAT gateway — except S3 traffic, which the free gateway
 endpoint keeps off the meter. The Postgres security group admits port 5432 from the cluster's security
 group only; there is no bastion, no SSH, no public database, and kubectl reaches the API server over
@@ -358,7 +358,7 @@ ships specific broker images and nothing else.</td></tr>
 <tr><td><code>base/transcode/scaledjob-live.yaml</code> / <code>scaledjob-vod.yaml</code></td><td>KEDA ScaledJobs: the Kafka trigger (topic, consumer group, <code>lagThreshold: 1</code> = one message → one Job), tolerations for the transcode taint, node selectors per pool, and ffmpeg resource envelopes. The live variant's comment ties its ceiling to the topic partition count and the app's env ceiling — the three-way agreement CI enforces.</td></tr>
 <tr><td><code>base/transcode/sweeper-cronjob.yaml</code></td><td>Belt-and-suspenders: periodically reclaims transcode claims whose worker died mid-job, so a crashed worker's stream can be picked up rather than stranded.</td></tr>
 <tr><td><code>base/db-migrate/</code></td><td>A Job running <code>psql</code> over a ConfigMap generated <em>from</em> <code>postgres/migrations/*.sql</code> — one schema source for compose and cluster. Reading outside the kustomize root requires the repo-server's <code>--load-restrictor</code> option (case #11). Deliberately its own Application at wave 25, and deliberately <em>not</em> a hook — the file's comment explains both.</td></tr>
-<tr><td><code>overlays/prod/ingress-alb.yaml</code></td><td>The HTTPS front door: internet-facing ALB, target-type <code>ip</code> (straight to pod IPs — no NodePort double-hop), one shared ALB via <code>group.name</code> (every un-grouped Ingress is its own $16/mo), HTTP→HTTPS redirect, the REBUILD-SENSITIVE certificate ARN, a 1800 s idle timeout for uploads, and — scar tissue — <code>sync-wave: "2"</code>: its health depends on an <em>external</em> event (cert validation), and externally-gated resources go in the last wave so they cannot hold the sync lock (case #14).</td></tr>
+<tr><td><code>overlays/prod/ingress-alb.yaml</code></td><td>The HTTP front door (no-DNS build — no certificate): internet-facing ALB, target-type <code>ip</code> (straight to pod IPs — no NodePort double-hop), one shared ALB via <code>group.name</code> (every un-grouped Ingress is its own $16/mo), a 1800 s idle timeout for uploads, and <code>sync-wave: "2"</code> so the ALB provisions after the app's scaled jobs settle. The reference build's HTTPS variant (certificate ARN, HTTP→HTTPS redirect) is archived — its cert was an <em>external</em> dependency, so it lived in the last wave where it could not hold the sync lock (case #14).</td></tr>
 <tr><td><code>overlays/dev/</code></td><td>The same base squeezed onto a laptop: single replicas, tiny resources, no ALB.</td></tr>
 <tr><td><code>mediamtx/base/</code> + <code>overlays/aws/</code></td><td>The RTMP server: config file with auth delegated to ingest-webhook (<code>runOnReady</code>/hooks), a PodDisruptionBudget, and in the AWS overlay the NLB Service (<code>service-rtmp-nlb.yaml</code>) — TCP 1935 straight through, plus placement pinning. This overlay is what the manual-sync mediamtx Application deploys.</td></tr>
 </tbody></table></div>
@@ -500,8 +500,9 @@ one pass, use that.</p>
 <h3>Case 14 — The Ingress that held every rollout hostage</h3>
 <p><strong>Symptom:</strong> config fixes queued for an hour; the streaming app's operation "Running —
 waiting for healthy state of Ingress/streaming". <strong>Cause:</strong> the Ingress cannot be healthy
-until an ACM certificate validates — an event <em>outside the cluster</em> (DNS delegation pending) —
-and it sat in an early sync wave with resources sequenced after it. Case 7's lock mechanism, external
+until an ACM certificate validates — an event <em>outside the cluster</em> (DNS delegation pending), a
+failure the no-DNS build cannot hit because its ingress is HTTP-only — and it sat in an early sync wave
+with resources sequenced after it. Case 7's lock mechanism, external
 edition. <strong>Fix:</strong> real cert ARN + move the Ingress to the last wave, where nothing waits
 on it. <strong>Lesson:</strong> resources whose health depends on the outside world go in the final
 wave. Order by dependency, not by importance.</p>
@@ -617,7 +618,7 @@ the purest expression of CI's real job: <em>make the repository unable to lie to
 <tr><td><strong>KRaft</strong></td><td>Kafka's built-in consensus (no ZooKeeper). Our single node is both controller and broker.</td></tr>
 <tr><td><strong>Kustomize base / overlay</strong></td><td>Patch-based config reuse: one base, per-environment overlays; generators hash ConfigMaps into rolling updates.</td></tr>
 <tr><td><strong>NLB / ALB</strong></td><td>AWS load balancers: NLB forwards raw TCP (RTMP); ALB speaks HTTP(S), does TLS and routing (web).</td></tr>
-<tr><td><strong>OAC</strong></td><td>Origin Access Control — CloudFront's signed identity to a private S3 origin.</td></tr>
+<tr><td><strong>OAC</strong></td><td>Origin Access Control — CloudFront's signed identity to a private S3 origin (reference build only; the no-DNS build exposes <code>hls/</code> via a bucket policy instead).</td></tr>
 <tr><td><strong>PSS restricted</strong></td><td>Pod Security Standard rejecting privileged/root/un-seccomp'd pods at admission.</td></tr>
 <tr><td><strong>ScaledJob</strong></td><td>KEDA CR: event-source pressure → Kubernetes Jobs (vs ScaledObject, which resizes Deployments).</td></tr>
 <tr><td><strong>Sync wave</strong></td><td>ArgoCD ordering annotation; wave N must be healthy before N+1 applies.</td></tr>

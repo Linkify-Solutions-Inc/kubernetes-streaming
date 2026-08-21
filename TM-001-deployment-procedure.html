@@ -293,8 +293,8 @@ policy names like <code>streaming-eso</code> · bucket <code>linkify-streaming-m
 <td>Use as printed; already correct inside the repository.</td></tr>
 <tr><td><strong>Generated</strong> (per-build)</td>
 <td><code>vpc-…</code>, <code>subnet-…</code>, <code>rtb-…</code>, <code>sg-…</code>,
-<code>vpce-…</code>, RDS endpoint &amp; master-secret name, ACM certificate ARN, load-balancer
-hostnames, CloudFront domain</td>
+<code>vpce-…</code>, RDS endpoint &amp; master-secret name, the ALB's HTTP hostname, the mediamtx RTMP
+NLB's hostname, the S3 playback URL</td>
 <td>Discover with the command given at point of use; substitute into the file named there.</td></tr>
 </tbody></table></div>
 
@@ -309,8 +309,8 @@ discovery command — the file teaches you even if you lose this manual:</p>
 <td><code>aws ec2 describe-vpcs --filters Name=tag:alpha.eksctl.io/cluster-name,Values=streaming --query 'Vpcs[0].VpcId' --output text</code></td></tr>
 <tr><td><code>k8s/infra/secrets/externalsecret-db.yaml</code></td><td>RDS master-secret name (<code>rds!db-…</code>)</td>
 <td><code>aws rds describe-db-instances --db-instance-identifier streaming-db --query 'DBInstances[0].MasterUserSecret.SecretArn' --output text</code> — use the NAME portion (strip the trailing <code>-XXXXXX</code>)</td></tr>
-<tr><td><code>k8s/apps/overlays/prod/ingress-alb.yaml</code></td><td>ACM certificate ARN</td>
-<td><code>aws acm list-certificates --query 'CertificateSummaryList[?DomainName==`*.k8s.linkifysolutions.com`].CertificateArn' --output text</code></td></tr>
+<tr><td><code>k8s/apps/overlays/prod/config.env</code></td><td><code>RTMP_PUBLIC_URL</code> (mediamtx NLB hostname)</td>
+<td><code>kubectl get svc mediamtx-rtmp -n streaming -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'</code> — substitute into the <code>rtmp://…</code> value. No-DNS build: no certificate ARN to substitute (the ingress is HTTP-only).</td></tr>
 </tbody></table></div>
 
 <p>After each substitution: <code>git add -A &amp;&amp; git commit -m "substitute &lt;what&gt; for this build" &amp;&amp; git push</code>.
@@ -516,7 +516,7 @@ aws s3api put-bucket-cors --bucket $B --cors-configuration '{
   "CORSRules":[{"AllowedMethods":["GET","HEAD"],"AllowedOrigins":["*"],"AllowedHeaders":["*"],"MaxAgeSeconds":3000}]}'</code></pre>
 <div class="box anatomy"><div class="bx-label">Command anatomy — the four s3api calls</div><div class="bx-body"><dl>
 <dt>create-bucket</dt><dd>Bucket names are <em>globally</em> unique across all AWS customers — hence the account-id suffix.</dd>
-<dt>put-public-access-block</dt><dd>Four switches that make public exposure structurally impossible regardless of any future policy mistake. Viewers never touch S3 directly — CloudFront does.</dd>
+<dt>put-public-access-block</dt><dd>Four switches that make public exposure structurally impossible regardless of any future policy mistake. The no-DNS build deliberately flips two of them in 8-6 to expose only the <code>hls/</code> prefix — the anatomy box there covers the tradeoff.</dd>
 <dt>put-bucket-lifecycle-configuration</dt><dd>One rule: abandoned multipart uploads (a crashed upload's invisible half-transferred parts, which bill as storage) get reaped after 7 days.</dd>
 <dt>put-bucket-cors</dt><dd>Lets browsers on other origins GET segments — required because the player page and the CDN are different hostnames. GET/HEAD only; nobody writes via CORS.</dd>
 </dl></div></div>
@@ -587,49 +587,31 @@ aws rds describe-db-instances --db-instance-identifier streaming-db \
   --query 'DBInstances[0].MasterUserSecret.SecretArn' --output text</code></pre>
 <p>Edit <code>externalsecret-db.yaml</code>, commit, push.</p>
 
-<p><span class="para-num">8-6.</span><strong>CloudFront.</strong> An Origin Access Control lets the CDN
-— and nothing else — read the bucket; the distribution caches video segments aggressively and playlists
-not at all (a live playlist changes every few seconds):</p>
-<pre><code>OAC=$(aws cloudfront create-origin-access-control --origin-access-control-config \
-  'Name=streaming-s3-oac,Description=OAC for HLS bucket,SigningProtocol=sigv4,SigningBehavior=always,OriginAccessControlOriginType=s3' \
-  --query 'OriginAccessControl.Id' --output text)
+<p><span class="para-num">8-6.</span><strong>Public HLS playback from S3 (no CloudFront — no-DNS build).</strong>
+Transcoding writes finished segments to the bucket's <code>hls/</code> prefix. In the no-DNS build the CDN
+is skipped: <code>hls/*</code> is made publicly readable so any player can fetch segments straight from S3
+over HTTPS, while <code>raw/</code> uploads stay sealed:</p>
+<pre><code># 1) allow a bucket policy to exist (ACLs stay blocked — nothing here is ACL-based)
+aws s3api put-public-access-block --bucket linkify-streaming-media-242626138899 \
+  --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=false,RestrictPublicBuckets=false
 
-cat &gt; /tmp/cf-dist.json &lt;&lt;EOF
-{
-  "CallerReference": "streaming-cdn-$(date +%s)",
-  "Comment": "streaming: HLS delivery from S3 hls/ prefix",
-  "Enabled": true, "PriceClass": "PriceClass_100",
-  "Origins": {"Quantity": 1, "Items": [{
-    "Id": "s3-hls",
-    "DomainName": "linkify-streaming-media-242626138899.s3.us-east-1.amazonaws.com",
-    "OriginAccessControlId": "$OAC", "S3OriginConfig": {"OriginAccessIdentity": ""}}]},
-  "DefaultCacheBehavior": {"TargetOriginId": "s3-hls", "ViewerProtocolPolicy": "redirect-to-https",
-    "AllowedMethods": {"Quantity": 2, "Items": ["GET","HEAD"],
-      "CachedMethods": {"Quantity": 2, "Items": ["GET","HEAD"]}},
-    "CachePolicyId": "658327ea-f89d-4fab-a63d-7e88639e58f6", "Compress": true},
-  "CacheBehaviors": {"Quantity": 1, "Items": [{
-    "PathPattern": "*.m3u8", "TargetOriginId": "s3-hls", "ViewerProtocolPolicy": "redirect-to-https",
-    "AllowedMethods": {"Quantity": 2, "Items": ["GET","HEAD"],
-      "CachedMethods": {"Quantity": 2, "Items": ["GET","HEAD"]}},
-    "CachePolicyId": "4135ea2d-6df8-44a3-9df3-4b5a84be39ad", "Compress": true}]}
-}
-EOF
-aws cloudfront create-distribution --distribution-config file:///tmp/cf-dist.json \
-  --query 'Distribution.[Id,DomainName]' --output text
-# note BOTH values: the Id goes into the bucket policy below; the DomainName is your playback URL
-
+# 2) public read on the hls/ prefix only
 aws s3api put-bucket-policy --bucket linkify-streaming-media-242626138899 --policy '{
   "Version":"2012-10-17","Statement":[{
-    "Sid":"CloudFrontOACRead","Effect":"Allow",
-    "Principal":{"Service":"cloudfront.amazonaws.com"},
+    "Sid":"PublicReadHls","Effect":"Allow","Principal":"*",
     "Action":"s3:GetObject",
-    "Resource":"arn:aws:s3:::linkify-streaming-media-242626138899/hls/*",
-    "Condition":{"StringEquals":{"AWS:SourceArn":"arn:aws:cloudfront::242626138899:distribution/&lt;YOUR-DIST-ID&gt;"}}}]}'</code></pre>
-<div class="box anatomy"><div class="bx-label">Command anatomy — OAC, the distribution, and the bucket policy</div><div class="bx-body"><dl>
-<dt>Origin Access Control</dt><dd>An identity CloudFront uses to <em>sign</em> its requests to S3 (SigV4, always). The bucket stays sealed; only signed CDN requests pass.</dd>
-<dt>The two cache behaviors</dt><dd>The managed policy IDs are AWS-published constants: <code>658327ea…</code> = CachingOptimized (segments — immutable, cache hard), <code>4135ea2d…</code> = CachingDisabled (<code>*.m3u8</code> — a live playlist changes every few seconds; caching it freezes playback). This split <em>is</em> live-HLS-over-CDN in two lines.</dd>
-<dt>PriceClass_100</dt><dd>North America + Europe edges only — cheaper, fine for a lab.</dd>
-<dt>The bucket policy's Condition</dt><dd>"cloudfront.amazonaws.com may read <code>hls/*</code>" would mean <em>any AWS customer's</em> distribution; the <code>AWS:SourceArn</code> condition narrows it to exactly yours. Note <code>raw/</code> uploads are excluded — the CDN can only ever see finished output.</dd>
+    "Resource":"arn:aws:s3:::linkify-streaming-media-242626138899/hls/*"}]}'</code></pre>
+<div class="box anatomy"><div class="bx-label">Command anatomy — the two public-access switches</div><div class="bx-body"><dl>
+<dt>BlockPublicPolicy=false + RestrictPublicBuckets=false</dt><dd>The only two of the four switches we
+flip. ACLs (the other two) stay blocked — this is a <em>policy</em>, and policies are how S3 expresses a
+public read on a prefix without ACLs. The bucket can still carry a policy; it just cannot use ACLs.</dd>
+<dt>Principal "*" narrowed by Resource</dt><dd>Anonymous <code>s3:GetObject</code> on
+<code>arn:…/hls/*</code> <em>only</em>. The <code>raw/</code> prefix — source uploads — is not in the
+statement, so it stays private; the transcode worker's Pod Identity credentials are the only writer.</dd>
+<dt>Why no CloudFront</dt><dd>The reference build fronted S3 with a CDN for edge caching and signed access.
+At lab scale that buys one more moving part and a DNS name to mint; the no-DNS build trades it for a public
+<code>hls/</code> prefix. If you later want the CDN: delete this policy, restore the four-block default, and
+re-add CloudFront with an OAC.</dd>
 </dl></div></div>
 
 
@@ -641,43 +623,31 @@ aws eks list-pod-identity-associations --cluster-name streaming --region us-east
   --query 'associations[].[namespace,serviceAccount]' --output text
 # external-secrets/external-secrets, streaming/upload-api, streaming/transcode-worker (+ kube-system/ebs-csi-controller-sa)</code></pre>
 </div></div>
-<h2 id="ch9">Chapter 9 — DNS &amp; TLS (coordinated step)</h2>
+<h2 id="ch9">Chapter 9 — No DNS: reach the platform by load-balancer hostname</h2>
 
-<p><span class="para-num">9-1.</span><strong>Create the zone and certificate.</strong> The platform's
-public names live under <code>k8s.linkifysolutions.com</code>. You create the Route53 zone and request
-a wildcard certificate; validation is automatic once the parent domain delegates to your zone:</p>
-<pre><code>ZID=$(aws route53 create-hosted-zone --name k8s.linkifysolutions.com \
-  --caller-reference streaming-$RANDOM$RANDOM --query 'HostedZone.Id' --output text)
-aws route53 get-hosted-zone --id $ZID --query 'DelegationSet.NameServers' --output text | tr '\t' '\n'
-# ^ FOUR nameserver hostnames — send these to Aayush (9-2)
+<p><span class="para-num">9-1.</span><strong>What changed.</strong> The reference build created a Route53
+zone and an ACM certificate for <code>k8s.linkifysolutions.com</code> and pointed the ALB at a friendly
+name via ExternalDNS. <strong>This build deliberately skips all of it:</strong> the ingress is HTTP-only
+(no certificate, no HTTPS listener) and the three front doors are reached by the hostnames AWS assigns.
+There is no Aayush step and no Cloudflare delegation — nothing here needs a domain.</p>
 
-CERT=$(aws acm request-certificate --domain-name "*.k8s.linkifysolutions.com" \
-  --subject-alternative-names k8s.linkifysolutions.com --validation-method DNS \
-  --query CertificateArn --output text)
-sleep 15
-aws acm describe-certificate --certificate-arn $CERT \
-  --query 'Certificate.DomainValidationOptions[0].ResourceRecord.[Name,Value]' --output text
-# put that CNAME into your zone (substitute the Name and Value you just got):
-aws route53 change-resource-record-sets --hosted-zone-id $ZID --change-batch '{
-  "Changes":[{"Action":"UPSERT","ResourceRecordSet":{
-    "Name":"&lt;validation-record-Name&gt;","Type":"CNAME","TTL":300,
-    "ResourceRecords":[{"Value":"&lt;validation-record-Value&gt;"}]}}]}'</code></pre>
-<div class="box anatomy"><div class="bx-label">Command anatomy — zones, delegation, and DNS-validated certificates</div><div class="bx-body"><p>A Route53 <em>hosted zone</em> is an authoritative database for one subtree of the DNS. Creating it assigns four AWS nameservers — but the world doesn't know they're in charge until the <em>parent</em> zone (Cloudflare's <code>linkifysolutions.com</code>) publishes NS records pointing <code>k8s</code> at them. That pointer is the delegation, and it is the entire reason Aayush's step exists. ACM's DNS validation is a proof-of-control loop: it gives you a random CNAME only the zone's controller could publish; you publish it (<code>change-resource-record-sets</code> with UPSERT — create-or-overwrite, idempotent); once the delegation makes it publicly resolvable, ACM issues. The certificate then renews itself forever as long as the record stays.</p></div></div>
+<p><span class="para-num">9-2.</span><strong>The three no-DNS front doors.</strong></p>
+<ul>
+<li><strong>Web app (HTTP).</strong> The ALB auto-assigns a hostname — open it in a browser:
+<code>kubectl get ingress streaming -n streaming -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'</code>,
+then visit <code>http://&lt;that-hostname&gt;</code>. The ingress has no host rule, so any Host header works.</li>
+<li><strong>RTMP ingest.</strong> The mediamtx NLB hostname (the value you substituted into
+<code>config.env</code> in Chapter 4) on port <code>1935</code> — paste this into OBS as the stream server.</li>
+<li><strong>HLS playback.</strong> Public straight from S3:
+<code>https://linkify-streaming-media-242626138899.s3.us-east-1.amazonaws.com/hls/&lt;stream-key&gt;/index.m3u8</code>
+(<code>hls/</code> is public by the Chapter 8 policy; <code>raw/</code> is not).</li>
+</ul>
 
-
-<div class="box caution"><div class="bx-label">Caution — Aayush performs this part</div><div class="bx-body">
-<p>The parent domain <code>linkifysolutions.com</code> is hosted on Cloudflare, which you do not have
-access to. Send Aayush the four nameserver hostnames. He adds four <strong>NS</strong> records in
-Cloudflare — each named <code>k8s</code>, one per value, proxy OFF ("DNS only"). Until this happens the
-certificate stays <code>PENDING_VALIDATION</code> and the web Ingress cannot come up; <em>everything
-else in this manual proceeds regardless.</em></p>
-</div></div>
-
-<p><span class="para-num">9-2.</span><strong>Substitute the certificate ARN</strong> into
-<code>k8s/apps/overlays/prod/ingress-alb.yaml</code> (Chapter 4 registry), commit, push. Later, when
-delegation is live, confirm issuance:
-<code>aws acm describe-certificate --certificate-arn $CERT --query 'Certificate.Status'</code> →
-<code>ISSUED</code>.</p>
+<p><span class="para-num">9-3.</span><strong>Production polish you can add later.</strong> If you ever
+want the friendly domain back: create the Route53 zone, request a wildcard ACM cert, re-add the
+<code>certificate-arn</code> annotation and the HTTPS listener to <code>ingress-alb.yaml</code>, put
+CloudFront in front of S3, and return <code>hls/</code> to private. The Chapter 12 teardown ledger still
+lists the deleted reference-build certificate for completeness.</p>
 
 <h2 id="ch10">Chapter 10 — GitOps bootstrap</h2>
 
@@ -723,7 +693,7 @@ a 20 GiB volume, and roughly 2 GiB of free memory. Expected end-state:</p>
 <tbody>
 <tr><td>all except <code>streaming</code>, <code>mediamtx</code></td><td>Synced / Healthy</td><td>normal</td></tr>
 <tr><td><code>streaming</code></td><td>Synced / Progressing</td>
-<td>normal until the ACM cert is ISSUED (Chapter 9) — the Ingress waits in the last sync-wave, blocking nothing</td></tr>
+<td>normal until the ALB provisions (Chapter 9) — the Ingress waits in the last sync-wave, blocking nothing</td></tr>
 <tr><td><code>mediamtx</code></td><td>OutOfSync / Missing</td>
 <td>normal — it is manual-sync by design because syncing it creates the billable NLB. Trigger it now:</td></tr>
 </tbody></table></div>
@@ -807,14 +777,15 @@ node become the cheaper option?</p>
 </div></div>
 
 <p><span class="para-num">11-5.</span><strong>Playback.</strong> Find your stream's UUID in the S3
-listing and play it through CloudFront (domain from 8-6; any HLS player, or Safari directly):</p>
-<pre><code>curl "https://&lt;your-cf-domain&gt;.cloudfront.net/hls/live/&lt;stream-uuid&gt;/master.m3u8"
+listing and play it straight from the bucket (public <code>hls/</code> prefix from 8-6; any HLS player, or
+Safari directly):</p>
+<pre><code>curl "https://linkify-streaming-media-242626138899.s3.us-east-1.amazonaws.com/hls/live/&lt;stream-uuid&gt;/master.m3u8"
 # an ABR master playlist with 1080p/720p/480p renditions = the full pipeline works</code></pre>
 
 <div class="box checkpoint"><div class="bx-label">Checkpoint 11-A — platform verified</div><div class="bx-body">
 <p>You streamed RTMP into a load balancer, a webhook authenticated your key against Postgres, an event
 crossed Kafka, KEDA cut a Job, Karpenter bought a machine, ffmpeg transcoded three renditions to S3,
-and CloudFront served them back over HTTPS. Every box in the architecture diagram just earned its place.</p>
+and S3 served them back over HTTPS. Every box in the architecture diagram just earned its place.</p>
 </div></div>
 
 <h2 id="ch12">Chapter 12 — Teardown</h2>
@@ -849,15 +820,15 @@ discovery. <code>kubectl get apiservices | awk '$3=="False"'</code> → delete t
 </div></div>
 
 <p><span class="para-num">12-3.</span><strong>Phase B</strong> then unwinds the AWS side
-(~25–35 minutes; CloudFront and eksctl dominate), self-healing the two known blockers — security
+(~25–35 minutes; eksctl dominates), self-healing the two known blockers — security
 groups left in the VPC, and the NAT's orphaned Elastic IP — before printing the zero-cost
 verification (every list must be empty, including Elastic IPs).</p>
 
 <div class="box checkpoint"><div class="bx-label">Checkpoint 12-A — the account is empty</div><div class="bx-body">
 <p>The script's final section prints CloudFormation stacks, EC2 instances, load balancers, EBS volumes,
 VPCs, NAT gateways, and RDS instances. <strong>Every one must be empty.</strong> Anything left is money
-leaking — hunt it down before you stop. Finally, tell Aayush to remove the four <code>k8s</code> NS
-records from Cloudflare.</p>
+leaking — hunt it down before you stop. (The no-DNS build created no Route53 zone, so there are no NS
+records to remove from Cloudflare.)</p>
 </div></div>
 
 <h2 id="appA">Appendix A — Troubleshooting quick reference</h2>
@@ -879,7 +850,7 @@ records from Cloudflare.</p>
 <tr><td>readyz 503 with S3 403 on HeadBucket</td><td>ListBucket prefix-conditioned</td><td>policy in 8-3 is already corrected</td></tr>
 <tr><td>Stream publishes fine; no transcode Job; no errors anywhere</td><td>consumer group never bootstrapped + scaleToZeroOnInvalidOffset</td><td>the Warning box in Chapter 10; re-sync kafka app</td></tr>
 <tr><td>Bootstrap job ImagePullBackOff on strimzi image</td><td>image tag <code>&lt;strimzi&gt;-kafka-&lt;version&gt;</code> combination doesn't exist</td><td>align with the operator's shipped versions (same check as Kafka pin)</td></tr>
-<tr><td>Ingress never healthy; whole app sync stuck</td><td>ACM cert pending — external dependency in an early sync wave</td><td>already moved to last wave; cert needs the Cloudflare step</td></tr>
+<tr><td>Ingress never healthy; whole app sync stuck</td><td>no-DNS build: HTTP-only, no certificate — this failure cannot recur</td><td>n/a (reference-build legacy)</td></tr>
 <tr><td>Namespaces stuck Terminating: DiscoveryFailed</td><td>dead aggregated APIService</td><td>delete it (12-1 note)</td></tr>
 </tbody></table></div>
 
@@ -895,7 +866,7 @@ records from Cloudflare.</p>
 <tr><td>Route53 zone</td><td>—</td><td>$0.50</td></tr>
 <tr><td>Secrets Manager (4 secrets)</td><td>—</td><td>$1.60</td></tr>
 <tr><td>Karpenter transcode nodes</td><td>c6a.xlarge $0.154/hr</td><td><strong>only while streams run</strong> (~$0.03 per 10-min stream)</td></tr>
-<tr><td>S3 + CloudFront</td><td>usage-based</td><td>pennies at lab scale</td></tr>
+<tr><td>S3 (hls/ public)</td><td>usage-based</td><td>pennies at lab scale</td></tr>
 <tr><td><strong>Total platform</strong></td><td><strong>≈ $0.33/hr</strong></td><td><strong>≈ $280 — which is why Chapter 12 exists</strong></td></tr>
 </tbody></table></div>
 
