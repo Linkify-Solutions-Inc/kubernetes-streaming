@@ -44,17 +44,17 @@ accessConfig:
   bootstrapClusterCreatorAdminPermissions: true
   accessEntries:
     # A second admin, so deleting the creating principal cannot lock you out.
-    # The creator (aayush's AdminAccess role) gets admin automatically via
+    # The creator (fatima's StreamingDeploy role) gets admin automatically via
     # bootstrapClusterCreatorAdminPermissions -- do NOT also list it here or
-    # eksctl fails on the duplicate. This entry is fatima's StreamingDeploy
-    # role. If StreamingDeploy is the CREATOR instead (fatima deploys), swap
-    # this entry to the AdminAccess role ARN (TM-001 Ch 5 caution): the
-    # creator must never appear in this list. It is the SSO *role* ARN (aws-reserved path), not the assumed-role
+    # eksctl fails on the duplicate. This entry is aayush's AdminAccess role.
+    # If AdminAccess is the CREATOR instead (aayush deploys), swap this entry
+    # to the StreamingDeploy role ARN (TM-001 Ch 5 caution): the creator must
+    # never appear in this list. It is the SSO *role* ARN (aws-reserved path), not the assumed-role
     # session ARN that `aws sts get-caller-identity` prints. There is no region
     # segment in the path because Identity Center lives in us-east-1; only
     # non-us-east-1 instances get one. Verified with `aws iam list-roles
     # --path-prefix /aws-reserved/sso.amazonaws.com/` on 2026-08-10.
-    - principalARN: arn:aws:iam::242626138899:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_StreamingDeploy_c76ab22657ecbba5
+    - principalARN: arn:aws:iam::242626138899:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdminAccess_8d36146d2e13acf4
       accessPolicies:
         - policyARN: arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy
           accessScope:
