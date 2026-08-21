@@ -3,13 +3,10 @@ kind: Ingress
 metadata:
   name: streaming
   annotations:
-    # LAST wave on purpose (ScaledJobs are wave 1). This Ingress cannot be
-    # healthy until the ACM cert validates, which needs the Cloudflare NS
-    # delegation — an EXTERNAL dependency. At wave 0 its pending state held
-    # the whole app's sync operation open ("waiting for healthy state of
-    # Ingress/streaming") and blocked every later config rollout for an hour
-    # (hit 2026-08-11). Nothing sequences after the final wave, so here its
-    # pending state gates nothing.
+    # LAST wave on purpose (ScaledJobs are wave 1). No-DNS build: the ingress
+    # is HTTP-only with no ACM cert, so nothing external gates its health —
+    # the wave now just orders the ALB after the app's scaled jobs settle, so
+    # its provisioning never holds a sync operation open.
     argocd.argoproj.io/sync-wave: "2"
     alb.ingress.kubernetes.io/scheme: internet-facing
     # NLB/ALB -> pod IP directly. With the VPC CNI handing pods real VPC
@@ -23,17 +20,9 @@ metadata:
     # DNS change, so set it now even with a single Ingress.
     alb.ingress.kubernetes.io/group.name: streaming
 
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80},{"HTTPS":443}]'
-    # The controller synthesises a 301 redirect action on the HTTP listener.
-    # Port 80 exists only to send people to 443.
-    alb.ingress.kubernetes.io/ssl-redirect: "443"
-    # REBUILD-SENSITIVE: cert is per-environment. Rediscover with:
-    #   aws acm list-certificates --region us-east-1 \
-    #     --query 'CertificateSummaryList[?DomainName==`*.k8s.linkifysolutions.com`].CertificateArn' --output text
-    # The ALB only provisions once this cert reaches ISSUED (needs the
-    # Cloudflare NS delegation for k8s.linkifysolutions.com).
-    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:us-east-1:242626138899:certificate/8f796564-8090-43fd-bdf8-7f94284ab5b1
-    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    # HTTP-only, no DNS/cert. The ALB is reached at its auto-assigned
+    # *.elb.amazonaws.com hostname (or the public IP) on port 80.
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP":80}]'
 
     alb.ingress.kubernetes.io/healthcheck-path: /livez
     alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
@@ -49,14 +38,13 @@ metadata:
     alb.ingress.kubernetes.io/target-group-attributes: >-
       deregistration_delay.timeout_seconds=30,
       stickiness.enabled=false
-
-    # ExternalDNS (Module 5) reads this and creates the Route 53 ALIAS.
-    external-dns.alpha.kubernetes.io/hostname: stream.k8s.linkifysolutions.com
 spec:
   ingressClassName: alb
   rules:
-    - host: stream.k8s.linkifysolutions.com
-      http:
+    # No host rule: with DNS unset, the ALB accepts any Host header. Ingresses
+    # on the shared group.name ALB are routed by host in the DNS build; without
+    # hosts they'd split by path — keep the single `web` rule at /.
+    - http:
         paths:
           - path: /
             pathType: Prefix
